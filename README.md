@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+# Nova Fit App
 
-First, run the development server:
+Applicación web progresiva (PWA) diseñada para tablets, enfocada en el control de asistencia offline-first para el gimnasio Nova Fit.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Tecnologías
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Next.js 14+ (App Router)**: Framework principal.
+- **Tailwind CSS**: Estilizado utility-first con diseño "Glassmorphism" premium.
+- **Dexie.js**: Wrapper de IndexedDB para almacenamiento offline robusto.
+- **Framer Motion**: Animaciones fluidas.
+- **Lucide React**: Iconografía moderna.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Características
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1.  **Check-In Rápido**:
+    - Buscador optimizado para tablets (teclado numérico o nombre).
+    - Feedback visual inmediato (Pantalla verde/roja).
+    - Validación automática de vigencia de membresía (30 días o 15 días).
 
-## Learn More
+2.  **Gestión Offline**:
+    - Todos los datos se guardan localmente en el dispositivo.
+    - Funciona perfectamente sin internet.
 
-To learn more about Next.js, take a look at the following resources:
+3.  **Sincronización Inteligente**:
+    - Botón de exportación/sincronización en el header.
+    - Si hay internet: Simula envío a API.
+    - Si no hay internet: Genera y descarga backup JSON automáticamente.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4.  **Diseño Premium**:
+    - Modo oscuro por defecto.
+    - Botones grandes y accesibles.
+    - Feedback visual claro (Verde = Activo, Rojo = Vencido).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Instalación y Uso
 
-## Deploy on Vercel
+1.  Instalar dependencias:
+    ```bash
+    npm install
+    ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2.  Correr en modo desarrollo:
+    ```bash
+    npm run dev
+    ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3.  Abrir [http://localhost:3000](http://localhost:3000) en tu navegador.
+
+## Estructura del Proyecto
+
+- `src/lib/db.ts`: Configuración de la base de datos local (Dexie).
+- `src/components/checkin/`: Componentes de la vista principal.
+- `src/components/admin/`: Formulario de registro.
+- `src/components/ui/`: Componentes base reutilizables (Botones, Inputs, Cards).
+
+## Notas
+
+- La base de datos se inicializa con 3 miembros de prueba si está vacía.
+- Para probar el modo offline, puedes desconectar el Wi-Fi o usar las DevTools del navegador (Network > Offline).
