@@ -59,7 +59,8 @@ export default function CheckInView() {
     
     try {
       await db.attendances.add({
-        miembroId: member.id,
+        miembroId: member.id!,
+        memberId: member.memberId, // Link to User Identity
         fecha_hora: new Date(),
       });
       setLastCheckIn({ member, timestamp: Date.now() });

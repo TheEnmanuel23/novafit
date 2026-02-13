@@ -35,6 +35,26 @@ class NovaFitDatabase extends Dexie {
         }
       }
     });
+
+    this.version(6).stores({
+      attendances: '++id, memberId, miembroId, fecha_hora',
+    }).upgrade(async tx => {
+      const attendances = await tx.table('attendances').toArray();
+      const members = await tx.table('members').toArray();
+      const memberMap = new Map();
+      members.forEach(m => {
+          if (m.id && m.memberId) memberMap.set(m.id, m.memberId);
+      });
+      
+      for (const att of attendances) {
+        if (!att.memberId) {
+            const mid = memberMap.get(att.miembroId);
+            if (mid) {
+                await tx.table('attendances').update(att.id, { memberId: mid });
+            }
+        }
+      }
+    });
   }
 }
 

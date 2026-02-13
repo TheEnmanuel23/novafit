@@ -10,8 +10,10 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Search, RefreshCcw } from 'lucide-react';
 import { MemberHistoryModal } from './MemberHistoryModal';
+import { AttendanceReport } from './AttendanceReport';
 
 export default function AdminView() {
+  const [view, setView] = useState<'members' | 'report'>('members');
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [plan, setPlan] = useState<PlanType>('Mensual');
@@ -210,16 +212,36 @@ export default function AdminView() {
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-8">
-      <div className="flex items-center space-x-4 mb-8">
-        <div className="p-3 bg-primary/20 rounded-xl">
-          <UserPlus className="h-8 w-8 text-primary" />
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
+        <div className="flex items-center space-x-4">
+          <div className="p-3 bg-primary/20 rounded-xl">
+            {view === 'members' ? <UserPlus className="h-8 w-8 text-primary" /> : <Calendar className="h-8 w-8 text-primary" />}
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold">Administración</h1>
+            <p className="text-muted-foreground">
+              {view === 'members' ? 'Registro y control de miembros.' : 'Reporte de Accesos y Asistencia.'}
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold">Administración</h1>
-          <p className="text-muted-foreground">Registro y control de miembros.</p>
+
+        <div className="flex bg-card/50 border border-white/10 p-1 rounded-xl">
+            <button 
+                onClick={() => setView('members')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'members' ? 'bg-primary text-black shadow-lg' : 'text-muted-foreground hover:text-white'}`}
+            >
+                Miembros
+            </button>
+            <button 
+                onClick={() => setView('report')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'report' ? 'bg-primary text-black shadow-lg' : 'text-muted-foreground hover:text-white'}`}
+            >
+                Asistencias
+            </button>
         </div>
       </div>
 
+      {view === 'members' ? (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Registration Form */}
         <Card className="border-primary/20 bg-card/40 backdrop-blur-xl shadow-2xl h-fit">
@@ -507,6 +529,9 @@ export default function AdminView() {
           </div>
         </div>
       </div>
+      ) : (
+        <AttendanceReport />
+      )}
       
       {/* History Modal */}
       <MemberHistoryModal 

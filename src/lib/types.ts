@@ -20,7 +20,8 @@ export interface Member {
 // Attendance types
 export interface Attendance {
   id?: number; // Auto-incremented ID
-  miembroId: number;
+  miembroId: number; // Original Plan ID used for check-in
+  memberId?: string; // Stable User Identity ID
   fecha_hora: Date;
 }
 
