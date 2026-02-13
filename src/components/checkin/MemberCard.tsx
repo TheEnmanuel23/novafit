@@ -33,13 +33,6 @@ export const MemberCard: React.FC<MemberCardProps> = ({ member, onClick }) => {
             
             <div className="space-y-1">
               <h3 className="text-2xl font-bold text-white group-hover:text-primary transition-colors">{member.nombre}</h3>
-              <div className="flex items-center gap-4 text-muted-foreground text-sm">
-                <span className="flex items-center gap-1"><Phone size={14} /> {member.telefono}</span>
-                <span className="flex items-center gap-1"><Calendar size={14} /> {member.plan_tipo} {member.costo ? `(C$ ${member.costo})` : ''}</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${isExpired ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                  Vence: {formatDate(getExpirationDate(member))}
-                </span>
-              </div>
             </div>
           </div>
           

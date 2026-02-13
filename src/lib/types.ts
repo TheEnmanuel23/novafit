@@ -6,6 +6,7 @@ export type PlanType = 'Mensual' | 'Quincenal' | 'Día';
 
 export interface Member {
   id?: number; // Auto-incremented ID
+  memberId?: string; // Stable ID for the user entity (links multiple plans)
   nombre: string;
   telefono: string;
   plan_tipo: PlanType;

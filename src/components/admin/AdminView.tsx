@@ -21,6 +21,11 @@ export default function AdminView() {
   const [success, setSuccess] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   
+  // Identity management
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [nameSuggestions, setNameSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  
   // Search state for members list
   const [membersSearchTerm, setMembersSearchTerm] = useState('');
   const [selectedHistoryMember, setSelectedHistoryMember] = useState<any>(null);
@@ -40,10 +45,10 @@ export default function AdminView() {
     
     const rawResults = await collection.reverse().toArray();
     
-    // Deduplicate: Keep only the latest record for each unique member (Name only, to handle phone updates)
+    // Deduplicate: Keep only the latest record for each unique memberId
     const uniqueMembers = new Map();
     rawResults.forEach(member => {
-      const key = member.nombre.toLowerCase().trim();
+      const key = member.memberId || member.nombre.toLowerCase().trim(); // Fallback to name if migration failed (shouldn't happen)
       if (!uniqueMembers.has(key)) {
         uniqueMembers.set(key, member);
       }
@@ -51,6 +56,42 @@ export default function AdminView() {
     
     return Array.from(uniqueMembers.values());
   }, [membersSearchTerm]);
+
+  // Name Autocomplete
+  React.useEffect(() => {
+    // Only search if name is long enough and we are not currently editing a specific record (unless we want to reassign ID?)
+    // And don't search if we just selected a suggestion (avoid loops, though 'nombre' change triggers this).
+    // We'll handle selection by clearing suggestions.
+    if (nombre.length < 2 || editingId) {
+      setNameSuggestions([]);
+      return;
+    }
+    
+    // Debounce or just query
+    const timer = setTimeout(async () => {
+        try {
+            const results = await db.members
+                .filter(m => !m.deleted && m.nombre.toLowerCase().includes(nombre.toLowerCase()))
+                .limit(20)
+                .toArray();
+            
+            // Dedupe suggestions by memberId
+            const unique = new Map();
+            results.forEach(m => {
+                if (m.memberId && !unique.has(m.memberId)) {
+                    unique.set(m.memberId, m);
+                }
+            });
+            // Filter out current selection if strictly matching? No, show all matches.
+            setNameSuggestions(Array.from(unique.values()));
+            setShowSuggestions(true);
+        } catch (e) {
+            console.error(e);
+        }
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [nombre, editingId]);
 
   // Auto-update price suggestion when plan changes
   React.useEffect(() => {
@@ -60,12 +101,21 @@ export default function AdminView() {
     if (plan === 'Día') setCosto('50');
   }, [plan, editingId]);
 
+  const selectSuggestion = (member: any) => {
+      setNombre(member.nombre);
+      setTelefono(member.telefono);
+      setSelectedMemberId(member.memberId);
+      setNameSuggestions([]);
+      setShowSuggestions(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre || !telefono || !costo) return;
 
     try {
       if (editingId) {
+        // Updating a specific record. Keep existing memberId (or add if missing)
         await db.members.update(editingId, {
           nombre,
           telefono,
@@ -73,10 +123,16 @@ export default function AdminView() {
           costo: Number(costo),
           is_promo: isPromo,
           notes: notes,
+          // Do not overwrite memberId if it exists, but ensured by update partial
         });
         setEditingId(null);
       } else {
+        // Creating new plan (Renewal or New User)
+        // Use selectedMemberId if available, else new UUID
+        const memberId = selectedMemberId || crypto.randomUUID();
+        
         await db.members.add({
+          memberId,
           nombre,
           telefono,
           plan_tipo: plan,
@@ -93,6 +149,8 @@ export default function AdminView() {
       setNotes('');
       setIsPromo(false);
       setEditingId(null);
+      setSelectedMemberId(null);
+      setNameSuggestions([]);
       // Reset plan default
       setPlan('Mensual');
       setCosto('500');
@@ -106,17 +164,20 @@ export default function AdminView() {
   const handleEdit = (member: any, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingId(member.id);
+    setSelectedMemberId(member.memberId); // Track ID
     setNombre(member.nombre);
     setTelefono(member.telefono);
     setPlan(member.plan_tipo);
     setCosto(member.costo.toString());
     setIsPromo(!!member.is_promo);
     setNotes(member.notes || '');
+    setNameSuggestions([]); // Clear suggestions
   };
 
   const handleRenew = (member: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditingId(null);
+    setEditingId(null); // New record
+    setSelectedMemberId(member.memberId); // Reuse Identity
     setNombre(member.nombre);
     setTelefono(member.telefono);
     setPlan(member.plan_tipo);
@@ -124,6 +185,7 @@ export default function AdminView() {
     setIsPromo(!!member.is_promo);
     setNotes(member.notes || '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    setNameSuggestions([]);
   };
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
@@ -135,13 +197,16 @@ export default function AdminView() {
 
   const handleCancelEdit = () => {
     setEditingId(null);
+    setSelectedMemberId(null);
     setNombre('');
     setTelefono('');
     setNotes('');
     setIsPromo(false);
     setPlan('Mensual');
     setCosto('500');
+    setNameSuggestions([]);
   };
+ // ... return ...
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-8">
@@ -179,7 +244,32 @@ export default function AdminView() {
                     value={nombre}
                     onChange={(e) => setNombre(e.target.value)}
                     className="pl-10 h-12 text-base"
+                    autoComplete="off"
+                    onFocus={() => { if (nameSuggestions.length > 0) setShowSuggestions(true); }}
                   />
+                  {/* Suggestions Dropdown */}
+                  {showSuggestions && nameSuggestions.length > 0 && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-neutral-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
+                      {nameSuggestions.map(s => {
+                          const status = getMembershipStatus(s);
+                          return (
+                            <div 
+                                key={s.id} 
+                                className="p-3 hover:bg-white/5 cursor-pointer flex justify-between items-center transition-colors border-b border-white/5 last:border-0"
+                                onClick={() => selectSuggestion(s)}
+                            >
+                                <div>
+                                    <div className="font-bold text-sm">{s.nombre}</div>
+                                    <div className="text-xs text-muted-foreground">{s.telefono}</div>
+                                </div>
+                                <div className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${status === 'Active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                    {status === 'Active' ? 'Activo' : 'Vencido'}
+                                </div>
+                            </div>
+                          );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
