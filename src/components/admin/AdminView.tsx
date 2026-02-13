@@ -8,7 +8,7 @@ import { getMembershipStatus, formatDate } from '@/lib/utils';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Search } from 'lucide-react';
+import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Search, RefreshCcw } from 'lucide-react';
 import { MemberHistoryModal } from './MemberHistoryModal';
 
 export default function AdminView() {
@@ -32,15 +32,24 @@ export default function AdminView() {
     // Apply search filter if present
     if (membersSearchTerm) {
       const lower = membersSearchTerm.toLowerCase();
-      // Simple client-side filtering since dataset is small or we want flexibility
-      // We can check name or phone
       collection = collection.and(m => 
         m.nombre.toLowerCase().includes(lower) || 
         m.telefono.includes(lower)
       );
     }
     
-    return await collection.reverse().toArray();
+    const rawResults = await collection.reverse().toArray();
+    
+    // Deduplicate: Keep only the latest record for each unique member (Name only, to handle phone updates)
+    const uniqueMembers = new Map();
+    rawResults.forEach(member => {
+      const key = member.nombre.toLowerCase().trim();
+      if (!uniqueMembers.has(key)) {
+        uniqueMembers.set(key, member);
+      }
+    });
+    
+    return Array.from(uniqueMembers.values());
   }, [membersSearchTerm]);
 
   // Auto-update price suggestion when plan changes
@@ -103,6 +112,18 @@ export default function AdminView() {
     setCosto(member.costo.toString());
     setIsPromo(!!member.is_promo);
     setNotes(member.notes || '');
+  };
+
+  const handleRenew = (member: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(null);
+    setNombre(member.nombre);
+    setTelefono(member.telefono);
+    setPlan(member.plan_tipo);
+    setCosto(member.costo.toString());
+    setIsPromo(!!member.is_promo);
+    setNotes(member.notes || '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
@@ -357,7 +378,7 @@ export default function AdminView() {
                         {member.is_promo && <span className="text-emerald-400 ml-1 text-xs" title="Promo Aplicada">★</span>}
                       </div>
                       
-                      {!isExpired && (
+                      {!isExpired ? (
                         <div className="flex gap-2 mt-1">
                           <button 
                              onClick={(e) => handleEdit(member, e)}
@@ -372,6 +393,16 @@ export default function AdminView() {
                              title="Eliminar"
                           >
                             <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2 mt-1">
+                          <button 
+                             onClick={(e) => handleRenew(member, e)}
+                             className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
+                             title="Renovar Suscripción"
+                          >
+                            <RefreshCcw size={12} /> Renovar
                           </button>
                         </div>
                       )}

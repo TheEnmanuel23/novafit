@@ -17,11 +17,9 @@ export const MemberHistoryModal: React.FC<MemberHistoryModalProps> = ({ member, 
   useEffect(() => {
     if (member) {
       const fetchHistory = async () => {
-        // Find all records with same name and phone, including deleted ones if they are part of history?
-        // Usually history implies valid past plans.
-        // Let's include everything matching name/phone to be safe.
+        // Find all records with same name (ignoring phone to track history across updates)
         const records = await db.members
-          .filter(m => m.nombre === member.nombre && m.telefono === member.telefono)
+          .filter(m => m.nombre === member.nombre)
           .reverse()
           .toArray();
         setHistory(records);
