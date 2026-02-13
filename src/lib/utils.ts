@@ -11,13 +11,18 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Check membership status
-// Check membership status
-export function getMembershipStatus(member: Member): 'Active' | 'Expired' {
+// Calculate expiration date based on plan type
+export function getExpirationDate(member: Member): Date {
   let daysActive = 30;
   if (member.plan_tipo === 'Quincenal') daysActive = 15;
   if (member.plan_tipo === 'Día') daysActive = 1;
 
-  const expirationDate = addDays(member.fecha_inicio, daysActive);
+  return addDays(new Date(member.fecha_inicio), daysActive);
+}
+
+// Check membership status
+export function getMembershipStatus(member: Member): 'Active' | 'Expired' {
+  const expirationDate = getExpirationDate(member);
   
   if (isAfter(new Date(), expirationDate)) {
     return 'Expired';

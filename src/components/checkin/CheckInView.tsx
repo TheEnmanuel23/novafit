@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { Member } from '@/lib/types';
+import { getMembershipStatus } from '@/lib/utils';
 import { MemberCard } from './MemberCard';
 import { Input } from '@/components/ui/Input';
 import { Search } from 'lucide-react';
@@ -18,21 +19,39 @@ export default function CheckInView() {
     if (!searchTerm) return [];
     
     const lower = searchTerm.toLowerCase();
-    // Simple logic: If input is numeric, filter by phone, else by name
     const isPhone = /^\d+$/.test(lower);
     
+    let results = [];
+    
     if (isPhone) {
-      return await db.members
+      results = await db.members
         .where('telefono')
         .startsWith(searchTerm)
-        .limit(10)
+        .filter(m => !m.deleted)
         .toArray();
     } else {
-      return await db.members
-        .filter(m => m.nombre.toLowerCase().includes(lower))
-        .limit(10)
+      results = await db.members
+        .filter(m => !m.deleted && m.nombre.toLowerCase().includes(lower))
         .toArray();
     }
+
+    // Filter for active plans only
+    return results.filter(m => {
+       // We need getMembershipStatus, let's assume it's available or import it.
+       // Since we can't import inside, I will rely on the top-level import I will add in a separate step or just include it if I can.
+       // Actually, I can't add two edits in one replace_file_content block easily if they are far apart.
+       // I will do this in two steps. First, this body change. Then the import.
+       // Wait, I can't use `getMembershipStatus` if it's not imported.
+       // I'll assume I will fix the import in the next step.
+       // Or I can just implement the logic inline: 
+       // const status = ...
+       // But better to use the util.
+       // I'll just use it and fix the import immediately.
+       // However, to avoid runtime error during the microseconds between edits (if hot reload), I should probably do import first?
+       // No, I can't.
+       // I'll do this replacement, it will use `getMembershipStatus`.
+       return getMembershipStatus(m) === 'Active';
+    }).slice(0, 10);
   }, [searchTerm]);
 
   const handleCheckIn = async (member: Member) => {

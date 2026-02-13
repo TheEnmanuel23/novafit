@@ -10,8 +10,8 @@ class NovaFitDatabase extends Dexie {
 
   constructor() {
     super('NovaFitDB');
-    this.version(3).stores({
-      members: '++id, nombre, telefono, plan_tipo, fecha_inicio, costo, is_promo', // Added index for promo
+    this.version(4).stores({
+      members: '++id, nombre, telefono, plan_tipo, fecha_inicio, costo, is_promo, deleted', // Added deleted index
       attendances: '++id, miembroId, fecha_hora',
     });
   }

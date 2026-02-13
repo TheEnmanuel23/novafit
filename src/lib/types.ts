@@ -13,6 +13,7 @@ export interface Member {
   is_promo?: boolean; // Promotional price applied
   notes?: string; // Optional notes
   fecha_inicio: Date;
+  deleted?: boolean; // Soft delete flag
 }
 
 // Attendance types
