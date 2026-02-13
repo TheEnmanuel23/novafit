@@ -24,8 +24,12 @@ export const AttendanceReport = () => {
   const fetchLogs = async () => {
     setLoading(true);
     try {
-        const start = startOfDay(new Date(startDate));
-        const end = endOfDay(new Date(endDate));
+        // Parse dates as Local Time to avoid UTC offsets shifting the day
+        const [sy, sm, sd] = startDate.split('-').map(Number);
+        const start = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
+
+        const [ey, em, ed] = endDate.split('-').map(Number);
+        const end = new Date(ey, em - 1, ed, 23, 59, 59, 999);
 
         // Get logs in range
         const atts = await db.attendances
@@ -145,7 +149,7 @@ export const AttendanceReport = () => {
                             filteredLogs.map(log => (
                                 <tr key={log.id} className="hover:bg-white/5 transition-colors">
                                     <td className="p-4 font-mono text-emerald-400">
-                                        {format(log.fecha_hora, "dd MMM yyyy, HH:mm", { locale: es })}
+                                        {format(log.fecha_hora, "dd MMM yyyy, hh:mm a", { locale: es })}
                                     </td>
                                     <td className="p-4 font-bold flex items-center gap-2">
                                         <div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] text-primary">
