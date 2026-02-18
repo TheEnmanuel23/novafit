@@ -5,8 +5,23 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Users } from 'lucide-react';
 
+import { useAuthStore } from '@/lib/store';
+
 export const Header = () => {
   const pathname = usePathname();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Prevent hydration mismatch by defining initial visibility or just returning null until mounted if critical.
+  // But here we want to HIDE by default on '/' unless we know for sure we are auth'd.
+  // Actually, standard behavior:
+  if (!mounted) return null; // Avoid hydration mismatch on initial load
+
+  if (pathname === '/' && !isAuthenticated) return null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/5 bg-background/80 backdrop-blur-xl">
