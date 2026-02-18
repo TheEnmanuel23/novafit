@@ -6,6 +6,8 @@ import { Member, Attendance } from './types';
 class NovaFitDatabase extends Dexie {
   members!: Table<Member, number>;
   attendances!: Table<Attendance, number>;
+  settings!: Table<{ key: string; value: any }, string>; 
+
 
 
   constructor() {
@@ -54,6 +56,32 @@ class NovaFitDatabase extends Dexie {
             }
         }
       }
+    });
+    this.version(7).stores({
+      members: '++id, memberId, nombre, telefono, plan_tipo, fecha_inicio, costo, is_promo, deleted, updated_at, synced',
+      attendances: '++id, memberId, miembroId, fecha_hora, updated_at, synced',
+      settings: 'key'
+    }).upgrade(async tx => {
+      await tx.table('members').toCollection().modify({ synced: 0, updated_at: new Date() });
+      await tx.table('attendances').toCollection().modify({ synced: 0, updated_at: new Date() });
+    });
+
+    this.members.hook('creating', (_primKey, obj) => {
+      obj.updated_at = new Date();
+      obj.synced = 0;
+    });
+    this.members.hook('updating', (mods, _primKey, _obj) => {
+      if ((mods as any).synced === 1) return undefined;
+      return { ...mods, updated_at: new Date(), synced: 0 };
+    });
+
+    this.attendances.hook('creating', (_primKey, obj) => {
+      obj.updated_at = new Date();
+      obj.synced = 0;
+    });
+    this.attendances.hook('updating', (mods, _primKey, _obj) => {
+       if ((mods as any).synced === 1) return undefined;
+       return { ...mods, updated_at: new Date(), synced: 0 };
     });
   }
 }

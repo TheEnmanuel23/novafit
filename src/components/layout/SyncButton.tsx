@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/db';
+import { syncData } from '@/lib/sync';
 import { Button } from '@/components/ui/Button';
 import { CloudUpload, Download, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 
@@ -42,10 +43,10 @@ export const SyncButton = () => {
       }, null, 2);
 
       if (isOnline) {
-        // Mock API call
-        console.log("Simulating Sync:", payload);
-        await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
-        alert(`Sincronización Exitosa.\n${members.length} miembros.\n${attendances.length} asistencias.`);
+        await syncData();
+        const members = await db.members.toArray();
+        const attendances = await db.attendances.toArray();
+        alert(`Sincronización Exitosa con Supabase.\n${members.length} miembros.\n${attendances.length} asistencias.`);
       } else {
         // Force download
         const blob = new Blob([payload], { type: 'application/json' });

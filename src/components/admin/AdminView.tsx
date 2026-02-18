@@ -105,7 +105,7 @@ export default function AdminView() {
 
   const selectSuggestion = (member: any) => {
       setNombre(member.nombre);
-      setTelefono(member.telefono);
+      setTelefono(member.telefono || '');
       setSelectedMemberId(member.memberId);
       setNameSuggestions([]);
       setShowSuggestions(false);
@@ -113,7 +113,7 @@ export default function AdminView() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombre || !telefono || !costo) return;
+    if (!nombre || !costo) return;
 
     try {
       if (editingId) {
@@ -168,7 +168,7 @@ export default function AdminView() {
     setEditingId(member.id);
     setSelectedMemberId(member.memberId); // Track ID
     setNombre(member.nombre);
-    setTelefono(member.telefono);
+    setTelefono(member.telefono || '');
     setPlan(member.plan_tipo);
     setCosto(member.costo.toString());
     setIsPromo(!!member.is_promo);
@@ -181,7 +181,7 @@ export default function AdminView() {
     setEditingId(null); // New record
     setSelectedMemberId(member.memberId); // Reuse Identity
     setNombre(member.nombre);
-    setTelefono(member.telefono);
+    setTelefono(member.telefono || '');
     setPlan(member.plan_tipo);
     setCosto(member.costo.toString());
     setIsPromo(!!member.is_promo);
@@ -296,7 +296,7 @@ export default function AdminView() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground ml-1">Teléfono</label>
+                <label className="text-xs font-medium text-muted-foreground ml-1">Teléfono (Opcional)</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input 
@@ -397,7 +397,7 @@ export default function AdminView() {
               <Button 
                 type="submit" 
                 className={`w-full h-14 text-lg rounded-xl shadow-lg shadow-primary/25 ${editingId ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
-                disabled={!nombre || !telefono || !costo}
+                disabled={!nombre || !costo}
               >
                 {success ? (
                   <span className="flex items-center animate-pulse">
@@ -457,7 +457,7 @@ export default function AdminView() {
                     <div>
                       <h3 className="font-bold text-lg">{member.nombre}</h3>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span className="flex items-center"><Phone size={12} className="mr-1"/> {member.telefono}</span>
+                        {member.telefono && <span className="flex items-center"><Phone size={12} className="mr-1"/> {member.telefono}</span>}
                         <span className="flex items-center text-xs bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
                           {member.plan_tipo}
                         </span>

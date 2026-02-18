@@ -15,6 +15,8 @@ export interface Member {
   notes?: string; // Optional notes
   fecha_inicio: Date;
   deleted?: boolean; // Soft delete flag
+  updated_at?: Date; // For sync
+  synced?: number; // 0 = dirty, 1 = synced
 }
 
 // Attendance types
@@ -23,6 +25,8 @@ export interface Attendance {
   miembroId: number; // Original Plan ID used for check-in
   memberId?: string; // Stable User Identity ID
   fecha_hora: Date;
+  updated_at?: Date;
+  synced?: number;
 }
 
 // Sync types
