@@ -3,7 +3,6 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { SyncButton } from './SyncButton';
 import { Home, Users } from 'lucide-react';
 
 export const Header = () => {
@@ -33,7 +32,7 @@ export const Header = () => {
           </Link>
         </nav>
 
-        <SyncButton />
+
       </div>
     </header>
   );

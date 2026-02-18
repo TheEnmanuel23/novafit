@@ -11,6 +11,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Search, RefreshCcw } from 'lucide-react';
 import { MemberHistoryModal } from './MemberHistoryModal';
 import { AttendanceReport } from './AttendanceReport';
+import { SyncButton } from '@/components/layout/SyncButton';
 
 export default function AdminView() {
   const [view, setView] = useState<'members' | 'report'>('members');
@@ -225,19 +226,22 @@ export default function AdminView() {
           </div>
         </div>
 
-        <div className="flex bg-card/50 border border-white/10 p-1 rounded-xl">
-            <button 
-                onClick={() => setView('members')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'members' ? 'bg-primary text-black shadow-lg' : 'text-muted-foreground hover:text-white'}`}
-            >
-                Miembros
-            </button>
-            <button 
-                onClick={() => setView('report')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'report' ? 'bg-primary text-black shadow-lg' : 'text-muted-foreground hover:text-white'}`}
-            >
-                Asistencias
-            </button>
+        <div className="flex items-center gap-4">
+          <div className="flex bg-card/50 border border-white/10 p-1 rounded-xl">
+              <button 
+                  onClick={() => setView('members')}
+                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'members' ? 'bg-primary text-black shadow-lg' : 'text-muted-foreground hover:text-white'}`}
+              >
+                  Miembros
+              </button>
+              <button 
+                  onClick={() => setView('report')}
+                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'report' ? 'bg-primary text-black shadow-lg' : 'text-muted-foreground hover:text-white'}`}
+              >
+                  Asistencias
+              </button>
+          </div>
+          <SyncButton />
         </div>
       </div>
 
