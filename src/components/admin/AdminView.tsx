@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState } from 'react';
 import { db } from '@/lib/db';
@@ -8,12 +7,16 @@ import { getMembershipStatus, formatDate } from '@/lib/utils';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Search, RefreshCcw } from 'lucide-react';
+import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Search, RefreshCcw, LogOut } from 'lucide-react';
 import { MemberHistoryModal } from './MemberHistoryModal';
 import { AttendanceReport } from './AttendanceReport';
 import { SyncButton } from '@/components/layout/SyncButton';
 
-export default function AdminView() {
+interface AdminViewProps {
+  onLogout?: () => void;
+}
+
+export default function AdminView({ onLogout }: AdminViewProps) {
   const [view, setView] = useState<'members' | 'report'>('members');
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
@@ -209,7 +212,6 @@ export default function AdminView() {
     setCosto('500');
     setNameSuggestions([]);
   };
- // ... return ...
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-8">
@@ -242,6 +244,13 @@ export default function AdminView() {
               </button>
           </div>
           <SyncButton />
+            <button 
+              onClick={onLogout}
+              className="p-3 bg-red-500/10 text-red-400 rounded-xl hover:bg-red-500/20 transition-colors border border-red-500/10"
+              title="Cerrar Sesión"
+            >
+              <LogOut size={20} />
+            </button>
         </div>
       </div>
 
@@ -436,14 +445,6 @@ export default function AdminView() {
             {members?.map((member) => {
               const status = getMembershipStatus(member);
               const isExpired = status === 'Expired';
-              // We need getExpirationDate imported from utils
-              // Assuming I imported it, but wait, I didn't import it in the top block of this replacement.
-              // I MUST import getExpirationDate.
-              // I will use a simple inline calculation or assume I added it to imports.
-              // I added it in the top block of this replacement content.
-              // Wait, I see "import { Trash2... }". I missed getExpirationDate import.
-              // I will inject the calculation inline to be safe or fix the import.
-              // Let's fix the import in the replacement content.
               
               const expirationDate = new Date(member.fecha_inicio);
               let daysActive = 30;

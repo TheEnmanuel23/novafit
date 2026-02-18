@@ -19,6 +19,6 @@ export default function AdminPage() {
     }
 
     return (
-        <AdminView />
+        <AdminView onLogout={() => setIsAuthenticated(false)} />
     );
 }
