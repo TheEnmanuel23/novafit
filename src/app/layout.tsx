@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Header } from '@/components/layout/Header';
+import { SyncWorker } from '@/components/layout/SyncWorker';
 import { cn } from '@/lib/utils'; // Keep import for potential use, though not strictly needed here if we rely on globals.
 // Sonner import removed
 
@@ -24,6 +25,7 @@ export default function RootLayout({
     <html lang="es" className="dark">
       <body className={`${inter.className} min-h-screen bg-background text-foreground selection:bg-primary selection:text-white antialiased`}>
         <div className="relative flex min-h-screen flex-col">
+          <SyncWorker />
           <Header />
           <main className="flex-1 container mx-auto py-6 md:py-10">
             {children}

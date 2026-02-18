@@ -7,48 +7,31 @@ import { syncData } from '@/lib/sync';
 import { Button } from '@/components/ui/Button';
 import { CloudUpload, Download, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 
-function useOnlineStatus() {
-  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  return isOnline;
-}
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 
 export const SyncButton = () => {
   const [loading, setLoading] = useState(false);
   const isOnline = useOnlineStatus();
 
   const handleSync = async () => {
+    if (loading) return;
     setLoading(true);
     try {
-      const members = await db.members.toArray();
-      const attendances = await db.attendances.toArray();
-      
-      const payload = JSON.stringify({
-        members,
-        attendances,
-        exportedAt: new Date().toISOString(),
-      }, null, 2);
-
       if (isOnline) {
         await syncData();
         const members = await db.members.toArray();
         const attendances = await db.attendances.toArray();
         alert(`Sincronización Exitosa con Supabase.\n${members.length} miembros.\n${attendances.length} asistencias.`);
       } else {
-        // Force download
+        // Force download (Manual only)
+        const members = await db.members.toArray();
+        const attendances = await db.attendances.toArray();
+        const payload = JSON.stringify({
+          members,
+          attendances,
+          exportedAt: new Date().toISOString(),
+        }, null, 2);
+
         const blob = new Blob([payload], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
