@@ -34,3 +34,19 @@ export interface SyncPayload {
   members: Member[];
   attendances: Attendance[];
 }
+
+// Staff / User types
+export type StaffRole = 'super_admin' | 'admin';
+
+export interface Staff {
+  id?: number;
+  staffId?: string; // Manual String ID or UUID
+  nombre: string;
+  username: string;
+  password: string; // stored synched for offline auth (hashed ideally, but plain for prototype if needed)
+  role: StaffRole;
+  created_at: Date;
+  updated_at?: Date;
+  deleted?: boolean;
+  synced?: number;
+}

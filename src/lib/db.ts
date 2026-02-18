@@ -1,12 +1,13 @@
 
 // src/lib/db.ts
 import Dexie, { Table } from 'dexie';
-import { Member, Attendance } from './types';
+import { Member, Attendance, Staff } from './types';
 
 class NovaFitDatabase extends Dexie {
   members!: Table<Member, number>;
   attendances!: Table<Attendance, number>;
   settings!: Table<{ key: string; value: any }, string>; 
+  staff!: Table<Staff, number>; 
 
 
 
@@ -82,6 +83,20 @@ class NovaFitDatabase extends Dexie {
     this.attendances.hook('updating', (mods, _primKey, _obj) => {
        if ((mods as any).synced === 1) return undefined;
        return { ...mods, updated_at: new Date(), synced: 0 };
+    });
+
+    this.version(8).stores({
+        staff: '++id, staffId, username, role, updated_at, synced'
+    });
+
+    this.staff.hook('creating', (_primKey, obj) => {
+        obj.updated_at = new Date();
+        obj.synced = 0;
+        obj.created_at = new Date();
+    });
+    this.staff.hook('updating', (mods, _primKey, _obj) => {
+        if ((mods as any).synced === 1) return undefined;
+        return { ...mods, updated_at: new Date(), synced: 0 };
     });
   }
 }

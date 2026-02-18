@@ -103,6 +103,77 @@ export const syncData = async () => {
             console.error("Error syncing attendance:", error);
         }
     }
+
+    // 4. Sync Staff (Push)
+    // Note: We expect staff to be created mostly on Supabase and pulled down, but if created locally:
+    const unsyncedStaff = await db.staff.where('synced').equals(0).toArray();
+    console.log(`Found ${unsyncedStaff.length} unsynced staff.`);
+
+    for (const user of unsyncedStaff) {
+        let sid = user.staffId;
+        if (!sid) {
+            // Generate simple ID if missing (or UUID if preferred, but user asked for simple strings)
+            // Ideally username is unique enough, but let's stick to an ID.
+            // If user creates it locally, we might just default to UUID, but if they want "normal strings", 
+            // they probably mean when inserting manually in Supabase.
+            // For auto-gen locally, we'll stick to random string or UUID.
+            sid = crypto.randomUUID(); 
+            await db.staff.update(user.id!, { staffId: sid });
+        }
+
+        const { error } = await supabase.from('staff').upsert({
+            staffId: sid,
+            nombre: user.nombre,
+            username: user.username,
+            password: user.password,
+            role: user.role,
+            deleted: user.deleted || false,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'staffId' });
+
+        if (!error) {
+            await db.staff.update(user.id!, { synced: 1 });
+        } else {
+            console.error("Error syncing staff:", error);
+        }
+    }
+
+    // 5. Sync Staff (Pull)
+    const { data: remoteStaff, error: staffError } = await supabase.from('staff').select('*');
+    if (remoteStaff) {
+        for (const rs of remoteStaff) {
+            // Match by staffId (which is now string/text in DB)
+            const local = await db.staff.where('staffId').equals(rs.staffId).first();
+            const remoteDate = new Date(rs.updated_at);
+
+            if (local) {
+                const localDate = local.updated_at || new Date(0);
+                if (remoteDate > localDate) {
+                    await db.staff.update(local.id!, {
+                        nombre: rs.nombre,
+                        username: rs.username,
+                        password: rs.password,
+                        role: rs.role as any,
+                        deleted: rs.deleted,
+                        updated_at: remoteDate,
+                        synced: 1
+                    });
+                }
+            } else {
+                await db.staff.add({
+                    staffId: rs.staffId,
+                    nombre: rs.nombre,
+                    username: rs.username,
+                    password: rs.password,
+                    role: rs.role as any,
+                    deleted: rs.deleted,
+                    updated_at: remoteDate,
+                    created_at: new Date(rs.created_at),
+                    synced: 1
+                });
+            }
+        }
+    }
     
     console.log("Sync completed.");
 };

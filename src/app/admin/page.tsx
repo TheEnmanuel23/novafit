@@ -1,16 +1,24 @@
 
+'use client';
 import AdminView from '@/components/admin/AdminView';
-import { Metadata } from 'next';
-
-export const metadata: Metadata = {
-  title: 'Admin - Nova Fit',
-  description: 'Gestión de miembros - Agregar nuevos socios',
-};
+import React, { useState } from 'react';
+import { LoginView } from '@/components/admin/LoginView';
+import { Staff } from '@/lib/types';
 
 export default function AdminPage() {
-  return (
-    <>
-      <AdminView />
-    </>
-  );
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [user, setUser] = useState<Staff | null>(null);
+
+    const handleLogin = (loggedInUser: Staff) => {
+        setUser(loggedInUser);
+        setIsAuthenticated(true);
+    };
+
+    if (!isAuthenticated) {
+        return <LoginView onLogin={handleLogin} />;
+    }
+
+    return (
+        <AdminView />
+    );
 }
