@@ -14,6 +14,15 @@ export const metadata: Metadata = {
   description: 'Sistema de control de asistencia para gimnasio Nova Fit',
   manifest: '/manifest.json', // PWA ready
   themeColor: '#0f172a',
+  applicationName: 'Nova Fit',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Nova Fit',
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export default function RootLayout({
@@ -23,6 +32,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className="dark">
+      <head>
+        <link rel="apple-touch-icon" href="/icons/apple-icon-180.png" />
+      </head>
       <body className={`${inter.className} min-h-screen bg-background text-foreground selection:bg-primary selection:text-white antialiased`}>
         <div className="relative flex min-h-screen flex-col">
           <SyncWorker />

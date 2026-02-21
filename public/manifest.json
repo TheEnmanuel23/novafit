@@ -1,0 +1,23 @@
+{
+    "name": "Nova Fit",
+    "short_name": "Nova Fit",
+    "description": "Sistema de control de asistencia para gimnasio Nova Fit",
+    "icons": [
+        {
+            "src": "/icons/manifest-icon-192.maskable.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icons/manifest-icon-512.maskable.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0f172a",
+    "theme_color": "#0f172a"
+}
