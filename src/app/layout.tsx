@@ -1,5 +1,5 @@
 
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Header } from '@/components/layout/Header';
@@ -9,11 +9,14 @@ import { cn } from '@/lib/utils'; // Keep import for potential use, though not s
 
 const inter = Inter({ subsets: ['latin'] });
 
+export const viewport: Viewport = {
+  themeColor: '#0f172a',
+};
+
 export const metadata: Metadata = {
   title: 'Nova Fit Check-In',
   description: 'Sistema de control de asistencia para gimnasio Nova Fit',
   manifest: '/manifest.json', // PWA ready
-  themeColor: '#0f172a',
   applicationName: 'Nova Fit',
   appleWebApp: {
     capable: true,
