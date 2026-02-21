@@ -162,6 +162,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       setCosto('500');
       
       setTimeout(() => setSuccess(false), 3000);
+      window.dispatchEvent(new Event('request-sync'));
     } catch (error) {
       console.error('Error adding/updating member:', error);
     }
@@ -198,6 +199,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     e.stopPropagation();
     if (confirm('¿Estás seguro de eliminar este registro?')) {
       await db.members.update(id, { deleted: true });
+      window.dispatchEvent(new Event('request-sync'));
     }
   };
 

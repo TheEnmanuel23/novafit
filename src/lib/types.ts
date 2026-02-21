@@ -25,6 +25,7 @@ export interface Attendance {
   miembroId: number; // Original Plan ID used for check-in
   memberId?: string; // Stable User Identity ID
   fecha_hora: Date;
+  created_at?: Date;
   updated_at?: Date;
   synced?: number;
 }

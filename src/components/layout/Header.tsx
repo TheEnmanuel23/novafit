@@ -6,10 +6,12 @@ import { usePathname } from 'next/navigation';
 import { Home, Users } from 'lucide-react';
 
 import { useAuthStore } from '@/lib/store';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 
 export const Header = () => {
   const pathname = usePathname();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isOnline = useOnlineStatus();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -29,8 +31,14 @@ export const Header = () => {
         <Link href="/" className="flex items-center gap-2 transition hover:opacity-80">
           <img src="/logo.png" alt="Nova Fit" className="h-16 w-auto rounded-2xl" />
         </Link>
+        {!isOnline && (
+          <div className="ml-4 flex items-center gap-1.5 rounded-full bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-500 border border-red-500/20">
+            <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+            OFFLINE
+          </div>
+        )}
         
-        <nav className="flex items-center gap-6">
+        <nav className="flex flex-1 items-center justify-end gap-6">
           <Link 
             href="/" 
             className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${pathname === '/' ? 'text-primary' : 'text-muted-foreground'}`}

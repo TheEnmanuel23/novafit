@@ -65,6 +65,7 @@ export default function CheckInView() {
       });
       setLastCheckIn({ member, timestamp: Date.now() });
       setSearchTerm(''); // clear search after check-in
+      window.dispatchEvent(new Event('request-sync'));
     } catch (e) {
       console.error('Failed to log attendance', e);
     }
