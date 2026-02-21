@@ -5,9 +5,9 @@ import { supabase } from './supabase';
 export const syncData = async () => {
     console.log("Starting sync...");
     
-    // 1. Sync Members (Push)
-    const unsyncedMembers = await db.members.where('synced').equals(0).toArray();
-    console.log(`Found ${unsyncedMembers.length} unsynced members.`);
+    const allMembers = await db.members.toArray();
+    const unsyncedMembers = allMembers.filter(m => !m.synced || m.synced === 0);
+    console.log(`Found ${unsyncedMembers.length} unsynced members (Total local: ${allMembers.length}).`);
     
     for (const member of unsyncedMembers) {
         let mid = member.memberId;
@@ -31,18 +31,19 @@ export const syncData = async () => {
         }, { onConflict: 'memberId' });
 
         if (!error) {
-            // Mark as synced
-            // We pass synced: 1 explicitly, our hook will allow it without resetting updated_at
             await db.members.update(member.id!, { synced: 1 });
         } else {
             console.error("Error syncing member:", error);
+            throw new Error(`Error en miembro '${member.nombre}': ${error.message} - ${error.details}`);
         }
     }
 
     // 2. Sync Members (Pull)
-    // Fetch all members from server to update local state
-    // In a real app, use 'last_synced_at' to fetch only changes.
     const { data: remoteMembers, error: pullError } = await supabase.from('members').select('*');
+    if (pullError) {
+        console.error("Error pulling members:", pullError);
+        throw new Error(`Error pulling members: ${pullError.message}`);
+    }
     
     if (remoteMembers) {
         for (const rm of remoteMembers) {
@@ -86,37 +87,51 @@ export const syncData = async () => {
     }
 
     // 3. Sync Attendances (Push Only for now)
-    const unsyncedAttendances = await db.attendances.where('synced').equals(0).toArray();
-    console.log(`Found ${unsyncedAttendances.length} unsynced attendances.`);
+    const allAttendances = await db.attendances.toArray();
+    const unsyncedAttendances = allAttendances.filter(a => !a.synced || a.synced === 0);
+    console.log(`Found ${unsyncedAttendances.length} unsynced attendances (Total local: ${allAttendances.length}).`);
 
     for (const att of unsyncedAttendances) {
-        if (!att.memberId) continue; // Skip if no memberId link
+        let attMemberId = att.memberId;
+        
+        // Recover missing memberId for an attendance if it was created before the member was synced
+        if (!attMemberId && att.miembroId) {
+            const relatedMember = await db.members.get(att.miembroId);
+            if (relatedMember?.memberId) {
+                attMemberId = relatedMember.memberId;
+                await db.attendances.update(att.id!, { memberId: attMemberId });
+            }
+        }
+        
+        if (!attMemberId) {
+            console.warn(`Skipping attendance ${att.id} because it has no memberId link.`);
+            continue;
+        }
 
         const { error } = await supabase.from('attendances').insert({
-            memberId: att.memberId,
-            fecha_hora: att.fecha_hora.toISOString(),
+            memberId: attMemberId,
+            fecha_hora: att.fecha_hora 
+                ? (typeof att.fecha_hora === 'string' ? new Date(att.fecha_hora).toISOString() : att.fecha_hora.toISOString())
+                : new Date().toISOString(),
         });
         
         if (!error) {
             await db.attendances.update(att.id!, { synced: 1 });
         } else {
             console.error("Error syncing attendance:", error);
+            throw new Error(`Error en asistencia: ${error.message}`);
         }
     }
 
     // 4. Sync Staff (Push)
     // Note: We expect staff to be created mostly on Supabase and pulled down, but if created locally:
-    const unsyncedStaff = await db.staff.where('synced').equals(0).toArray();
+    const allStaff = await db.staff.toArray();
+    const unsyncedStaff = allStaff.filter(s => !s.synced || s.synced === 0);
     console.log(`Found ${unsyncedStaff.length} unsynced staff.`);
 
     for (const user of unsyncedStaff) {
         let sid = user.staffId;
         if (!sid) {
-            // Generate simple ID if missing (or UUID if preferred, but user asked for simple strings)
-            // Ideally username is unique enough, but let's stick to an ID.
-            // If user creates it locally, we might just default to UUID, but if they want "normal strings", 
-            // they probably mean when inserting manually in Supabase.
-            // For auto-gen locally, we'll stick to random string or UUID.
             sid = crypto.randomUUID(); 
             await db.staff.update(user.id!, { staffId: sid });
         }
@@ -135,6 +150,7 @@ export const syncData = async () => {
             await db.staff.update(user.id!, { synced: 1 });
         } else {
             console.error("Error syncing staff:", error);
+            throw new Error(`Error en staff '${user.username}': ${error.message}`);
         }
     }
 

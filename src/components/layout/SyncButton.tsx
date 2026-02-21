@@ -18,6 +18,9 @@ export const SyncButton = () => {
     setLoading(true);
     try {
       if (isOnline) {
+        const debugAtt = await db.attendances.toArray();
+        console.log("ALL LOCAL ATTENDANCES:", debugAtt);
+
         await syncData();
         const members = await db.members.toArray();
         const attendances = await db.attendances.toArray();
@@ -42,9 +45,9 @@ export const SyncButton = () => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Sync error:', e);
-      alert('Error en la sincronización. Revisa la consola.');
+      alert(`Error en la sincronización: ${e.message}\nRevisa la consola.`);
     } finally {
       setLoading(false);
     }
