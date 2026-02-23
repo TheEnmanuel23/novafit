@@ -27,7 +27,7 @@ export const syncData = async () => {
             notes: member.notes,
             fecha_inicio: member.fecha_inicio.toISOString(),
             deleted: member.deleted || false,
-            updated_at: new Date().toISOString()
+            updated_at: member.updated_at ? member.updated_at.toISOString() : new Date().toISOString()
         }, { onConflict: 'memberId' });
 
         if (!error) {
@@ -120,6 +120,51 @@ export const syncData = async () => {
         } else {
             console.error("Error syncing attendance:", error);
             throw new Error(`Error en asistencia: ${error.message}`);
+        }
+    }
+
+    // 3.5 Sync Attendances (Pull)
+    const { data: remoteAttendances, error: pullAttError } = await supabase.from('attendances').select('*');
+    if (pullAttError) {
+        console.error("Error pulling attendances:", pullAttError);
+        throw new Error(`Error pulling attendances: ${pullAttError.message}`);
+    }
+
+    if (remoteAttendances) {
+        // Fetch all local attendances to check against
+        const localAttendances = await db.attendances.toArray();
+        let addedCount = 0;
+
+        for (const ra of remoteAttendances) {
+            // Because we don't store the UUID of the attendance locally, we match by exact time & memberId
+            // This is a naive but effective guard against inserting the same check-in twice
+            const raDateStr = new Date(ra.fecha_hora).toISOString();
+            
+            const existsLocally = localAttendances.find(la => {
+                const laDateStr = typeof la.fecha_hora === 'string' 
+                                    ? new Date(la.fecha_hora).toISOString() 
+                                    : la.fecha_hora.toISOString();
+                return la.memberId === ra.memberId && laDateStr === raDateStr;
+            });
+
+            if (!existsLocally) {
+                // Find local `miembroId` that corresponds to this Supabase `memberId`
+                const localMember = await db.members.where('memberId').equals(ra.memberId).first();
+                if (localMember) {
+                    await db.attendances.add({
+                        memberId: ra.memberId,
+                        miembroId: localMember.id!, // Keep the legacy pointer
+                        fecha_hora: new Date(ra.fecha_hora),
+                        synced: 1, // It's already in the cloud
+                        created_at: new Date(ra.created_at)
+                    });
+                    addedCount++;
+                }
+            }
+        }
+        
+        if (addedCount > 0) {
+            console.log(`Pulled and saved ${addedCount} new attendances from Supabase.`);
         }
     }
 

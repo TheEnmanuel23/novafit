@@ -15,6 +15,8 @@ CREATE TABLE members (
     deleted boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
+    registered_by text REFERENCES staff("staffId"),
+    registered_by_name text,
     PRIMARY KEY (id)
 );
 

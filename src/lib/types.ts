@@ -17,6 +17,8 @@ export interface Member {
   deleted?: boolean; // Soft delete flag
   updated_at?: Date; // For sync
   synced?: number; // 0 = dirty, 1 = synced
+  registered_by?: string; // staffId of creator
+  registered_by_name?: string; // name of creator
 }
 
 // Attendance types
@@ -25,6 +27,7 @@ export interface Attendance {
   miembroId: number; // Original Plan ID used for check-in
   memberId?: string; // Stable User Identity ID
   fecha_hora: Date;
+  created_at?: Date;
   updated_at?: Date;
   synced?: number;
 }
