@@ -7,10 +7,11 @@ import { getMembershipStatus, formatDate } from '@/lib/utils';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Search, RefreshCcw, LogOut } from 'lucide-react';
+import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Search, RefreshCcw, LogOut, Users } from 'lucide-react';
 import { MemberHistoryModal } from './MemberHistoryModal';
 import { AttendanceReport } from './AttendanceReport';
 import { SyncButton } from '@/components/layout/SyncButton';
+import { useAuthStore } from '@/lib/store';
 
 interface AdminViewProps {
   onLogout?: () => void;
@@ -115,6 +116,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       setShowSuggestions(false);
   };
 
+  const user = useAuthStore(state => state.user);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre || !costo) return;
@@ -129,6 +132,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
           costo: Number(costo),
           is_promo: isPromo,
           notes: notes,
+          registered_by: user?.staffId,
+          registered_by_name: user?.nombre,
           // Do not overwrite memberId if it exists, but ensured by update partial
         });
         setEditingId(null);
@@ -146,6 +151,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
           is_promo: isPromo,
           notes: notes,
           fecha_inicio: new Date(),
+          registered_by: user?.staffId,
+          registered_by_name: user?.nombre,
         });
       }
       
@@ -483,6 +490,12 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                         <p className="text-xs text-muted-foreground mt-2 italic border-l-2 border-primary/20 pl-2">
                           "{member.notes}"
                         </p>
+                      )}
+                      
+                      {member.registered_by_name && (
+                         <div className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1 opacity-70">
+                            <Users size={10} /> Reg: {member.registered_by_name}
+                         </div>
                       )}
                     </div>
                     
