@@ -11,6 +11,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 export const Header = () => {
   const pathname = usePathname();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
   const isOnline = useOnlineStatus();
   const [mounted, setMounted] = React.useState(false);
 
@@ -37,20 +38,34 @@ export const Header = () => {
         )}
         
         <nav className="flex flex-1 items-center justify-end gap-6">
-          <Link 
-            href="/" 
-            className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${pathname === '/' ? 'text-primary' : 'text-muted-foreground'}`}
-          >
-            <Home className="h-5 w-5" />
-            <span className="hidden sm:inline">Check-In</span>
-          </Link>
-          <Link 
-            href="/admin" 
-            className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${pathname === '/admin' ? 'text-primary' : 'text-muted-foreground'}`}
-          >
-            <Users className="h-5 w-5" />
-            <span className="hidden sm:inline">Administrar</span>
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link 
+              href="/" 
+              className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${pathname === '/' ? 'text-primary' : 'text-muted-foreground'}`}
+            >
+              <Home className="h-5 w-5" />
+              <span className="hidden sm:inline">Check-In</span>
+            </Link>
+            <Link 
+              href="/admin" 
+              className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${pathname === '/admin' ? 'text-primary' : 'text-muted-foreground'}`}
+            >
+              <Users className="h-5 w-5" />
+              <span className="hidden sm:inline">Administrar</span>
+            </Link>
+          </div>
+          
+          {user && (
+            <div className="flex items-center gap-2 pl-4 ml-2 border-l border-white/10">
+              <div className="flex flex-col items-end">
+                <span className="text-sm font-medium leading-none">{user.nombre}</span>
+                <span className="text-xs text-muted-foreground mt-1">Staff</span>
+              </div>
+              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
+                {user.nombre.charAt(0).toUpperCase()}
+              </div>
+            </div>
+          )}
         </nav>
 
 

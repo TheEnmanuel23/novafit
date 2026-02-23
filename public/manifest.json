@@ -20,6 +20,9 @@
     "display": "standalone",
     "background_color": "#0f172a",
     "theme_color": "#0f172a",
+    "launch_handler": {
+        "client_mode": "navigate-new"
+    },
     "shortcuts": [
         {
             "name": "Administración",
