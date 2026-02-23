@@ -27,7 +27,7 @@ export const syncData = async () => {
             notes: member.notes,
             fecha_inicio: member.fecha_inicio.toISOString(),
             deleted: member.deleted || false,
-            updated_at: new Date().toISOString()
+            updated_at: member.updated_at ? member.updated_at.toISOString() : new Date().toISOString()
         }, { onConflict: 'memberId' });
 
         if (!error) {

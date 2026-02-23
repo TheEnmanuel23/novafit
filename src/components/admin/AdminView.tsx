@@ -134,6 +134,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
           notes: notes,
           registered_by: user?.staffId,
           registered_by_name: user?.nombre,
+          synced: 0,
+          updated_at: new Date(),
           // Do not overwrite memberId if it exists, but ensured by update partial
         });
         setEditingId(null);
@@ -153,6 +155,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
           fecha_inicio: new Date(),
           registered_by: user?.staffId,
           registered_by_name: user?.nombre,
+          updated_at: new Date(),
         });
       }
       
@@ -205,7 +208,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('¿Estás seguro de eliminar este registro?')) {
-      await db.members.update(id, { deleted: true });
+      await db.members.update(id, { deleted: true, synced: 0, updated_at: new Date() });
       window.dispatchEvent(new Event('request-sync'));
     }
   };
