@@ -5,6 +5,7 @@ import './globals.css';
 import { Header } from '@/components/layout/Header';
 import { SyncWorker } from '@/components/layout/SyncWorker';
 import { cn } from '@/lib/utils'; // Keep import for potential use, though not strictly needed here if we rely on globals.
+import { TimeTravel } from '@/components/dev/TimeTravel';
 // Sonner import removed
 
 const inter = Inter({ subsets: ['latin'] });
@@ -45,6 +46,9 @@ export default function RootLayout({
           <main className="flex-1 container mx-auto py-6 md:py-10">
             {children}
           </main>
+          {process.env.NODE_ENV === 'development' && (
+            <TimeTravel />
+          )}
         </div>
       </body>
     </html>

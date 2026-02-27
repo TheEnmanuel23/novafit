@@ -15,6 +15,16 @@ export default function CheckInView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [lastCheckIn, setLastCheckIn] = useState<{ member: Member; timestamp: number } | null>(null);
 
+  // Force re-render on time travel
+  const [timeTick, setTimeTick] = useState(0);
+
+  React.useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return;
+    const handleTimeChange = () => setTimeTick(t => t + 1);
+    window.addEventListener('time-travel-changed', handleTimeChange);
+    return () => window.removeEventListener('time-travel-changed', handleTimeChange);
+  }, []);
+
   const members = useLiveQuery(async () => {
     if (!searchTerm) return [];
     
@@ -37,7 +47,7 @@ export default function CheckInView() {
 
     // Filter for active plans only
     return results.filter(m => getMembershipStatus(m) === 'Active').slice(0, 10);
-  }, [searchTerm]);
+  }, [searchTerm, timeTick]);
 
   const handleCheckIn = async (member: Member) => {
     if (!member.id) return;

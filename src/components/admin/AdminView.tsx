@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { db } from '@/lib/db';
 import { PlanType, SystemPlan } from '@/lib/types';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { getMembershipStatus, formatDate } from '@/lib/utils';
+import { getMembershipStatus, formatDate, getExpirationDate } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -33,6 +33,16 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [nameSuggestions, setNameSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  
+  // Force re-render on time travel
+  const [timeTick, setTimeTick] = useState(0);
+
+  React.useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return;
+    const handleTimeChange = () => setTimeTick(t => t + 1);
+    window.addEventListener('time-travel-changed', handleTimeChange);
+    return () => window.removeEventListener('time-travel-changed', handleTimeChange);
+  }, []);
   
   // Search state for members list
   const [membersSearchTerm, setMembersSearchTerm] = useState('');
@@ -78,7 +88,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     });
     
     return Array.from(uniqueMembers.values());
-  }, [membersSearchTerm]);
+  }, [membersSearchTerm, timeTick]);
 
   // Name Autocomplete
   React.useEffect(() => {
@@ -469,16 +479,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
             {members?.map((member) => {
               const status = getMembershipStatus(member);
               const isExpired = status === 'Expired';
-              
-              const expirationDate = new Date(member.fecha_inicio);
-              let daysActive = member.plan_days;
-              if (!daysActive) {
-                daysActive = 30;
-                if (member.plan_tipo === 'Quincenal') daysActive = 15;
-                if (member.plan_tipo === 'Semanal') daysActive = 7;
-                if (member.plan_tipo === 'Día') daysActive = 1;
-              }
-              expirationDate.setDate(expirationDate.getDate() + daysActive);
+              const expirationDate = getExpirationDate(member);
 
               return (
                 <Card 
