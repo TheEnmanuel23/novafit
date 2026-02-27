@@ -13,9 +13,15 @@ export function cn(...inputs: ClassValue[]) {
 // Check membership status
 // Calculate expiration date based on plan type
 export function getExpirationDate(member: Member): Date {
-  let daysActive = 30;
-  if (member.plan_tipo === 'Quincenal') daysActive = 15;
-  if (member.plan_tipo === 'Día') daysActive = 1;
+  let daysActive = member.plan_days;
+  
+  // Fallback for older records or default
+  if (!daysActive) {
+    daysActive = 30;
+    if (member.plan_tipo === 'Quincenal') daysActive = 15;
+    if (member.plan_tipo === 'Semanal') daysActive = 7;
+    if (member.plan_tipo === 'Día') daysActive = 1;
+  }
 
   return addDays(new Date(member.fecha_inicio), daysActive);
 }

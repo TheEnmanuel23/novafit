@@ -1,8 +1,18 @@
 
 // src/lib/types.ts
 
+import { Database } from './database.types';
+
 // Member types
-export type PlanType = 'Mensual' | 'Quincenal' | 'Día';
+export type PlanType = Database['public']['Tables']['plans']['Row']['description'];
+
+export interface SystemPlan {
+  id: string;
+  description: string;
+  price: number;
+  days_active: number;
+  active: boolean;
+}
 
 export interface Member {
   id?: number; // Auto-incremented ID
@@ -10,6 +20,7 @@ export interface Member {
   nombre: string;
   telefono: string;
   plan_tipo: PlanType;
+  plan_days?: number; // Days active for the plan when it was assigned
   costo: number; // Price charged
   is_promo?: boolean; // Promotional price applied
   notes?: string; // Optional notes

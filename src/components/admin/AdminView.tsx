@@ -1,9 +1,10 @@
 'use client';
 import React, { useState } from 'react';
 import { db } from '@/lib/db';
-import { PlanType } from '@/lib/types';
+import { PlanType, SystemPlan } from '@/lib/types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getMembershipStatus, formatDate } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -21,8 +22,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   const [view, setView] = useState<'members' | 'report'>('members');
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
-  const [plan, setPlan] = useState<PlanType>('Mensual');
-  const [costo, setCosto] = useState<string>('500'); // Default for Mensual
+  const [plan, setPlan] = useState<PlanType>('');
+  const [costo, setCosto] = useState<string>('');
   const [isPromo, setIsPromo] = useState(false);
   const [notes, setNotes] = useState('');
   const [success, setSuccess] = useState(false);
@@ -36,6 +37,21 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   // Search state for members list
   const [membersSearchTerm, setMembersSearchTerm] = useState('');
   const [selectedHistoryMember, setSelectedHistoryMember] = useState<any>(null);
+  const [dbPlans, setDbPlans] = useState<SystemPlan[]>([]);
+
+  // Fetch plans on mount
+  React.useEffect(() => {
+    async function fetchPlans() {
+      const { data } = await supabase.from('plans').select('*').eq('active', true).order('price', { ascending: false });
+      if (data) {
+        setDbPlans(data as SystemPlan[]);
+        if (!plan && data.length > 0) {
+          setPlan(data[0].description);
+        }
+      }
+    }
+    fetchPlans();
+  }, []);
 
   const members = useLiveQuery(async () => {
     // Fetch active (non-deleted) members
@@ -103,10 +119,11 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   // Auto-update price suggestion when plan changes
   React.useEffect(() => {
     if (editingId) return; // Don't auto-change price if editing
-    if (plan === 'Mensual') setCosto('500');
-    if (plan === 'Quincenal') setCosto('300');
-    if (plan === 'Día') setCosto('50');
-  }, [plan, editingId]);
+    const selectedPlan = dbPlans.find(p => p.description === plan);
+    if (selectedPlan) {
+      setCosto(selectedPlan.price.toString());
+    }
+  }, [plan, editingId, dbPlans]);
 
   const selectSuggestion = (member: any) => {
       setNombre(member.nombre);
@@ -123,12 +140,16 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     if (!nombre || !costo) return;
 
     try {
+      const selectedSysPlan = dbPlans.find(p => p.description === plan);
+      const planDays = selectedSysPlan?.days_active;
+
       if (editingId) {
         // Updating a specific record. Keep existing memberId (or add if missing)
         await db.members.update(editingId, {
           nombre,
           telefono,
           plan_tipo: plan,
+          ...(planDays ? { plan_days: planDays } : {}),
           costo: Number(costo),
           is_promo: isPromo,
           notes: notes,
@@ -149,6 +170,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
           nombre,
           telefono,
           plan_tipo: plan,
+          ...(planDays ? { plan_days: planDays } : {}),
           costo: Number(costo),
           is_promo: isPromo,
           notes: notes,
@@ -168,8 +190,13 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       setSelectedMemberId(null);
       setNameSuggestions([]);
       // Reset plan default
-      setPlan('Mensual');
-      setCosto('500');
+      if (dbPlans.length > 0) {
+        setPlan(dbPlans[0].description);
+        setCosto(dbPlans[0].price.toString());
+      } else {
+        setPlan('');
+        setCosto('');
+      }
       
       setTimeout(() => setSuccess(false), 3000);
       window.dispatchEvent(new Event('request-sync'));
@@ -220,8 +247,13 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     setTelefono('');
     setNotes('');
     setIsPromo(false);
-    setPlan('Mensual');
-    setCosto('500');
+    if (dbPlans.length > 0) {
+      setPlan(dbPlans[0].description);
+      setCosto(dbPlans[0].price.toString());
+    } else {
+      setPlan('');
+      setCosto('');
+    }
     setNameSuggestions([]);
   };
 
@@ -336,45 +368,25 @@ export default function AdminView({ onLogout }: AdminViewProps) {
 
               <div className="space-y-4">
                 <label className="text-sm font-medium text-muted-foreground ml-1">Plan</label>
-                <div className="grid grid-cols-3 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPlan('Mensual')}
-                    className={`flex flex-col items-center justify-center aspect-square rounded-2xl border-2 transition-all ${
-                      plan === 'Mensual' 
-                        ? 'border-primary bg-primary/10 text-primary shadow-lg shadow-primary/20' 
-                        : 'border-muted bg-card hover:bg-muted/50 text-muted-foreground'
-                    }`}
-                  >
-                    <Calendar className="h-8 w-8 mb-2" />
-                    <span className="font-bold text-sm sm:text-base">Mensual</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPlan('Quincenal')}
-                    className={`flex flex-col items-center justify-center aspect-square rounded-2xl border-2 transition-all ${
-                      plan === 'Quincenal' 
-                        ? 'border-primary bg-primary/10 text-primary shadow-lg shadow-primary/20' 
-                        : 'border-muted bg-card hover:bg-muted/50 text-muted-foreground'
-                    }`}
-                  >
-                    <CreditCard className="h-8 w-8 mb-2" />
-                    <span className="font-bold text-sm sm:text-base">Quincenal</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPlan('Día')}
-                    className={`flex flex-col items-center justify-center aspect-square rounded-2xl border-2 transition-all ${
-                      plan === 'Día' 
-                        ? 'border-primary bg-primary/10 text-primary shadow-lg shadow-primary/20' 
-                        : 'border-muted bg-card hover:bg-muted/50 text-muted-foreground'
-                    }`}
-                  >
-                    <CheckCircle className="h-8 w-8 mb-2" />
-                    <span className="font-bold text-sm sm:text-base">Día</span>
-                  </button>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {dbPlans.map(sysPlan => (
+                    <button
+                      key={sysPlan.id}
+                      type="button"
+                      onClick={() => setPlan(sysPlan.description)}
+                      className={`flex flex-col items-center justify-center aspect-square rounded-2xl border-2 transition-all ${
+                        plan === sysPlan.description 
+                          ? 'border-primary bg-primary/10 text-primary shadow-lg shadow-primary/20' 
+                          : 'border-muted bg-card hover:bg-muted/50 text-muted-foreground'
+                      }`}
+                    >
+                      <Calendar className="h-8 w-8 mb-2" />
+                      <span className="font-bold text-sm sm:text-base text-center break-words px-2">{sysPlan.description}</span>
+                    </button>
+                  ))}
+                  {dbPlans.length === 0 && (
+                    <div className="col-span-full text-center text-sm text-muted-foreground py-4">Cargando planes...</div>
+                  )}
                 </div>
               </div>
 
@@ -459,9 +471,13 @@ export default function AdminView({ onLogout }: AdminViewProps) {
               const isExpired = status === 'Expired';
               
               const expirationDate = new Date(member.fecha_inicio);
-              let daysActive = 30;
-              if (member.plan_tipo === 'Quincenal') daysActive = 15;
-              if (member.plan_tipo === 'Día') daysActive = 1;
+              let daysActive = member.plan_days;
+              if (!daysActive) {
+                daysActive = 30;
+                if (member.plan_tipo === 'Quincenal') daysActive = 15;
+                if (member.plan_tipo === 'Semanal') daysActive = 7;
+                if (member.plan_tipo === 'Día') daysActive = 1;
+              }
               expirationDate.setDate(expirationDate.getDate() + daysActive);
 
               return (
