@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Member } from '@/lib/types';
+import { Member, MemberPlan } from '@/lib/types';
 import { db } from '@/lib/db';
 import { getMembershipStatus, formatDate, getExpirationDate } from '@/lib/utils';
 import { Calendar, X, Clock, History } from 'lucide-react';
@@ -12,14 +12,14 @@ interface MemberHistoryModalProps {
 }
 
 export const MemberHistoryModal: React.FC<MemberHistoryModalProps> = ({ member, onClose }) => {
-  const [history, setHistory] = useState<Member[]>([]);
+  const [history, setHistory] = useState<MemberPlan[]>([]);
 
   useEffect(() => {
     if (member) {
       const fetchHistory = async () => {
-        // Find all records with same name (ignoring phone to track history across updates)
-        const records = await db.members
-          .filter(m => m.nombre === member.nombre)
+        // Find all member_plans records for this memberId
+        const records = await db.member_plans
+          .where('memberId').equals(member.memberId)
           .reverse()
           .toArray();
         setHistory(records);
@@ -71,7 +71,9 @@ export const MemberHistoryModal: React.FC<MemberHistoryModalProps> = ({ member, 
                   const status = getMembershipStatus(record);
                   const isExpired = status === 'Expired';
                   const expirationDate = getExpirationDate(record);
-                  const isCurrent = record.id === member.id;
+                  // The "Current" plan is probably the one with the latest fecha_inicio, 
+                  // or the one that is 'Active'. Let's mark active ones as current.
+                  const isCurrent = !isExpired && status === 'Active';
                   
                   return (
                     <div 

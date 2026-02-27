@@ -1,25 +1,30 @@
 
 import React from 'react';
-import { Member } from '@/lib/types';
+import { Member, MemberPlan } from '@/lib/types';
 import { getMembershipStatus, formatDate, getExpirationDate } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { User, Phone, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-interface MemberCardProps {
+export interface CombinedMember {
   member: Member;
-  onClick: (member: Member) => void;
+  plan: MemberPlan;
 }
 
-export const MemberCard: React.FC<MemberCardProps> = ({ member, onClick }) => {
-  const status = getMembershipStatus(member);
+interface MemberCardProps {
+  data: CombinedMember;
+  onClick: (data: CombinedMember) => void;
+}
+
+export const MemberCard: React.FC<MemberCardProps> = ({ data, onClick }) => {
+  const { member, plan } = data;
+  const status = getMembershipStatus(plan);
   const isExpired = status === 'Expired';
   
   return (
     <motion.div
       whileTap={{ scale: 0.98 }}
-      onClick={() => onClick(member)}
+      onClick={() => onClick(data)}
       className="cursor-pointer"
     >
       <Card className={`relative overflow-hidden group hover:border-primary/50 transition-colors ${isExpired ? 'border-red-500/30' : 'border-emerald-500/30'}`}>

@@ -19,27 +19,103 @@ export type Database = {
           created_at: string | null
           fecha_hora: string
           id: string
+          member_plan_id: string | null
           memberId: string
         }
         Insert: {
           created_at?: string | null
           fecha_hora: string
           id?: string
+          member_plan_id?: string | null
           memberId: string
         }
         Update: {
           created_at?: string | null
           fecha_hora?: string
           id?: string
+          member_plan_id?: string | null
           memberId?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "attendances_member_plan_id_fkey"
+            columns: ["member_plan_id"]
+            isOneToOne: false
+            referencedRelation: "member_plans"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "attendances_memberId_fkey"
             columns: ["memberId"]
             isOneToOne: false
             referencedRelation: "members"
             referencedColumns: ["memberId"]
+          },
+        ]
+      }
+      member_plans: {
+        Row: {
+          costo: number
+          created_at: string
+          deleted: boolean | null
+          fecha_inicio: string
+          id: string
+          is_promo: boolean | null
+          memberId: string
+          notes: string | null
+          plan_days: number
+          plan_id: string | null
+          plan_tipo: string
+          registered_by: string | null
+          registered_by_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          costo: number
+          created_at?: string
+          deleted?: boolean | null
+          fecha_inicio: string
+          id?: string
+          is_promo?: boolean | null
+          memberId: string
+          notes?: string | null
+          plan_days: number
+          plan_id?: string | null
+          plan_tipo: string
+          registered_by?: string | null
+          registered_by_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          costo?: number
+          created_at?: string
+          deleted?: boolean | null
+          fecha_inicio?: string
+          id?: string
+          is_promo?: boolean | null
+          memberId?: string
+          notes?: string | null
+          plan_days?: number
+          plan_id?: string | null
+          plan_tipo?: string
+          registered_by?: string | null
+          registered_by_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_plans_memberId_fkey"
+            columns: ["memberId"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["memberId"]
+          },
+          {
+            foreignKeyName: "member_plans_registered_by_fkey"
+            columns: ["registered_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["staffId"]
           },
         ]
       }

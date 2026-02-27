@@ -3,9 +3,9 @@
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { Member } from '@/lib/types';
-import { getMembershipStatus } from '@/lib/utils';
-import { MemberCard } from './MemberCard';
+import { Member, MemberPlan } from '@/lib/types';
+import { getMembershipStatus, getCurrentDate } from '@/lib/utils';
+import { MemberCard, CombinedMember } from './MemberCard';
 import { Input } from '@/components/ui/Input';
 import { Search } from 'lucide-react';
 import { CheckInSuccess } from './CheckInSuccess';
@@ -13,7 +13,7 @@ import { AnimatePresence } from 'framer-motion';
 
 export default function CheckInView() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [lastCheckIn, setLastCheckIn] = useState<{ member: Member; timestamp: number } | null>(null);
+  const [lastCheckIn, setLastCheckIn] = useState<{ data: CombinedMember; timestamp: number } | null>(null);
 
   // Force re-render on time travel
   const [timeTick, setTimeTick] = useState(0);
@@ -45,20 +45,42 @@ export default function CheckInView() {
         .toArray();
     }
 
+    // Deduplicate and combine with plans: Keep only the latest record for each unique memberId
+    const uniqueMembers = new Map<string, Member>();
+    results.forEach(member => {
+      const key = member.memberId || member.nombre.toLowerCase().trim();
+      if (!uniqueMembers.has(key)) {
+        uniqueMembers.set(key, member);
+      }
+    });
+
+    const combinedResults: CombinedMember[] = [];
+    
+    for (const m of Array.from(uniqueMembers.values())) {
+      const plans = await db.member_plans.where('memberId').equals(m.memberId).filter(p => !p.deleted).toArray();
+      if (plans.length > 0) {
+        // Sort results by fecha_inicio descending to ensure we get the latest
+        plans.sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime());
+        combinedResults.push({ member: m, plan: plans[0] });
+      }
+    }
+
     // Filter for active plans only
-    return results.filter(m => getMembershipStatus(m) === 'Active').slice(0, 10);
+    return combinedResults.filter(c => getMembershipStatus(c.plan) === 'Active').slice(0, 10);
   }, [searchTerm, timeTick]);
 
-  const handleCheckIn = async (member: Member) => {
-    if (!member.id) return;
+  const handleCheckIn = async (data: CombinedMember) => {
+    const { member, plan } = data;
+    if (!member.id || !plan.sync_id) return;
     
     try {
       await db.attendances.add({
-        miembroId: member.id!,
+        miembroId: member.id, // Legacy local ID
         memberId: member.memberId, // Link to User Identity
-        fecha_hora: new Date(),
+        member_plan_id: plan.sync_id, // Link to the specific plan used
+        fecha_hora: getCurrentDate(),
       });
-      setLastCheckIn({ member, timestamp: Date.now() });
+      setLastCheckIn({ data, timestamp: Date.now() });
       setSearchTerm(''); // clear search after check-in
       window.dispatchEvent(new Event('request-sync'));
     } catch (e) {
@@ -93,8 +115,8 @@ export default function CheckInView() {
 
       {/* Results List */}
       <div className="flex-1 overflow-y-auto space-y-4 pb-20 custom-scrollbar">
-        {members?.map((member) => (
-          <MemberCard key={member.id} member={member} onClick={handleCheckIn} />
+        {members?.map((combined) => (
+          <MemberCard key={combined.plan.sync_id} data={combined} onClick={handleCheckIn} />
         ))}
         {searchTerm && members?.length === 0 && (
           <div className="text-center py-10 text-muted-foreground">
@@ -114,7 +136,7 @@ export default function CheckInView() {
         {lastCheckIn && (
           <CheckInSuccess 
             key={lastCheckIn.timestamp} // Force remount on new check-in
-            member={lastCheckIn.member} 
+            data={lastCheckIn.data} 
             onDismiss={() => setLastCheckIn(null)} 
           />
         )}
