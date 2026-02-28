@@ -382,7 +382,12 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                   <Input 
                     placeholder="Nombre Completo" 
                     value={nombre}
-                    onChange={(e) => setNombre(e.target.value)}
+                    onChange={(e) => {
+                      setNombre(e.target.value);
+                      if (selectedMemberId && !editingMemberId) {
+                        setSelectedMemberId(null);
+                      }
+                    }}
                     className="pl-10 h-12 text-base"
                     autoComplete="off"
                     onFocus={() => { if (nameSuggestions.length > 0) setShowSuggestions(true); }}
