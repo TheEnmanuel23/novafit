@@ -38,27 +38,22 @@ export const AttendanceReport = () => {
             .reverse()
             .toArray();
 
-        // Enrich with member data
-        // We need to fetch basic info.
-        // Create a set of memberIds (or miembroIds) to fetch efficiently? 
-        // Or just fetch all members if dataset is small (<1000). 
-        // For scalability, fetch utilized IDs.
-        
-        // Strategy: Fetch related plans (miembroId) to get Current Info at that time?
-        // Actually, member details might store current name.
-        // We want the name associated with the `miembroId` (the plan record).
-        
-        const planIds = new Set(atts.map(a => a.miembroId));
-        const plans = await db.members.where('id').anyOf([...planIds]).toArray();
-        const planMap = new Map(plans.map(p => [p.id!, p]));
+        // Fetch all members and plans to avoid anyOf lookup issues on undefined arrays
+        const allMembers = await db.members.toArray();
+        const memberMap = new Map(allMembers.map(m => [m.memberId, m]));
+        const legacyMemberMap = new Map(allMembers.map(m => [m.id!, m]));
+
+        const allPlans = await db.member_plans.toArray();
+        const planMap = new Map(allPlans.map(p => [p.sync_id, p]));
 
         const enriched = atts.map(att => {
-            const plan = planMap.get(att.miembroId);
+            const member = att.memberId ? memberMap.get(att.memberId) : legacyMemberMap.get(att.miembroId);
+            const plan = att.member_plan_id ? planMap.get(att.member_plan_id) : legacyMemberMap.get(att.miembroId);
+            
             return {
                 ...att,
-                memberName: plan?.nombre || 'Desconocido',
+                memberName: member?.nombre || 'Desconocido',
                 planName: plan?.plan_tipo || 'N/A',
-                // We could also use att.memberId to group, but for display "Plan Name" from the record is good.
             };
         });
 

@@ -21,13 +21,14 @@ export const syncData = async () => {
             memberId: mid, // Unique Identifier
             nombre: member.nombre,
             telefono: member.telefono,
-            plan_tipo: member.plan_tipo,
-            costo: member.costo,
-            is_promo: member.is_promo,
+            plan_tipo: member.plan_tipo || 'Visita',
+            plan_days: member.plan_days || 1,
+            costo: member.costo || 0,
+            is_promo: member.is_promo || false,
             notes: member.notes,
-            fecha_inicio: member.fecha_inicio.toISOString(),
+            fecha_inicio: member.fecha_inicio ? new Date(member.fecha_inicio).toISOString() : new Date().toISOString(),
             deleted: member.deleted || false,
-            updated_at: member.updated_at ? member.updated_at.toISOString() : new Date().toISOString()
+            updated_at: member.updated_at ? new Date(member.updated_at).toISOString() : new Date().toISOString()
         }, { onConflict: 'memberId' });
 
         if (!error) {
@@ -58,10 +59,11 @@ export const syncData = async () => {
                       nombre: rm.nombre, 
                       telefono: rm.telefono,
                       plan_tipo: rm.plan_tipo as any,
+                      plan_days: rm.plan_days,
                       costo: rm.costo,
                       is_promo: rm.is_promo,
                       notes: rm.notes,
-                      fecha_inicio: new Date(rm.fecha_inicio),
+                      fecha_inicio: rm.fecha_inicio ? new Date(rm.fecha_inicio) : new Date(),
                       deleted: rm.deleted,
                       updated_at: remoteDate,
                       synced: 1
@@ -74,11 +76,96 @@ export const syncData = async () => {
                     nombre: rm.nombre,
                     telefono: rm.telefono,
                     plan_tipo: rm.plan_tipo as any,
+                    plan_days: rm.plan_days,
                     costo: rm.costo,
                     is_promo: rm.is_promo,
                     notes: rm.notes,
-                    fecha_inicio: new Date(rm.fecha_inicio),
+                    fecha_inicio: rm.fecha_inicio ? new Date(rm.fecha_inicio) : new Date(),
                     deleted: rm.deleted,
+                    updated_at: remoteDate,
+                    synced: 1
+                });
+            }
+        }
+    }
+
+    // 2.5 Sync Member Plans (Push)
+    const allMemberPlans = await db.member_plans.toArray();
+    const unsyncedMemberPlans = allMemberPlans.filter(p => !p.synced || p.synced === 0);
+    console.log(`Found ${unsyncedMemberPlans.length} unsynced member plans.`);
+
+    for (const plan of unsyncedMemberPlans) {
+        if (!plan.sync_id) continue;
+
+        const { error } = await supabase.from('member_plans').upsert({
+            id: plan.sync_id,
+            memberId: plan.memberId,
+            plan_id: plan.plan_id || null,
+            plan_tipo: plan.plan_tipo,
+            plan_days: plan.plan_days,
+            costo: plan.costo,
+            is_promo: plan.is_promo,
+            notes: plan.notes,
+            fecha_inicio: plan.fecha_inicio ? new Date(plan.fecha_inicio).toISOString() : new Date().toISOString(),
+            deleted: plan.deleted || false,
+            registered_by: plan.registered_by,
+            registered_by_name: plan.registered_by_name,
+            updated_at: plan.updated_at ? new Date(plan.updated_at).toISOString() : new Date().toISOString()
+        }, { onConflict: 'id' });
+
+        if (!error) {
+            await db.member_plans.update(plan.id!, { synced: 1 });
+        } else {
+            console.error("Error syncing member plan:", error);
+            throw new Error(`Error en plan: ${error.message} - ${error.details}`);
+        }
+    }
+
+    // 2.75 Sync Member Plans (Pull)
+    const { data: remoteMemberPlans, error: pullPlansError } = await supabase.from('member_plans').select('*');
+    if (pullPlansError) {
+        console.error("Error pulling member plans:", pullPlansError);
+        throw new Error(`Error pulling member plans: ${pullPlansError.message}`);
+    }
+    
+    if (remoteMemberPlans) {
+        for (const rp of remoteMemberPlans) {
+            const local = await db.member_plans.where('sync_id').equals(rp.id).first();
+            const remoteDate = new Date(rp.updated_at);
+            
+            if (local) {
+               const localDate = local.updated_at || new Date(0);
+               if (remoteDate > localDate) {
+                  await db.member_plans.update(local.id!, {
+                      memberId: rp.memberId,
+                      plan_id: rp.plan_id,
+                      plan_tipo: rp.plan_tipo as any,
+                      plan_days: rp.plan_days,
+                      costo: rp.costo,
+                      is_promo: rp.is_promo,
+                      notes: rp.notes,
+                      fecha_inicio: new Date(rp.fecha_inicio),
+                      deleted: rp.deleted,
+                      registered_by: rp.registered_by,
+                      registered_by_name: rp.registered_by_name,
+                      updated_at: remoteDate,
+                      synced: 1
+                  });
+               }
+            } else {
+                await db.member_plans.add({
+                    sync_id: rp.id,
+                    memberId: rp.memberId,
+                    plan_id: rp.plan_id,
+                    plan_tipo: rp.plan_tipo as any,
+                    plan_days: rp.plan_days,
+                    costo: rp.costo,
+                    is_promo: rp.is_promo,
+                    notes: rp.notes,
+                    fecha_inicio: new Date(rp.fecha_inicio),
+                    deleted: rp.deleted,
+                    registered_by: rp.registered_by,
+                    registered_by_name: rp.registered_by_name,
                     updated_at: remoteDate,
                     synced: 1
                 });
@@ -110,6 +197,7 @@ export const syncData = async () => {
 
         const { error } = await supabase.from('attendances').insert({
             memberId: attMemberId,
+            member_plan_id: att.member_plan_id || null,
             fecha_hora: att.fecha_hora 
                 ? (typeof att.fecha_hora === 'string' ? new Date(att.fecha_hora).toISOString() : att.fecha_hora.toISOString())
                 : new Date().toISOString(),
@@ -153,6 +241,7 @@ export const syncData = async () => {
                 if (localMember) {
                     await db.attendances.add({
                         memberId: ra.memberId,
+                        member_plan_id: ra.member_plan_id,
                         miembroId: localMember.id!, // Keep the legacy pointer
                         fecha_hora: new Date(ra.fecha_hora),
                         synced: 1, // It's already in the cloud
@@ -211,6 +300,7 @@ export const syncData = async () => {
                 const localDate = local.updated_at || new Date(0);
                 if (remoteDate > localDate) {
                     await db.staff.update(local.id!, {
+                        staffId: rs.staffId,
                         nombre: rs.nombre,
                         username: rs.username,
                         password: rs.password,

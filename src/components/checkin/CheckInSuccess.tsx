@@ -5,22 +5,24 @@ import { Check, X } from 'lucide-react';
 import { Member } from '@/lib/types';
 import { getMembershipStatus } from '@/lib/utils';
 
+import { CombinedMember } from './MemberCard';
+
 interface CheckInSuccessProps {
-  member: Member | null;
+  data: CombinedMember | null;
   onDismiss: () => void;
 }
 
-export const CheckInSuccess: React.FC<CheckInSuccessProps> = ({ member, onDismiss }) => {
+export const CheckInSuccess: React.FC<CheckInSuccessProps> = ({ data, onDismiss }) => {
   useEffect(() => {
-    if (member) {
+    if (data) {
       const timer = setTimeout(onDismiss, 2000);
       return () => clearTimeout(timer);
     }
-  }, [member, onDismiss]);
+  }, [data, onDismiss]);
 
-  if (!member) return null;
+  if (!data) return null;
 
-  const status = getMembershipStatus(member);
+  const status = getMembershipStatus(data.plan);
   const isExpired = status === 'Expired';
   const color = isExpired ? 'red' : 'emerald';
 
@@ -50,7 +52,7 @@ export const CheckInSuccess: React.FC<CheckInSuccessProps> = ({ member, onDismis
           <h2 className="text-3xl font-bold text-white mb-2">
             {isExpired ? 'Acceso Denegado' : '¡Bienvenido!'}
           </h2>
-          <p className="text-xl text-neutral-400 mb-6">{member.nombre}</p>
+          <p className="text-xl text-neutral-400 mb-6">{data.member.nombre}</p>
           
           <div className={`inline-flex items-center rounded-full bg-${color}-500/10 px-4 py-2 text-${color}-400 ring-1 ring-inset ring-${color}-500/20`}>
             {status === 'Active' ? 'Plan Activo' : 'Plan Vencido'}
