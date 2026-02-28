@@ -365,7 +365,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
         <Card className="border-primary/20 bg-card/40 backdrop-blur-xl shadow-2xl h-fit">
           <CardHeader>
              <CardTitle className="text-xl flex justify-between items-center">
-               {editingMemberId ? 'Editar Miembro' : 'Nuevo Registro'}
+               {editingMemberId ? 'Editar Miembro' : selectedMemberId ? 'Renovar Plan' : 'Nuevo Registro'}
                {editingMemberId && (
                  <button onClick={handleCancelEdit} className="text-xs text-muted-foreground hover:text-white border px-2 py-1 rounded">
                    Cancelar
@@ -391,6 +391,10 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                     className="pl-10 h-12 text-base"
                     autoComplete="off"
                     onFocus={() => { if (nameSuggestions.length > 0) setShowSuggestions(true); }}
+                    onBlur={() => {
+                        // Delay hiding so clicks on suggestions can register
+                        setTimeout(() => setShowSuggestions(false), 200);
+                    }}
                   />
                   {/* Suggestions Dropdown */}
                   {showSuggestions && nameSuggestions.length > 0 && (
