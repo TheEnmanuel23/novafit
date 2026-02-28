@@ -213,8 +213,6 @@ export default function AdminView({ onLogout }: AdminViewProps) {
              nombre,
              telefono,
              updated_at: getCurrentDate(),
-             registered_by: user?.staffId,
-             registered_by_name: user?.nombre,
            });
         }
         

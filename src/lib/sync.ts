@@ -28,8 +28,6 @@ export const syncData = async () => {
             notes: member.notes,
             fecha_inicio: member.fecha_inicio ? new Date(member.fecha_inicio).toISOString() : new Date().toISOString(),
             deleted: member.deleted || false,
-            registered_by: member.registered_by || null,
-            registered_by_name: member.registered_by_name || null,
             updated_at: member.updated_at ? new Date(member.updated_at).toISOString() : new Date().toISOString()
         }, { onConflict: 'memberId' });
 
@@ -67,8 +65,6 @@ export const syncData = async () => {
                       notes: rm.notes,
                       fecha_inicio: rm.fecha_inicio ? new Date(rm.fecha_inicio) : new Date(),
                       deleted: rm.deleted,
-                      registered_by: rm.registered_by,
-                      registered_by_name: rm.registered_by_name,
                       updated_at: remoteDate,
                       synced: 1
                   });
@@ -86,8 +82,6 @@ export const syncData = async () => {
                     notes: rm.notes,
                     fecha_inicio: rm.fecha_inicio ? new Date(rm.fecha_inicio) : new Date(),
                     deleted: rm.deleted,
-                    registered_by: rm.registered_by,
-                    registered_by_name: rm.registered_by_name,
                     updated_at: remoteDate,
                     synced: 1
                 });

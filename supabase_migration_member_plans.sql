@@ -65,3 +65,16 @@ CREATE POLICY "Allow all access to member_plans" ON public.member_plans FOR ALL 
 
 -- Note: Depending on your initial configuration, we left the legacy columns (plan_tipo, costo, etc.)
 -- on the `members` table temporarily to ensure backward compatibility during migration. They can be dropped later.
+
+-- 8. Cleanup legacy staff tracking columns from `members`
+-- Since `member_plans` now tracks exactly who registered which plan, we drop the obsolete duplicates.
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'members' AND column_name = 'registered_by') THEN
+    ALTER TABLE public.members DROP COLUMN registered_by;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'members' AND column_name = 'registered_by_name') THEN
+    ALTER TABLE public.members DROP COLUMN registered_by_name;
+  END IF;
+END $$;

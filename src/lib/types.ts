@@ -30,8 +30,6 @@ export interface Member {
   deleted?: boolean; // Soft delete flag
   updated_at?: Date; // For sync
   synced?: number; // 0 = dirty, 1 = synced
-  registered_by?: string; // staffId of creator
-  registered_by_name?: string; // name of creator
 }
 
 export interface MemberPlan {
