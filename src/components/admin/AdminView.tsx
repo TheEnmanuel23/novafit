@@ -57,7 +57,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   
   // Search state for members list
   const [membersSearchTerm, setMembersSearchTerm] = useState('');
-  const [membersSort, setMembersSort] = useState('created_desc');
+  const [membersSort, setMembersSort] = useState('created');
+  const [membersSortOrder, setMembersSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedHistoryMember, setSelectedHistoryMember] = useState<any>(null);
   const [dbPlans, setDbPlans] = useState<SystemPlan[]>([]);
 
@@ -104,23 +105,23 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     
     // Sort overall results based on selected criteria
     combined.sort((a, b) => {
-      if (membersSort === 'name_asc') {
-        return a.member.nombre.localeCompare(b.member.nombre);
-      } else if (membersSort === 'date_expire_asc') {
-        return getExpirationDate(a.plan).getTime() - getExpirationDate(b.plan).getTime();
-      } else if (membersSort === 'date_expire_desc') {
-        return getExpirationDate(b.plan).getTime() - getExpirationDate(a.plan).getTime();
-      } else if (membersSort === 'date_start_desc') {
-        return new Date(b.plan.fecha_inicio).getTime() - new Date(a.plan.fecha_inicio).getTime();
+      let result = 0;
+      if (membersSort === 'name') {
+        result = a.member.nombre.localeCompare(b.member.nombre);
+      } else if (membersSort === 'date_expire') {
+        result = getExpirationDate(a.plan).getTime() - getExpirationDate(b.plan).getTime();
+      } else if (membersSort === 'date_start') {
+        result = new Date(a.plan.fecha_inicio).getTime() - new Date(b.plan.fecha_inicio).getTime();
       } else {
-        // created_desc: sort by member plan creation ID/timestamp
+        // created: sort by member plan creation ID/timestamp
         // Assuming plan.id represents creation order roughly
-        return (b.plan.id || 0) - (a.plan.id || 0);
+        result = (a.plan.id || 0) - (b.plan.id || 0);
       }
+      return membersSortOrder === 'asc' ? result : -result;
     });
 
     return combined;
-  }, [membersSearchTerm, membersSort, timeTick]);
+  }, [membersSearchTerm, membersSort, membersSortOrder, timeTick]);
 
   // Name Autocomplete
   React.useEffect(() => {
@@ -549,9 +550,10 @@ export default function AdminView({ onLogout }: AdminViewProps) {
             <h2 className="text-xl font-bold ml-1">Miembros Recientes</h2>
           </div>
           
-          {/* Search Box and Sort */}
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1">
+          {/* Filters Row */}
+          <div className="flex flex-col gap-3">
+            {/* Search Box */}
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Buscar por nombre o teléfono..." 
@@ -560,16 +562,28 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                 className="pl-10 h-10 bg-card/50"
               />
             </div>
-            <select
-              value={membersSort}
-              onChange={(e) => setMembersSort(e.target.value)}
-              className="h-10 rounded-md border border-white/10 bg-card/50 px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-white min-w-[180px]"
-            >
-              <option value="created_desc" className="bg-neutral-900">Creación (Más recientes)</option>
-              <option value="name_asc" className="bg-neutral-900">Nombre (A-Z)</option>
-              <option value="date_expire_asc" className="bg-neutral-900">Vencimiento (Próximos)</option>
-              <option value="date_start_desc" className="bg-neutral-900">Inicio (Recientes)</option>
-            </select>
+            {/* Sort Row */}
+            <div className="flex flex-row gap-2 items-center">
+              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Ordenar por:</span>
+              <select
+                value={membersSort}
+                onChange={(e) => setMembersSort(e.target.value)}
+                className="h-9 flex-1 rounded-md border border-white/10 bg-card/50 px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-white"
+              >
+                <option value="created" className="bg-neutral-900">Fecha de Creación</option>
+                <option value="name" className="bg-neutral-900">Nombre</option>
+                <option value="date_expire" className="bg-neutral-900">Vencimiento</option>
+                <option value="date_start" className="bg-neutral-900">Inicio de Plan</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setMembersSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className="flex items-center justify-center p-2 rounded-md border border-white/10 bg-card/50 hover:bg-card/80 transition-colors text-white h-9 px-3 text-sm font-medium"
+                title={membersSortOrder === 'asc' ? 'Ascendente (A-Z / Más Antiguos Primero)' : 'Descendente (Z-A / Más Nuevos Primero)'}
+              >
+                {membersSortOrder === 'asc' ? 'Ascendente' : 'Descendente'}
+              </button>
+            </div>
           </div>
 
           <div className="space-y-3 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
