@@ -31,9 +31,9 @@ export function getExpirationDate(plan: MemberPlan): Date {
   
   // Fallback for older records or default
   if (!daysActive) {
-    daysActive = 30;
+    daysActive = 31;
     if (plan.plan_tipo === 'Quincenal') daysActive = 15;
-    if (plan.plan_tipo === 'Semanal') daysActive = 7;
+    if (plan.plan_tipo === 'Semanal') daysActive = 6;
     if (plan.plan_tipo === 'Día') daysActive = 1;
   }
 

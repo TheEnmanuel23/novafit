@@ -57,6 +57,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   
   // Search state for members list
   const [membersSearchTerm, setMembersSearchTerm] = useState('');
+  const [membersSort, setMembersSort] = useState('created');
+  const [membersSortOrder, setMembersSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedHistoryMember, setSelectedHistoryMember] = useState<any>(null);
   const [dbPlans, setDbPlans] = useState<SystemPlan[]>([]);
 
@@ -81,10 +83,10 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     // Apply search filter if present
     if (membersSearchTerm) {
       const lower = membersSearchTerm.toLowerCase();
-      collection = collection.and(m => 
-        m.nombre.toLowerCase().includes(lower) || 
-        m.telefono.includes(lower) // Handle null gracefully down stream if needed
-      );
+      collection = collection.and(m => {
+        const phoneMatch = m.telefono ? m.telefono.includes(lower) : false;
+        return m.nombre.toLowerCase().includes(lower) || phoneMatch;
+      });
     }
     
     const profiles = await collection.toArray();
@@ -93,22 +95,33 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     
     for (const p of profiles) {
       const plans = await db.member_plans.where('memberId').equals(p.memberId).filter(plan => !plan.deleted).toArray();
-      // Sort plans newest first
+      // Sort plans newest first to get the current plan
       plans.sort((a,b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime());
       
       if (plans.length > 0) {
         combined.push({ member: p, plan: plans[0] });
-      } else {
-        // Technically shouldn't happen, but gracefully show profile with dummy plan if needed
-        // Or just skip. We will skip users without any plans for safety.
       }
     }
     
-    // Sort overall results by most recent plan start date
-    combined.sort((a,b) => new Date(b.plan.fecha_inicio).getTime() - new Date(a.plan.fecha_inicio).getTime());
-    
+    // Sort overall results based on selected criteria
+    combined.sort((a, b) => {
+      let result = 0;
+      if (membersSort === 'name') {
+        result = a.member.nombre.localeCompare(b.member.nombre);
+      } else if (membersSort === 'date_expire') {
+        result = getExpirationDate(a.plan).getTime() - getExpirationDate(b.plan).getTime();
+      } else if (membersSort === 'date_start') {
+        result = new Date(a.plan.fecha_inicio).getTime() - new Date(b.plan.fecha_inicio).getTime();
+      } else {
+        // created: sort by member plan creation ID/timestamp
+        // Assuming plan.id represents creation order roughly
+        result = (a.plan.id || 0) - (b.plan.id || 0);
+      }
+      return membersSortOrder === 'asc' ? result : -result;
+    });
+
     return combined;
-  }, [membersSearchTerm, timeTick]);
+  }, [membersSearchTerm, membersSort, membersSortOrder, timeTick]);
 
   // Name Autocomplete
   React.useEffect(() => {
@@ -537,15 +550,40 @@ export default function AdminView({ onLogout }: AdminViewProps) {
             <h2 className="text-xl font-bold ml-1">Miembros Recientes</h2>
           </div>
           
-          {/* Search Box */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Buscar por nombre o teléfono..." 
-              value={membersSearchTerm}
-              onChange={(e) => setMembersSearchTerm(e.target.value)}
-              className="pl-10 h-10 bg-card/50"
-            />
+          {/* Filters Row */}
+          <div className="flex flex-col gap-3">
+            {/* Search Box */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Buscar por nombre o teléfono..." 
+                value={membersSearchTerm}
+                onChange={(e) => setMembersSearchTerm(e.target.value)}
+                className="pl-10 h-10 bg-card/50"
+              />
+            </div>
+            {/* Sort Row */}
+            <div className="flex flex-row gap-2 items-center">
+              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Ordenar por:</span>
+              <select
+                value={membersSort}
+                onChange={(e) => setMembersSort(e.target.value)}
+                className="h-9 flex-1 rounded-md border border-white/10 bg-card/50 px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-white"
+              >
+                <option value="created" className="bg-neutral-900">Fecha de Creación</option>
+                <option value="name" className="bg-neutral-900">Nombre</option>
+                <option value="date_expire" className="bg-neutral-900">Vencimiento</option>
+                <option value="date_start" className="bg-neutral-900">Inicio de Plan</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setMembersSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className="flex items-center justify-center p-2 rounded-md border border-white/10 bg-card/50 hover:bg-card/80 transition-colors text-white h-9 px-3 text-sm font-medium"
+                title={membersSortOrder === 'asc' ? 'Ascendente (A-Z / Más Antiguos Primero)' : 'Descendente (Z-A / Más Nuevos Primero)'}
+              >
+                {membersSortOrder === 'asc' ? 'Ascendente' : 'Descendente'}
+              </button>
+            </div>
           </div>
 
           <div className="space-y-3 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">

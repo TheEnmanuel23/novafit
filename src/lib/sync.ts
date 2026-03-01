@@ -21,12 +21,6 @@ export const syncData = async () => {
             memberId: mid, // Unique Identifier
             nombre: member.nombre,
             telefono: member.telefono,
-            plan_tipo: member.plan_tipo || 'Visita',
-            plan_days: member.plan_days || 1,
-            costo: member.costo || 0,
-            is_promo: member.is_promo || false,
-            notes: member.notes,
-            fecha_inicio: member.fecha_inicio ? new Date(member.fecha_inicio).toISOString() : new Date().toISOString(),
             deleted: member.deleted || false,
             updated_at: member.updated_at ? new Date(member.updated_at).toISOString() : new Date().toISOString()
         }, { onConflict: 'memberId' });
@@ -52,35 +46,22 @@ export const syncData = async () => {
             const remoteDate = new Date(rm.updated_at);
             
             if (local) {
-               const localDate = local.updated_at || new Date(0);
-               // Update local if remote is newer
-               if (remoteDate > localDate) {
+               const localDate = local.updated_at ? new Date(local.updated_at) : new Date(0);
+               // Update local if remote is different (handles edits that set dates backward or forward)
+               if (remoteDate.getTime() !== localDate.getTime()) {
                   await db.members.update(local.id!, {
                       nombre: rm.nombre, 
                       telefono: rm.telefono,
-                      plan_tipo: rm.plan_tipo as any,
-                      plan_days: rm.plan_days,
-                      costo: rm.costo,
-                      is_promo: rm.is_promo,
-                      notes: rm.notes,
-                      fecha_inicio: rm.fecha_inicio ? new Date(rm.fecha_inicio) : new Date(),
                       deleted: rm.deleted,
                       updated_at: remoteDate,
                       synced: 1
                   });
                }
             } else {
-                // Insert new member from server
                 await db.members.add({
                     memberId: rm.memberId,
                     nombre: rm.nombre,
                     telefono: rm.telefono,
-                    plan_tipo: rm.plan_tipo as any,
-                    plan_days: rm.plan_days,
-                    costo: rm.costo,
-                    is_promo: rm.is_promo,
-                    notes: rm.notes,
-                    fecha_inicio: rm.fecha_inicio ? new Date(rm.fecha_inicio) : new Date(),
                     deleted: rm.deleted,
                     updated_at: remoteDate,
                     synced: 1
@@ -134,8 +115,9 @@ export const syncData = async () => {
             const remoteDate = new Date(rp.updated_at);
             
             if (local) {
-               const localDate = local.updated_at || new Date(0);
-               if (remoteDate > localDate) {
+               const localDate = local.updated_at ? new Date(local.updated_at) : new Date(0);
+               // Update local if remote is different
+               if (remoteDate.getTime() !== localDate.getTime()) {
                   await db.member_plans.update(local.id!, {
                       memberId: rp.memberId,
                       plan_id: rp.plan_id,
@@ -297,8 +279,9 @@ export const syncData = async () => {
             const remoteDate = new Date(rs.updated_at);
 
             if (local) {
-                const localDate = local.updated_at || new Date(0);
-                if (remoteDate > localDate) {
+                const localDate = local.updated_at ? new Date(local.updated_at) : new Date(0);
+                // Update local if remote is different
+                if (remoteDate.getTime() !== localDate.getTime()) {
                     await db.staff.update(local.id!, {
                         staffId: rs.staffId,
                         nombre: rs.nombre,
