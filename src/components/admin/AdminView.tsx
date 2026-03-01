@@ -57,6 +57,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   
   // Search state for members list
   const [membersSearchTerm, setMembersSearchTerm] = useState('');
+  const [membersSort, setMembersSort] = useState('created_desc');
   const [selectedHistoryMember, setSelectedHistoryMember] = useState<any>(null);
   const [dbPlans, setDbPlans] = useState<SystemPlan[]>([]);
 
@@ -81,10 +82,10 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     // Apply search filter if present
     if (membersSearchTerm) {
       const lower = membersSearchTerm.toLowerCase();
-      collection = collection.and(m => 
-        m.nombre.toLowerCase().includes(lower) || 
-        m.telefono.includes(lower) // Handle null gracefully down stream if needed
-      );
+      collection = collection.and(m => {
+        const phoneMatch = m.telefono ? m.telefono.includes(lower) : false;
+        return m.nombre.toLowerCase().includes(lower) || phoneMatch;
+      });
     }
     
     const profiles = await collection.toArray();
@@ -93,22 +94,33 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     
     for (const p of profiles) {
       const plans = await db.member_plans.where('memberId').equals(p.memberId).filter(plan => !plan.deleted).toArray();
-      // Sort plans newest first
+      // Sort plans newest first to get the current plan
       plans.sort((a,b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime());
       
       if (plans.length > 0) {
         combined.push({ member: p, plan: plans[0] });
-      } else {
-        // Technically shouldn't happen, but gracefully show profile with dummy plan if needed
-        // Or just skip. We will skip users without any plans for safety.
       }
     }
     
-    // Sort overall results by most recent plan start date
-    combined.sort((a,b) => new Date(b.plan.fecha_inicio).getTime() - new Date(a.plan.fecha_inicio).getTime());
-    
+    // Sort overall results based on selected criteria
+    combined.sort((a, b) => {
+      if (membersSort === 'name_asc') {
+        return a.member.nombre.localeCompare(b.member.nombre);
+      } else if (membersSort === 'date_expire_asc') {
+        return getExpirationDate(a.plan).getTime() - getExpirationDate(b.plan).getTime();
+      } else if (membersSort === 'date_expire_desc') {
+        return getExpirationDate(b.plan).getTime() - getExpirationDate(a.plan).getTime();
+      } else if (membersSort === 'date_start_desc') {
+        return new Date(b.plan.fecha_inicio).getTime() - new Date(a.plan.fecha_inicio).getTime();
+      } else {
+        // created_desc: sort by member plan creation ID/timestamp
+        // Assuming plan.id represents creation order roughly
+        return (b.plan.id || 0) - (a.plan.id || 0);
+      }
+    });
+
     return combined;
-  }, [membersSearchTerm, timeTick]);
+  }, [membersSearchTerm, membersSort, timeTick]);
 
   // Name Autocomplete
   React.useEffect(() => {
@@ -537,15 +549,27 @@ export default function AdminView({ onLogout }: AdminViewProps) {
             <h2 className="text-xl font-bold ml-1">Miembros Recientes</h2>
           </div>
           
-          {/* Search Box */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Buscar por nombre o teléfono..." 
-              value={membersSearchTerm}
-              onChange={(e) => setMembersSearchTerm(e.target.value)}
-              className="pl-10 h-10 bg-card/50"
-            />
+          {/* Search Box and Sort */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Buscar por nombre o teléfono..." 
+                value={membersSearchTerm}
+                onChange={(e) => setMembersSearchTerm(e.target.value)}
+                className="pl-10 h-10 bg-card/50"
+              />
+            </div>
+            <select
+              value={membersSort}
+              onChange={(e) => setMembersSort(e.target.value)}
+              className="h-10 rounded-md border border-white/10 bg-card/50 px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-white min-w-[180px]"
+            >
+              <option value="created_desc" className="bg-neutral-900">Creación (Más recientes)</option>
+              <option value="name_asc" className="bg-neutral-900">Nombre (A-Z)</option>
+              <option value="date_expire_asc" className="bg-neutral-900">Vencimiento (Próximos)</option>
+              <option value="date_start_desc" className="bg-neutral-900">Inicio (Recientes)</option>
+            </select>
           </div>
 
           <div className="space-y-3 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
