@@ -46,9 +46,9 @@ export const syncData = async () => {
             const remoteDate = new Date(rm.updated_at);
             
             if (local) {
-               const localDate = local.updated_at || new Date(0);
-               // Update local if remote is newer
-               if (remoteDate > localDate) {
+               const localDate = local.updated_at ? new Date(local.updated_at) : new Date(0);
+               // Update local if remote is different (handles edits that set dates backward or forward)
+               if (remoteDate.getTime() !== localDate.getTime()) {
                   await db.members.update(local.id!, {
                       nombre: rm.nombre, 
                       telefono: rm.telefono,
@@ -115,8 +115,9 @@ export const syncData = async () => {
             const remoteDate = new Date(rp.updated_at);
             
             if (local) {
-               const localDate = local.updated_at || new Date(0);
-               if (remoteDate > localDate) {
+               const localDate = local.updated_at ? new Date(local.updated_at) : new Date(0);
+               // Update local if remote is different
+               if (remoteDate.getTime() !== localDate.getTime()) {
                   await db.member_plans.update(local.id!, {
                       memberId: rp.memberId,
                       plan_id: rp.plan_id,
@@ -278,8 +279,9 @@ export const syncData = async () => {
             const remoteDate = new Date(rs.updated_at);
 
             if (local) {
-                const localDate = local.updated_at || new Date(0);
-                if (remoteDate > localDate) {
+                const localDate = local.updated_at ? new Date(local.updated_at) : new Date(0);
+                // Update local if remote is different
+                if (remoteDate.getTime() !== localDate.getTime()) {
                     await db.staff.update(local.id!, {
                         staffId: rs.staffId,
                         nombre: rs.nombre,
