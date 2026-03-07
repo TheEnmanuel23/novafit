@@ -15,26 +15,16 @@ export interface SystemPlan {
 }
 
 export interface Member {
-  id?: number; // Auto-incremented ID
+  id?: number; // Keep for backward compatibility if needed, though Supabase might use it as bigserial. Let's assume memberId is the main UUID.
   memberId: string; // Stable ID for the user entity (links multiple plans)
   nombre: string;
   telefono: string;
-  // Legacy plan fields kept optional for backward compatibility during migration
-  plan_tipo?: PlanType;
-  plan_days?: number;
-  costo?: number;
-  is_promo?: boolean;
-  notes?: string;
-  fecha_inicio?: Date;
-  
   deleted?: boolean; // Soft delete flag
-  updated_at?: Date; // For sync
-  synced?: number; // 0 = dirty, 1 = synced
+  updated_at?: Date | string;
 }
 
 export interface MemberPlan {
-  id?: number; // Dexie auto-increment
-  sync_id: string; // UUID mapped to Supabase 'id'
+  id: string; // UUID mapped to Supabase 'id'
   memberId: string; // User identity
   plan_id?: string; // ID referencing the 'plans' system catalog
   plan_tipo: PlanType;
@@ -42,44 +32,32 @@ export interface MemberPlan {
   costo: number;
   is_promo?: boolean;
   notes?: string;
-  fecha_inicio: Date;
+  fecha_inicio: Date | string;
   deleted?: boolean;
-  updated_at?: Date;
-  synced?: number;
+  updated_at?: Date | string;
   registered_by?: string;
   registered_by_name?: string;
 }
 
 export interface Attendance {
-  id?: number; // Auto-incremented ID
-  miembroId: number; // Legacy local ID (keep for backward compat)
+  id?: number | string; 
   memberId: string; // Stable User Identity ID
-  member_plan_id?: string; // Maps to MemberPlan.sync_id and Supabase member_plans.id
-  fecha_hora: Date;
-  created_at?: Date;
-  updated_at?: Date;
-  synced?: number;
-}
-
-// Sync types
-export interface SyncPayload {
-  members: Member[];
-  member_plans?: MemberPlan[];
-  attendances: Attendance[];
+  member_plan_id?: string;
+  fecha_hora: Date | string;
+  created_at?: Date | string;
 }
 
 // Staff / User types
 export type StaffRole = 'super_admin' | 'admin';
 
 export interface Staff {
-  id?: number;
+  id?: number | string;
   staffId?: string; // Manual String ID or UUID
   nombre: string;
   username: string;
-  password: string; // stored synched for offline auth (hashed ideally, but plain for prototype if needed)
+  password: string;
   role: StaffRole;
-  created_at: Date;
-  updated_at?: Date;
+  created_at: Date | string;
+  updated_at?: Date | string;
   deleted?: boolean;
-  synced?: number;
 }

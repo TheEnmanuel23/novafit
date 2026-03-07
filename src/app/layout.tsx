@@ -3,10 +3,9 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Header } from '@/components/layout/Header';
-import { SyncWorker } from '@/components/layout/SyncWorker';
 import { cn } from '@/lib/utils'; // Keep import for potential use, though not strictly needed here if we rely on globals.
 import { TimeTravel } from '@/components/dev/TimeTravel';
-// Sonner import removed
+import { Toaster } from 'sonner';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -41,7 +40,6 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} min-h-screen bg-background text-foreground selection:bg-primary selection:text-white antialiased`}>
         <div className="relative flex min-h-screen flex-col">
-          <SyncWorker />
           <Header />
           <main className="flex-1 container mx-auto py-6 md:py-10">
             {children}
@@ -50,6 +48,7 @@ export default function RootLayout({
             <TimeTravel />
           )}
         </div>
+        <Toaster position="bottom-right" theme="dark" />
       </body>
     </html>
   );

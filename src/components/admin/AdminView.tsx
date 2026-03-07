@@ -1,8 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { db } from '@/lib/db';
 import { PlanType, SystemPlan } from '@/lib/types';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { getMembershipStatus, formatDate, getExpirationDate, getCurrentDate } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/Input';
@@ -11,10 +9,10 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Search, RefreshCcw, LogOut, Users } from 'lucide-react';
 import { MemberHistoryModal } from './MemberHistoryModal';
 import { AttendanceReport } from './AttendanceReport';
-import { SyncButton } from '@/components/layout/SyncButton';
 import { useAuthStore } from '@/lib/store';
 import { format } from 'date-fns';
 import { CombinedMember } from '../checkin/MemberCard';
+import { toast } from 'sonner';
 
 interface AdminViewProps {
   onLogout?: () => void;
@@ -30,8 +28,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   const [notes, setNotes] = useState('');
   const [fechaInicio, setFechaInicio] = useState<string>('');
   const [success, setSuccess] = useState(false);
-  const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
-  const [editingPlanId, setEditingPlanId] = useState<number | null>(null);
+  const [editingMemberId, setEditingMemberId] = useState<number | string | null>(null);
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   
   // Identity management
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
@@ -76,30 +74,39 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     fetchPlans();
   }, []);
 
-  const members = useLiveQuery(async () => {
-    // Fetch active (non-deleted) members
-    let collection = db.members.filter(m => !m.deleted);
+  const [members, setMembers] = useState<CombinedMember[]>([]);
+
+  const fetchMembers = async () => {
+    let query = supabase.from('members').select('*').eq('deleted', false);
     
-    // Apply search filter if present
     if (membersSearchTerm) {
       const lower = membersSearchTerm.toLowerCase();
-      collection = collection.and(m => {
-        const phoneMatch = m.telefono ? m.telefono.includes(lower) : false;
-        return m.nombre.toLowerCase().includes(lower) || phoneMatch;
-      });
+      // Use standard ilike/like for search
+      query = query.or(`nombre.ilike.%${lower}%,telefono.like.%${lower}%`);
     }
-    
-    const profiles = await collection.toArray();
-    
+
+    const { data: profiles, error } = await query;
+    if (error || !profiles) {
+      return;
+    }
+
     const combined: CombinedMember[] = [];
+    const memberIds = profiles.map((p: any) => p.memberId);
     
-    for (const p of profiles) {
-      const plans = await db.member_plans.where('memberId').equals(p.memberId).filter(plan => !plan.deleted).toArray();
-      // Sort plans newest first to get the current plan
-      plans.sort((a,b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime());
-      
-      if (plans.length > 0) {
-        combined.push({ member: p, plan: plans[0] });
+    if (memberIds.length > 0) {
+      const { data: plans } = await supabase.from('member_plans')
+         .select('*')
+         .in('memberId', memberIds)
+         .eq('deleted', false)
+         .order('fecha_inicio', { ascending: false });
+         
+      if (plans) {
+        for (const p of profiles) {
+          const userPlans = plans.filter((plan: any) => plan.memberId === p.memberId);
+          if (userPlans.length > 0) {
+            combined.push({ member: p, plan: userPlans[0] });
+          }
+        }
       }
     }
     
@@ -113,43 +120,51 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       } else if (membersSort === 'date_start') {
         result = new Date(a.plan.fecha_inicio).getTime() - new Date(b.plan.fecha_inicio).getTime();
       } else {
-        // created: sort by member plan creation ID/timestamp
-        // Assuming plan.id represents creation order roughly
-        result = (a.plan.id || 0) - (b.plan.id || 0);
+        // created: assuming string id is sortable
+        result = String(a.plan.id).localeCompare(String(b.plan.id));
       }
       return membersSortOrder === 'asc' ? result : -result;
     });
 
-    return combined;
+    setMembers(combined);
+  };
+
+  React.useEffect(() => {
+    fetchMembers();
   }, [membersSearchTerm, membersSort, membersSortOrder, timeTick]);
+
+  React.useEffect(() => {
+    const handleSync = () => fetchMembers();
+    window.addEventListener('request-sync', handleSync);
+    return () => window.removeEventListener('request-sync', handleSync);
+  }, [membersSearchTerm, membersSort, membersSortOrder]);
 
   // Name Autocomplete
   React.useEffect(() => {
-    // Only search if name is long enough and we are not currently editing a specific record
-    // And don't search if we just selected a suggestion
     if (nombre.length < 2 || editingMemberId) {
       setNameSuggestions([]);
       return;
     }
     
-    // Debounce or just query
     const timer = setTimeout(async () => {
         try {
-            const results = await db.members
-                .filter(m => !m.deleted && m.nombre.toLowerCase().includes(nombre.toLowerCase()))
-                .limit(20)
-                .toArray();
+            const { data: results } = await supabase
+                .from('members')
+                .select('*')
+                .eq('deleted', false)
+                .ilike('nombre', `%${nombre}%`)
+                .limit(20);
             
-            // Dedupe suggestions by memberId
-            const unique = new Map();
-            results.forEach(m => {
-                if (m.memberId && !unique.has(m.memberId)) {
-                    unique.set(m.memberId, m);
-                }
-            });
-            // Filter out current selection if strictly matching? No, show all matches.
-            setNameSuggestions(Array.from(unique.values()));
-            setShowSuggestions(true);
+            if (results) {
+              const unique = new Map();
+              results.forEach((m: any) => {
+                  if (m.memberId && !unique.has(m.memberId)) {
+                      unique.set(m.memberId, m);
+                  }
+              });
+              setNameSuggestions(Array.from(unique.values()));
+              setShowSuggestions(true);
+            }
         } catch (e) {
             console.error(e);
         }
@@ -188,61 +203,53 @@ export default function AdminView({ onLogout }: AdminViewProps) {
 
       if (editingMemberId && editingPlanId) {
         // Updating BOTH specific member profile and specific plan
-        await db.members.update(editingMemberId, {
+        await supabase.from('members').update({
           nombre,
           telefono,
-          synced: 0,
-          updated_at: getCurrentDate(),
-        });
+          updated_at: new Date().toISOString(),
+        }).eq('id', editingMemberId);
 
-        await db.member_plans.update(editingPlanId, {
+        await supabase.from('member_plans').update({
           plan_id: planId,
           plan_tipo: plan as any,
           ...(planDays ? { plan_days: planDays } : {}),
           costo: Number(costo),
           is_promo: isPromo,
           notes: notes,
-          fecha_inicio: new Date(fechaInicio + 'T12:00:00'),
-          synced: 0,
-          updated_at: getCurrentDate(),
-        });
+          fecha_inicio: new Date(fechaInicio + 'T12:00:00').toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq('id', editingPlanId);
         
         setEditingMemberId(null);
         setEditingPlanId(null);
       } else {
         // Creating new plan (Renewal or New User)
-        // Use selectedMemberId if available, else new UUID
         const memberId = selectedMemberId || crypto.randomUUID();
         
-        // Only update profile if we selected one, else create new
         if (selectedMemberId) {
-           const existingMember = await db.members.where('memberId').equals(selectedMemberId).first();
-           if (existingMember && existingMember.id) {
-             await db.members.update(existingMember.id, { nombre, telefono, updated_at: getCurrentDate(), synced: 0 });
-           }
+           await supabase.from('members')
+            .update({ nombre, telefono, updated_at: new Date().toISOString() })
+            .eq('memberId', selectedMemberId);
         } else {
-           await db.members.add({
+           await supabase.from('members').insert({
              memberId,
              nombre,
              telefono,
-             updated_at: getCurrentDate(),
            });
         }
         
         // Add new purchase record to member_plans
-        await db.member_plans.add({
-          sync_id: crypto.randomUUID(),
+        await supabase.from('member_plans').insert({
           memberId,
-          plan_id: planId || undefined,
+          plan_id: planId || null,
           plan_tipo: plan as any,
           ...(planDays ? { plan_days: planDays } : { plan_days: 30 }),
           costo: Number(costo),
           is_promo: isPromo,
           notes: notes,
-          fecha_inicio: new Date(fechaInicio + 'T12:00:00'),
+          fecha_inicio: new Date(fechaInicio + 'T12:00:00').toISOString(),
           registered_by: user?.staffId,
           registered_by_name: user?.nombre,
-          updated_at: getCurrentDate(),
         });
       }
       
@@ -306,9 +313,26 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   const handleDelete = async (combined: CombinedMember, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('¿Estás seguro de eliminar este registro?')) {
-      await db.members.update(combined.member.id!, { deleted: true, synced: 0, updated_at: new Date() });
-      await db.member_plans.update(combined.plan.id!, { deleted: true, synced: 0, updated_at: new Date() });
+      await supabase.from('members').update({ deleted: true, updated_at: new Date().toISOString() }).eq('id', combined.member.id);
+      await supabase.from('member_plans').update({ deleted: true, updated_at: new Date().toISOString() }).eq('id', combined.plan.id);
       window.dispatchEvent(new Event('request-sync'));
+    }
+  };
+
+  const handleCheckIn = async (combined: CombinedMember, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!combined.member.memberId || !combined.plan.id) return;
+    try {
+      await supabase.from('attendances').insert({
+        memberId: combined.member.memberId,
+        member_plan_id: combined.plan.id,
+        fecha_hora: getCurrentDate().toISOString(),
+      });
+      toast.success('Check-in registrado con éxito');
+      window.dispatchEvent(new Event('request-sync'));
+    } catch (err) {
+      console.error('Failed to log attendance', err);
+      toast.error('Error al registrar check-in');
     }
   };
 
@@ -361,7 +385,6 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                   Asistencias
               </button>
           </div>
-          <SyncButton />
             <button 
               onClick={onLogout}
               className="p-3 bg-red-500/10 text-red-400 rounded-xl hover:bg-red-500/20 transition-colors border border-red-500/10"
@@ -593,8 +616,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
               const expirationDate = getExpirationDate(combined.plan);
 
               return (
-                <Card 
-                  key={combined.plan.sync_id || combined.member.id} 
+                  <Card 
+                  key={combined.plan.id || combined.member.id} 
                   className={`border-white/5 bg-card/60 transition-all cursor-pointer hover:bg-card/80 hover:border-primary/30 ${editingMemberId === combined.member.id ? 'border-primary ring-2 ring-primary/50' : ''}`}
                   onClick={() => setSelectedHistoryMember(combined.member)}
                 >
@@ -641,35 +664,46 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                         {combined.plan.is_promo && <span className="text-emerald-400 ml-1 text-xs" title="Promo Aplicada">★</span>}
                       </div>
                       
+                    </div>
+                  </div>
+                  
+                  {/* Action Buttons Row */}
+                  <div className="px-4 pb-4 flex justify-end gap-2 mt-2 pt-3 border-t border-white/5">
                       {!isExpired ? (
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex gap-2">
+                          <button 
+                             onClick={(e) => handleCheckIn(combined, e)}
+                             className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
+                             title="Check-in"
+                          >
+                            <CheckCircle size={14} /> Check-in
+                          </button>
                           <button 
                              onClick={(e) => handleEdit(combined, e)}
-                             className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors z-10"
+                             className="px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
                              title="Editar"
                           >
-                            <Edit size={14} />
+                            <Edit size={14} /> Editar
                           </button>
                           <button 
                              onClick={(e) => handleDelete(combined, e)}
-                             className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors z-10"
+                             className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
                              title="Eliminar"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={14} /> Eliminar
                           </button>
                         </div>
                       ) : (
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex gap-2 w-full">
                           <button 
                              onClick={(e) => handleRenew(combined, e)}
-                             className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
+                             className="px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors z-10 flex items-center justify-center gap-1 text-xs font-bold w-full"
                              title="Renovar Suscripción"
                           >
-                            <RefreshCcw size={12} /> Renovar
+                            <RefreshCcw size={14} /> Renovar Suscripción
                           </button>
                         </div>
                       )}
-                    </div>
                   </div>
                 </Card>
               );

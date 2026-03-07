@@ -1,8 +1,7 @@
 
 'use client';
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { Member, MemberPlan } from '@/lib/types';
 import { getMembershipStatus, getCurrentDate } from '@/lib/utils';
 import { MemberCard, CombinedMember } from './MemberCard';
@@ -25,24 +24,31 @@ export default function CheckInView() {
     return () => window.removeEventListener('time-travel-changed', handleTimeChange);
   }, []);
 
-  const members = useLiveQuery(async () => {
-    if (!searchTerm) return [];
+  const [members, setMembers] = useState<CombinedMember[]>([]);
+
+  const fetchMembers = async () => {
+    if (!searchTerm) {
+      setMembers([]);
+      return;
+    }
     
     const lower = searchTerm.toLowerCase();
     const isPhone = /^\d+$/.test(lower);
     
-    let results = [];
+    let query = supabase.from('members').select('*').eq('deleted', false);
     
     if (isPhone) {
-      results = await db.members
-        .where('telefono')
-        .startsWith(searchTerm)
-        .filter(m => !m.deleted)
-        .toArray();
+        // Find exact or starts-with local equivalent logic
+        query = query.like('telefono', `${searchTerm}%`);
     } else {
-      results = await db.members
-        .filter(m => !m.deleted && m.nombre.toLowerCase().includes(lower))
-        .toArray();
+        query = query.ilike('nombre', `%${lower}%`);
+    }
+
+    const { data: results, error } = await query;
+    
+    if (error || !results) {
+        setMembers([]);
+        return;
     }
 
     // Deduplicate and combine with plans: Keep only the latest record for each unique memberId
@@ -55,30 +61,55 @@ export default function CheckInView() {
     });
 
     const combinedResults: CombinedMember[] = [];
-    
-    for (const m of Array.from(uniqueMembers.values())) {
-      const plans = await db.member_plans.where('memberId').equals(m.memberId).filter(p => !p.deleted).toArray();
-      if (plans.length > 0) {
-        // Sort results by fecha_inicio descending to ensure we get the latest
-        plans.sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime());
-        combinedResults.push({ member: m, plan: plans[0] });
+    const memberIds = Array.from(uniqueMembers.keys());
+
+    if (memberIds.length > 0) {
+      const { data: plans } = await supabase.from('member_plans')
+         .select('*')
+         .in('memberId', memberIds)
+         .eq('deleted', false)
+         .order('fecha_inicio', { ascending: false });
+
+      if (plans) {
+          for (const m of Array.from(uniqueMembers.values())) {
+             const memberPlans = plans.filter(p => p.memberId === m.memberId);
+             if (memberPlans.length > 0) {
+                combinedResults.push({ member: m, plan: memberPlans[0] });
+             }
+          }
       }
     }
 
     // Filter for active plans only
-    return combinedResults.filter(c => getMembershipStatus(c.plan) === 'Active').slice(0, 10);
+    const activeMembers = combinedResults
+        .filter(c => getMembershipStatus(c.plan) === 'Active')
+        .slice(0, 10);
+        
+    setMembers(activeMembers);
+  };
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+        fetchMembers();
+    }, 300);
+    return () => clearTimeout(timer);
   }, [searchTerm, timeTick]);
+
+  React.useEffect(() => {
+     const handleSync = () => fetchMembers();
+     window.addEventListener('request-sync', handleSync);
+     return () => window.removeEventListener('request-sync', handleSync);
+  }, [searchTerm]);
 
   const handleCheckIn = async (data: CombinedMember) => {
     const { member, plan } = data;
-    if (!member.id || !plan.sync_id) return;
+    if (!member.memberId || !plan.id) return;
     
     try {
-      await db.attendances.add({
-        miembroId: member.id, // Legacy local ID
-        memberId: member.memberId, // Link to User Identity
-        member_plan_id: plan.sync_id, // Link to the specific plan used
-        fecha_hora: getCurrentDate(),
+      await supabase.from('attendances').insert({
+        memberId: member.memberId,
+        member_plan_id: plan.id,
+        fecha_hora: getCurrentDate().toISOString(),
       });
       setLastCheckIn({ data, timestamp: Date.now() });
       setSearchTerm(''); // clear search after check-in
@@ -116,7 +147,7 @@ export default function CheckInView() {
       {/* Results List */}
       <div className="flex-1 overflow-y-auto space-y-4 pb-20 custom-scrollbar">
         {members?.map((combined) => (
-          <MemberCard key={combined.plan.sync_id} data={combined} onClick={handleCheckIn} />
+          <MemberCard key={combined.plan.id} data={combined} onClick={handleCheckIn} />
         ))}
         {searchTerm && members?.length === 0 && (
           <div className="text-center py-10 text-muted-foreground">
