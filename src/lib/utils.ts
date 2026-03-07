@@ -1,6 +1,6 @@
 
 // src/lib/utils.ts
-import { addDays, isAfter, format, isBefore, endOfDay } from 'date-fns';
+import { addDays, isAfter, format, isBefore, endOfDay, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PlanType, MemberPlan, Member } from './types';
 import { ClassValue, clsx } from 'clsx';
@@ -39,8 +39,22 @@ export function getExpirationDate(plan: MemberPlan): Date {
 
   // Adjust so that days are inclusive (e.g. 7 days starting today ends on the 6th day after today).
   // Use endOfDay so it expires at 23:59:59 of that final day.
-  const targetDate = addDays(new Date(plan.fecha_inicio), Math.max(0, daysActive - 1));
-  return endOfDay(targetDate);
+  let currentDate = new Date(plan.fecha_inicio);
+  let remainingDays = Math.max(0, daysActive - 1);
+
+  // If the plan is "Día", we skip Sundays
+  const skipSundays = plan.plan_tipo === 'Día';
+
+  while (remainingDays > 0) {
+    currentDate = addDays(currentDate, 1);
+    // 0 represents Sunday in date-fns
+    if (skipSundays && getDay(currentDate) === 0) {
+      continue;
+    }
+    remainingDays--;
+  }
+
+  return endOfDay(currentDate);
 }
 
 // Check membership status

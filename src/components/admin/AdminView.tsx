@@ -10,7 +10,7 @@ import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Searc
 import { MemberHistoryModal } from './MemberHistoryModal';
 import { AttendanceReport } from './AttendanceReport';
 import { useAuthStore } from '@/lib/store';
-import { format } from 'date-fns';
+import { format, addDays, getDay } from 'date-fns';
 import { CombinedMember } from '../checkin/MemberCard';
 import { toast } from 'sonner';
 
@@ -24,12 +24,15 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   const [telefono, setTelefono] = useState('');
   const [plan, setPlan] = useState<PlanType>('');
   const [costo, setCosto] = useState<string>('');
+  const [customDays, setCustomDays] = useState<number | ''>('');
   const [isPromo, setIsPromo] = useState(false);
   const [notes, setNotes] = useState('');
   const [fechaInicio, setFechaInicio] = useState<string>('');
+  const [autoCheckIn, setAutoCheckIn] = useState(false);
   const [success, setSuccess] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<number | string | null>(null);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   
   // Identity management
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
@@ -179,8 +182,37 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     const selectedPlan = dbPlans.find(p => p.description === plan);
     if (selectedPlan) {
       setCosto(selectedPlan.price.toString());
+      setCustomDays(selectedPlan.days_active || '');
     }
   }, [plan, editingPlanId, dbPlans]);
+
+  const calculatedFinalDate = React.useMemo(() => {
+    if (!fechaInicio || !plan) return '-';
+    const selectedSysPlan = dbPlans.find(p => p.description === plan);
+    let days = customDays !== '' ? Number(customDays) : selectedSysPlan?.days_active;
+    if (!days) days = 30; // fallback
+
+    try {
+      const start = new Date(fechaInicio + 'T12:00:00');
+      if (isNaN(start.getTime())) return '-';
+      
+      let currentDate = start;
+      let remainingDays = Math.max(0, days - 1);
+      const skipSundays = plan === 'Día';
+
+      while (remainingDays > 0) {
+        currentDate = addDays(currentDate, 1);
+        if (skipSundays && getDay(currentDate) === 0) {
+          continue;
+        }
+        remainingDays--;
+      }
+      
+      return formatDate(currentDate);
+    } catch {
+      return '-';
+    }
+  }, [fechaInicio, customDays, plan, dbPlans]);
 
   const selectSuggestion = (member: any) => {
       setNombre(member.nombre);
@@ -194,11 +226,15 @@ export default function AdminView({ onLogout }: AdminViewProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombre || !costo) return;
+    setSubmitAttempted(true);
+    if (!nombre || !costo || !plan || String(customDays) === '' || Number(customDays) <= 0) {
+      toast.error('Por favor completa todos los campos requeridos (*)');
+      return;
+    }
 
     try {
       const selectedSysPlan = dbPlans.find(p => p.description === plan);
-      const planDays = selectedSysPlan?.days_active;
+      const planDays = String(customDays) !== '' ? Number(customDays) : selectedSysPlan?.days_active;
       const planId = selectedSysPlan?.id;
 
       if (editingMemberId && editingPlanId) {
@@ -239,7 +275,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
         }
         
         // Add new purchase record to member_plans
-        await supabase.from('member_plans').insert({
+        const { data: insertedPlan, error: insertError } = await supabase.from('member_plans').insert({
           memberId,
           plan_id: planId || null,
           plan_tipo: plan as any,
@@ -250,7 +286,16 @@ export default function AdminView({ onLogout }: AdminViewProps) {
           fecha_inicio: new Date(fechaInicio + 'T12:00:00').toISOString(),
           registered_by: user?.staffId,
           registered_by_name: user?.nombre,
-        });
+        }).select().single();
+        
+        if (autoCheckIn && insertedPlan && !insertError) {
+          await supabase.from('attendances').insert({
+            memberId,
+            member_plan_id: insertedPlan.id,
+            fecha_hora: getCurrentDate().toISOString(),
+          });
+          toast.success('Check-in realizado de inmediato');
+        }
       }
       
       setSuccess(true);
@@ -258,6 +303,9 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       setTelefono('');
       setNotes('');
       setIsPromo(false);
+      setCustomDays('');
+      setAutoCheckIn(false);
+      setSubmitAttempted(false);
       setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
       setEditingMemberId(null);
       setEditingPlanId(null);
@@ -288,8 +336,10 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     setTelefono(combined.member.telefono || '');
     setPlan(combined.plan.plan_tipo);
     setCosto(combined.plan.costo.toString());
+    setCustomDays(combined.plan.plan_days || '');
     setIsPromo(!!combined.plan.is_promo);
     setNotes(combined.plan.notes || '');
+    setSubmitAttempted(false);
     setFechaInicio(format(new Date(combined.plan.fecha_inicio), 'yyyy-MM-dd'));
     setNameSuggestions([]); // Clear suggestions
   };
@@ -303,8 +353,10 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     setTelefono(combined.member.telefono || '');
     setPlan(combined.plan.plan_tipo);
     setCosto(combined.plan.costo.toString());
+    setCustomDays(combined.plan.plan_days || '');
     setIsPromo(!!combined.plan.is_promo);
     setNotes(combined.plan.notes || '');
+    setSubmitAttempted(false);
     setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setNameSuggestions([]);
@@ -344,6 +396,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     setTelefono('');
     setNotes('');
     setIsPromo(false);
+    setCustomDays('');
+    setSubmitAttempted(false);
     setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
     if (dbPlans.length > 0) {
       setPlan(dbPlans[0].description);
@@ -412,7 +466,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground ml-1">Nombre</label>
+                <label className="text-xs font-medium text-muted-foreground ml-1">Nombre <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input 
@@ -424,7 +478,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                         setSelectedMemberId(null);
                       }
                     }}
-                    className="pl-10 h-12 text-base"
+                    className={`pl-10 h-12 text-base ${submitAttempted && !nombre ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                     autoComplete="off"
                     onFocus={() => { if (nameSuggestions.length > 0) setShowSuggestions(true); }}
                     onBlur={() => {
@@ -473,8 +527,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
               </div>
 
               <div className="space-y-4">
-                <label className="text-sm font-medium text-muted-foreground ml-1">Plan</label>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <label className="text-sm font-medium text-muted-foreground ml-1">Plan <span className="text-red-500">*</span></label>
+                <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 ${submitAttempted && !plan ? 'p-2 border border-red-500/50 rounded-xl bg-red-500/5' : ''}`}>
                   {dbPlans.map(sysPlan => (
                     <button
                       key={sysPlan.id}
@@ -496,22 +550,37 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground ml-1">Fecha de Inicio</label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    type="date"
-                    value={fechaInicio}
-                    onChange={(e) => setFechaInicio(e.target.value)}
-                    className="pl-10 h-12 text-base w-full"
-                  />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground ml-1">Fecha de Inicio</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      type="date"
+                      value={fechaInicio}
+                      onChange={(e) => setFechaInicio(e.target.value)}
+                      className="pl-10 h-12 text-base w-full"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground ml-1">Vencimiento</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
+                    <Input 
+                      type="text"
+                      disabled
+                      value={calculatedFinalDate}
+                      className="pl-10 h-12 text-base w-full bg-muted/30 text-muted-foreground font-medium opacity-80"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground ml-1">Precio</label>
+                  <label className="text-xs font-medium text-muted-foreground ml-1">Precio <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">C$</span>
                     <Input 
@@ -519,9 +588,21 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                       value={costo}
                       onChange={(e) => setCosto(e.target.value)}
                       type="number"
-                      className="pl-8 h-12 font-mono text-base"
+                      className={`pl-8 h-12 font-mono text-base ${submitAttempted && !costo ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground ml-1">Días activos <span className="text-red-500">*</span></label>
+                  <Input 
+                    placeholder="30" 
+                    value={customDays}
+                    onChange={(e) => setCustomDays(e.target.value === '' ? '' : Number(e.target.value))}
+                    type="number"
+                    min="1"
+                    className={`h-12 font-mono text-base text-center ${submitAttempted && (String(customDays) === '' || Number(customDays) <= 0) ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -550,10 +631,24 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                  />
               </div>
 
+              {!editingMemberId && (
+              <div className="flex items-center gap-2 pt-2 pb-2 pl-1">
+                <input 
+                  type="checkbox" 
+                  id="autoCheckIn" 
+                  checked={autoCheckIn}
+                  onChange={(e) => setAutoCheckIn(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-primary focus:ring-primary"
+                />
+                <label htmlFor="autoCheckIn" className="text-sm font-medium text-muted-foreground select-none cursor-pointer">
+                  Hacer check-in automático
+                </label>
+              </div>
+              )}
+
               <Button 
                 type="submit" 
                 className={`w-full h-14 text-lg rounded-xl shadow-lg shadow-primary/25 ${editingMemberId ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
-                disabled={!nombre || !costo}
               >
                 {success ? (
                   <span className="flex items-center animate-pulse">
