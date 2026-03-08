@@ -186,6 +186,18 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     }
   }, [plan, editingPlanId, dbPlans]);
 
+  // Multiply price by customDays for Día plan and read-only
+  React.useEffect(() => {
+    if (editingPlanId) return;
+    if (plan === 'Día') {
+      const selectedPlan = dbPlans.find(p => p.description === plan);
+      if (selectedPlan) {
+        const days = customDays !== '' && Number(customDays) > 0 ? Number(customDays) : 1;
+        setCosto((selectedPlan.price * days).toString());
+      }
+    }
+  }, [customDays, plan, editingPlanId, dbPlans]);
+
   const calculatedFinalDate = React.useMemo(() => {
     if (!fechaInicio || !plan) return '-';
     const selectedSysPlan = dbPlans.find(p => p.description === plan);
@@ -196,16 +208,22 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       const start = new Date(fechaInicio + 'T12:00:00');
       if (isNaN(start.getTime())) return '-';
       
+      if (plan === 'Semanal') {
+        days = 6;
+      }
+      
       let currentDate = start;
-      let remainingDays = Math.max(0, days - 1);
-      const skipSundays = plan === 'Día';
+      let validDaysCounted = 0;
 
-      while (remainingDays > 0) {
+      if (getDay(currentDate) !== 0) {
+        validDaysCounted = 1;
+      }
+
+      while (validDaysCounted < days) {
         currentDate = addDays(currentDate, 1);
-        if (skipSundays && getDay(currentDate) === 0) {
-          continue;
+        if (getDay(currentDate) !== 0) {
+          validDaysCounted++;
         }
-        remainingDays--;
       }
       
       return formatDate(currentDate);
@@ -456,8 +474,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
           <CardHeader>
              <CardTitle className="text-xl flex justify-between items-center">
                {editingMemberId ? 'Editar Miembro' : selectedMemberId ? 'Renovar Plan' : 'Nuevo Registro'}
-               {editingMemberId && (
-                 <button onClick={handleCancelEdit} className="text-xs text-muted-foreground hover:text-white border px-2 py-1 rounded">
+               {(editingMemberId || selectedMemberId) && (
+                 <button type="button" onClick={handleCancelEdit} className="text-xs text-muted-foreground hover:text-white border px-2 py-1 rounded">
                    Cancelar
                  </button>
                )}
@@ -586,9 +604,10 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                     <Input 
                       placeholder="0" 
                       value={costo}
+                      disabled={true}
                       onChange={(e) => setCosto(e.target.value)}
                       type="number"
-                      className={`pl-8 h-12 font-mono text-base ${submitAttempted && !costo ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+                      className={`pl-8 h-12 font-mono text-base bg-muted/30 opacity-80 cursor-not-allowed ${submitAttempted && !costo ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                     />
                   </div>
                 </div>
@@ -601,7 +620,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                     onChange={(e) => setCustomDays(e.target.value === '' ? '' : Number(e.target.value))}
                     type="number"
                     min="1"
-                    className={`h-12 font-mono text-base text-center ${submitAttempted && (String(customDays) === '' || Number(customDays) <= 0) ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+                    disabled={plan !== 'Día'}
+                    className={`h-12 font-mono text-base text-center ${submitAttempted && (String(customDays) === '' || Number(customDays) <= 0) ? 'border-red-500 ring-1 ring-red-500' : ''} ${plan !== 'Día' ? 'opacity-50 cursor-not-allowed bg-muted/30' : ''}`}
                   />
                 </div>
 
@@ -646,18 +666,30 @@ export default function AdminView({ onLogout }: AdminViewProps) {
               </div>
               )}
 
-              <Button 
-                type="submit" 
-                className={`w-full h-14 text-lg rounded-xl shadow-lg shadow-primary/25 ${editingMemberId ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
-              >
-                {success ? (
-                  <span className="flex items-center animate-pulse">
-                    <CheckCircle className="mr-2 h-5 w-5" /> {editingMemberId ? 'Actualizado' : 'Guardado'}
-                  </span>
-                ) : (
-                  editingMemberId ? 'Actualizar Miembro' : 'Registrar'
+              <div className="flex gap-4">
+                {(editingMemberId || selectedMemberId) && (
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    className="w-1/3 h-14 text-lg rounded-xl border-white/10 hover:bg-white/5"
+                  >
+                    Cancelar
+                  </Button>
                 )}
-              </Button>
+                <Button 
+                  type="submit" 
+                  className={`${(editingMemberId || selectedMemberId) ? 'w-2/3' : 'w-full'} h-14 text-lg rounded-xl shadow-lg shadow-primary/25 ${editingMemberId ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
+                >
+                  {success ? (
+                    <span className="flex items-center animate-pulse">
+                      <CheckCircle className="mr-2 h-5 w-5" /> {editingMemberId ? 'Actualizado' : 'Guardado'}
+                    </span>
+                  ) : (
+                    editingMemberId ? 'Actualizar Miembro' : selectedMemberId ? 'Renovar Plan' : 'Registrar'
+                  )}
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
