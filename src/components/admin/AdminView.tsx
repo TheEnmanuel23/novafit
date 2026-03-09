@@ -238,17 +238,24 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       }
       
       let currentDate = start;
-      let validDaysCounted = 0;
+      const isShortPlan = days <= 7 || plan === 'Semanal' || plan === 'Día' || plan === 'Dia';
 
-      if (getDay(currentDate) !== 0) {
-        validDaysCounted = 1;
-      }
+      if (isShortPlan) {
+        let validDaysCounted = 0;
 
-      while (validDaysCounted < days) {
-        currentDate = addDays(currentDate, 1);
         if (getDay(currentDate) !== 0) {
-          validDaysCounted++;
+          validDaysCounted = 1;
         }
+
+        while (validDaysCounted < days) {
+          currentDate = addDays(currentDate, 1);
+          if (getDay(currentDate) !== 0) {
+            validDaysCounted++;
+          }
+        }
+      } else {
+        // For biweekly/monthly, count natural calendar days
+        currentDate = addDays(currentDate, days - 1);
       }
       
       return formatDate(currentDate);

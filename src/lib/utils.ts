@@ -42,24 +42,30 @@ export function getExpirationDate(plan: MemberPlan): Date {
     if (plan.plan_tipo === 'Día') daysActive = 1;
   }
 
-  // We skip Sundays for all plans since the week is 6 days
+  // We skip Sundays only for short plans (weekly or daily)
+  const isShortPlan = daysActive <= 7 || plan.plan_tipo === 'Semanal' || plan.plan_tipo === 'Día' || plan.plan_tipo === 'Dia';
+
   let currentDate = new Date(plan.fecha_inicio);
   
-  // Instead of assuming the first day is valid, we count valid days actively.
-  // We need to count exactly `daysActive` valid days.
-  let validDaysCounted = 0;
+  if (isShortPlan) {
+    let validDaysCounted = 0;
 
-  // If the start day itself is valid (not Sunday), it counts as day 1.
-  if (getDay(currentDate) !== 0) {
-    validDaysCounted = 1;
-  }
-
-  // Keep adding days until we have counted the required number of active days
-  while (validDaysCounted < daysActive) {
-    currentDate = addDays(currentDate, 1);
+    // If the start day itself is valid (not Sunday), it counts as day 1.
     if (getDay(currentDate) !== 0) {
-      validDaysCounted++;
+      validDaysCounted = 1;
     }
+
+    // Keep adding days until we have counted the required number of active days
+    while (validDaysCounted < daysActive) {
+      currentDate = addDays(currentDate, 1);
+      if (getDay(currentDate) !== 0) {
+        validDaysCounted++;
+      }
+    }
+  } else {
+    // For biweekly/monthly, just add calendar days. 
+    // Since day 1 is the start date, we add daysActive - 1.
+    currentDate = addDays(currentDate, daysActive - 1);
   }
 
   return endOfDay(currentDate);
