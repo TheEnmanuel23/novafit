@@ -214,7 +214,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   // Multiply price by customDays for Día plan and read-only
   React.useEffect(() => {
     if (editingPlanId) return;
-    if (plan === 'Día') {
+    if (plan === 'Dia') {
       const selectedPlan = dbPlans.find(p => p.description === plan);
       if (selectedPlan) {
         const days = customDays !== '' && Number(customDays) > 0 ? Number(customDays) : 1;
@@ -645,8 +645,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                     onChange={(e) => setCustomDays(e.target.value === '' ? '' : Number(e.target.value))}
                     type="number"
                     min="1"
-                    disabled={plan !== 'Día'}
-                    className={`h-12 font-mono text-base text-center ${submitAttempted && (String(customDays) === '' || Number(customDays) <= 0) ? 'border-red-500 ring-1 ring-red-500' : ''} ${plan !== 'Día' ? 'opacity-50 cursor-not-allowed bg-muted/30' : ''}`}
+                    disabled={plan !== 'Dia'}
+                    className={`h-12 font-mono text-base text-center ${submitAttempted && (String(customDays) === '' || Number(customDays) <= 0) ? 'border-red-500 ring-1 ring-red-500' : ''} ${plan !== 'Dia' ? 'opacity-50 cursor-not-allowed bg-muted/30' : ''}`}
                   />
                 </div>
 
@@ -722,7 +722,12 @@ export default function AdminView({ onLogout }: AdminViewProps) {
         {/* Members List */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold ml-1">Miembros Recientes</h2>
+            <h2 className="text-xl font-bold ml-1 flex items-center gap-2">
+              Miembros Recientes
+              <span className="bg-primary/20 text-primary text-xs px-2 py-0.5 rounded-full">
+                {members.length}
+              </span>
+            </h2>
           </div>
           
           {/* Filters Row */}
