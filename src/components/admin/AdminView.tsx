@@ -65,6 +65,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   const [membersSortOrder, setMembersSortOrder] = useState<'asc' | 'desc'>('desc');
   const [membersFilterDate, setMembersFilterDate] = useState<string>('');
   const [membersFilterPlan, setMembersFilterPlan] = useState<string>('all');
+  const [membersFilterSocio, setMembersFilterSocio] = useState<string>('all');
   const [selectedHistoryMember, setSelectedHistoryMember] = useState<any>(null);
   const [dbPlans, setDbPlans] = useState<SystemPlan[]>([]);
 
@@ -128,6 +129,15 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       combined = combined.filter((c) => c.plan.plan_tipo === membersFilterPlan);
     }
     
+    // Filter by Socio Fundador
+    if (membersFilterSocio && membersFilterSocio !== 'all') {
+      combined = combined.filter((c) => {
+        // Assuming Socio Fundador refers to Mensual plans with cost 550
+        const isSocio = c.plan.plan_tipo === 'Mensual' && Number(c.plan.costo) === 550;
+        return membersFilterSocio === 'yes' ? isSocio : !isSocio;
+      });
+    }
+    
     // Sort overall results based on selected criteria
     combined.sort((a, b) => {
       let result = 0;
@@ -149,13 +159,13 @@ export default function AdminView({ onLogout }: AdminViewProps) {
 
   React.useEffect(() => {
     fetchMembers();
-  }, [membersSearchTerm, membersSort, membersSortOrder, membersFilterDate, membersFilterPlan, timeTick]);
+  }, [membersSearchTerm, membersSort, membersSortOrder, membersFilterDate, membersFilterPlan, membersFilterSocio, timeTick]);
 
   React.useEffect(() => {
     const handleSync = () => fetchMembers();
     window.addEventListener('request-sync', handleSync);
     return () => window.removeEventListener('request-sync', handleSync);
-  }, [membersSearchTerm, membersSort, membersSortOrder, membersFilterDate, membersFilterPlan]);
+  }, [membersSearchTerm, membersSort, membersSortOrder, membersFilterDate, membersFilterPlan, membersFilterSocio]);
 
   // Name Autocomplete
   React.useEffect(() => {
@@ -753,6 +763,17 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                 {dbPlans.map(sysPlan => (
                    <option key={sysPlan.id} value={sysPlan.description} className="bg-neutral-900">{sysPlan.description}</option>
                 ))}
+              </select>
+
+              <select
+                value={membersFilterSocio}
+                onChange={(e) => setMembersFilterSocio(e.target.value)}
+                className="h-9 rounded-md border border-white/10 bg-card/50 px-2 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-white"
+                title="Filtrar por Socio Fundador"
+              >
+                <option value="all" className="bg-neutral-900">Todos los Socios</option>
+                <option value="yes" className="bg-neutral-900">Solo Fundadores</option>
+                <option value="no" className="bg-neutral-900">No Fundadores</option>
               </select>
 
               <span className="text-sm font-medium text-muted-foreground whitespace-nowrap ml-auto">Ordenar:</span>
