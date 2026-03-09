@@ -1,7 +1,7 @@
 
 'use client';
 import React, { useState } from 'react';
-import { db } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Lock, User } from 'lucide-react';
@@ -23,15 +23,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
         setError('');
 
         try {
-            // Offline-first auth: Check local DB
-            // In a real app we'd hash passwords. Here assuming plain text for MVP/Offline simplicity as per request context.
-            const user = await db.staff
-                .where('username')
-                .equals(username)
-                .first();
+            const { data: users, error } = await supabase
+                .from('staff')
+                .select('*')
+                .eq('username', username)
+                .eq('deleted', false)
+                .limit(1);
 
-            if (user && user.password === password && !user.deleted) {
-                onLogin(user);
+            if (error) throw error;
+            const user = users?.[0];
+
+            if (user && user.password === password) {
+                onLogin(user as Staff);
             } else {
                 setError('Credenciales inválidas o usuario no encontrado.');
             }

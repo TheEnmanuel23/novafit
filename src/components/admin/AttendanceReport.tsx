@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { db } from '@/lib/db';
 import { Member, Attendance } from '@/lib/types';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
+import { supabase } from '@/lib/supabase';
 import { es } from 'date-fns/locale';
 import { Calendar, Search, Filter, Download, User } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
@@ -24,7 +24,6 @@ export const AttendanceReport = () => {
   const fetchLogs = async () => {
     setLoading(true);
     try {
-        // Parse dates as Local Time to avoid UTC offsets shifting the day
         const [sy, sm, sd] = startDate.split('-').map(Number);
         const start = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
 
@@ -32,26 +31,31 @@ export const AttendanceReport = () => {
         const end = new Date(ey, em - 1, ed, 23, 59, 59, 999);
 
         // Get logs in range
-        const atts = await db.attendances
-            .where('fecha_hora')
-            .between(start, end)
-            .reverse()
-            .toArray();
+        const { data: atts, error: err } = await supabase
+            .from('attendances')
+            .select('*')
+            .gte('fecha_hora', start.toISOString())
+            .lte('fecha_hora', end.toISOString())
+            .order('fecha_hora', { ascending: false });
 
-        // Fetch all members and plans to avoid anyOf lookup issues on undefined arrays
-        const allMembers = await db.members.toArray();
-        const memberMap = new Map(allMembers.map(m => [m.memberId, m]));
-        const legacyMemberMap = new Map(allMembers.map(m => [m.id!, m]));
+        if (err) throw err;
 
-        const allPlans = await db.member_plans.toArray();
-        const planMap = new Map(allPlans.map(p => [p.sync_id, p]));
+        const { data: allMembers, error: memErr } = await supabase.from('members').select('*');
+        if (memErr) throw memErr;
+        
+        const { data: allPlans, error: planErr } = await supabase.from('member_plans').select('*');
+        if (planErr) throw planErr;
 
-        const enriched = atts.map(att => {
-            const member = att.memberId ? memberMap.get(att.memberId) : legacyMemberMap.get(att.miembroId);
-            const plan = att.member_plan_id ? planMap.get(att.member_plan_id) : legacyMemberMap.get(att.miembroId);
+        const memberMap = new Map(allMembers.map((m: any) => [m.memberId, m]));
+        const planMap = new Map(allPlans.map((p: any) => [p.id, p]));
+
+        const enriched = (atts || []).map((att: any) => {
+            const member = memberMap.get(att.memberId);
+            const plan = planMap.get(att.member_plan_id);
             
             return {
                 ...att,
+                fecha_hora: new Date(att.fecha_hora),
                 memberName: member?.nombre || 'Desconocido',
                 planName: plan?.plan_tipo || 'N/A',
             };

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Member, MemberPlan } from '@/lib/types';
-import { db } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { getMembershipStatus, formatDate, getExpirationDate } from '@/lib/utils';
 import { Calendar, X, Clock, History } from 'lucide-react';
 
@@ -17,12 +17,15 @@ export const MemberHistoryModal: React.FC<MemberHistoryModalProps> = ({ member, 
   useEffect(() => {
     if (member) {
       const fetchHistory = async () => {
-        // Find all member_plans records for this memberId
-        const records = await db.member_plans
-          .where('memberId').equals(member.memberId)
-          .reverse()
-          .toArray();
-        setHistory(records);
+        const { data: records, error } = await supabase
+          .from('member_plans')
+          .select('*')
+          .eq('memberId', member.memberId)
+          .order('fecha_inicio', { ascending: false });
+          
+        if (!error && records) {
+          setHistory(records as MemberPlan[]);
+        }
       };
       fetchHistory();
     }

@@ -1,8 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { db } from '@/lib/db';
 import { PlanType, SystemPlan } from '@/lib/types';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { getMembershipStatus, formatDate, getExpirationDate, getCurrentDate } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/Input';
@@ -11,10 +9,10 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Search, RefreshCcw, LogOut, Users } from 'lucide-react';
 import { MemberHistoryModal } from './MemberHistoryModal';
 import { AttendanceReport } from './AttendanceReport';
-import { SyncButton } from '@/components/layout/SyncButton';
 import { useAuthStore } from '@/lib/store';
-import { format } from 'date-fns';
+import { format, addDays, getDay } from 'date-fns';
 import { CombinedMember } from '../checkin/MemberCard';
+import { toast } from 'sonner';
 
 interface AdminViewProps {
   onLogout?: () => void;
@@ -26,12 +24,15 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   const [telefono, setTelefono] = useState('');
   const [plan, setPlan] = useState<PlanType>('');
   const [costo, setCosto] = useState<string>('');
+  const [customDays, setCustomDays] = useState<number | ''>('');
   const [isPromo, setIsPromo] = useState(false);
   const [notes, setNotes] = useState('');
   const [fechaInicio, setFechaInicio] = useState<string>('');
+  const [autoCheckIn, setAutoCheckIn] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
-  const [editingPlanId, setEditingPlanId] = useState<number | null>(null);
+  const [editingMemberId, setEditingMemberId] = useState<number | string | null>(null);
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   
   // Identity management
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
@@ -43,13 +44,16 @@ export default function AdminView({ onLogout }: AdminViewProps) {
 
   React.useEffect(() => {
     // Initialize standard fechaInicio on mount
-    setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
+    const today = format(getCurrentDate(), 'yyyy-MM-dd');
+    setFechaInicio(today);
+    setMembersFilterDate(today);
 
     if (process.env.NODE_ENV !== 'development') return;
     const handleTimeChange = () => {
       setTimeTick(t => t + 1);
       // Also update default date picker date if we aren't editing explicitly
       setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
+      setMembersFilterDate(format(getCurrentDate(), 'yyyy-MM-dd'));
     };
     window.addEventListener('time-travel-changed', handleTimeChange);
     return () => window.removeEventListener('time-travel-changed', handleTimeChange);
@@ -59,6 +63,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   const [membersSearchTerm, setMembersSearchTerm] = useState('');
   const [membersSort, setMembersSort] = useState('created');
   const [membersSortOrder, setMembersSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [membersFilterDate, setMembersFilterDate] = useState<string>('');
+  const [membersFilterPlan, setMembersFilterPlan] = useState<string>('all');
   const [selectedHistoryMember, setSelectedHistoryMember] = useState<any>(null);
   const [dbPlans, setDbPlans] = useState<SystemPlan[]>([]);
 
@@ -76,31 +82,50 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     fetchPlans();
   }, []);
 
-  const members = useLiveQuery(async () => {
-    // Fetch active (non-deleted) members
-    let collection = db.members.filter(m => !m.deleted);
+  const [members, setMembers] = useState<CombinedMember[]>([]);
+
+  const fetchMembers = async () => {
+    let query = supabase.from('members').select('*').eq('deleted', false);
     
-    // Apply search filter if present
     if (membersSearchTerm) {
       const lower = membersSearchTerm.toLowerCase();
-      collection = collection.and(m => {
-        const phoneMatch = m.telefono ? m.telefono.includes(lower) : false;
-        return m.nombre.toLowerCase().includes(lower) || phoneMatch;
-      });
+      // Use standard ilike/like for search
+      query = query.or(`nombre.ilike.%${lower}%,telefono.like.%${lower}%`);
+    }
+
+    const { data: profiles, error } = await query;
+    if (error || !profiles) {
+      return;
+    }
+
+    let combined: CombinedMember[] = [];
+    const memberIds = profiles.map((p: any) => p.memberId);
+    
+    if (memberIds.length > 0) {
+      const { data: plans } = await supabase.from('member_plans')
+         .select('*')
+         .in('memberId', memberIds)
+         .eq('deleted', false)
+         .order('fecha_inicio', { ascending: false });
+         
+      if (plans) {
+        for (const p of profiles) {
+          const userPlans = plans.filter((plan: any) => plan.memberId === p.memberId);
+          if (userPlans.length > 0) {
+            combined.push({ member: p, plan: userPlans[0] });
+          }
+        }
+      }
     }
     
-    const profiles = await collection.toArray();
+    // Filter by date if enabled
+    if (membersFilterDate) {
+      combined = combined.filter((c) => format(new Date(c.plan.fecha_inicio), 'yyyy-MM-dd') === membersFilterDate);
+    }
     
-    const combined: CombinedMember[] = [];
-    
-    for (const p of profiles) {
-      const plans = await db.member_plans.where('memberId').equals(p.memberId).filter(plan => !plan.deleted).toArray();
-      // Sort plans newest first to get the current plan
-      plans.sort((a,b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime());
-      
-      if (plans.length > 0) {
-        combined.push({ member: p, plan: plans[0] });
-      }
+    // Filter by Plan Type
+    if (membersFilterPlan && membersFilterPlan !== 'all') {
+      combined = combined.filter((c) => c.plan.plan_tipo === membersFilterPlan);
     }
     
     // Sort overall results based on selected criteria
@@ -113,43 +138,51 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       } else if (membersSort === 'date_start') {
         result = new Date(a.plan.fecha_inicio).getTime() - new Date(b.plan.fecha_inicio).getTime();
       } else {
-        // created: sort by member plan creation ID/timestamp
-        // Assuming plan.id represents creation order roughly
-        result = (a.plan.id || 0) - (b.plan.id || 0);
+        // created: assuming string id is sortable
+        result = String(a.plan.id).localeCompare(String(b.plan.id));
       }
       return membersSortOrder === 'asc' ? result : -result;
     });
 
-    return combined;
-  }, [membersSearchTerm, membersSort, membersSortOrder, timeTick]);
+    setMembers(combined);
+  };
+
+  React.useEffect(() => {
+    fetchMembers();
+  }, [membersSearchTerm, membersSort, membersSortOrder, membersFilterDate, membersFilterPlan, timeTick]);
+
+  React.useEffect(() => {
+    const handleSync = () => fetchMembers();
+    window.addEventListener('request-sync', handleSync);
+    return () => window.removeEventListener('request-sync', handleSync);
+  }, [membersSearchTerm, membersSort, membersSortOrder, membersFilterDate, membersFilterPlan]);
 
   // Name Autocomplete
   React.useEffect(() => {
-    // Only search if name is long enough and we are not currently editing a specific record
-    // And don't search if we just selected a suggestion
     if (nombre.length < 2 || editingMemberId) {
       setNameSuggestions([]);
       return;
     }
     
-    // Debounce or just query
     const timer = setTimeout(async () => {
         try {
-            const results = await db.members
-                .filter(m => !m.deleted && m.nombre.toLowerCase().includes(nombre.toLowerCase()))
-                .limit(20)
-                .toArray();
+            const { data: results } = await supabase
+                .from('members')
+                .select('*')
+                .eq('deleted', false)
+                .ilike('nombre', `%${nombre}%`)
+                .limit(20);
             
-            // Dedupe suggestions by memberId
-            const unique = new Map();
-            results.forEach(m => {
-                if (m.memberId && !unique.has(m.memberId)) {
-                    unique.set(m.memberId, m);
-                }
-            });
-            // Filter out current selection if strictly matching? No, show all matches.
-            setNameSuggestions(Array.from(unique.values()));
-            setShowSuggestions(true);
+            if (results) {
+              const unique = new Map();
+              results.forEach((m: any) => {
+                  if (m.memberId && !unique.has(m.memberId)) {
+                      unique.set(m.memberId, m);
+                  }
+              });
+              setNameSuggestions(Array.from(unique.values()));
+              setShowSuggestions(true);
+            }
         } catch (e) {
             console.error(e);
         }
@@ -164,8 +197,55 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     const selectedPlan = dbPlans.find(p => p.description === plan);
     if (selectedPlan) {
       setCosto(selectedPlan.price.toString());
+      setCustomDays(selectedPlan.days_active || '');
     }
   }, [plan, editingPlanId, dbPlans]);
+
+  // Multiply price by customDays for Día plan and read-only
+  React.useEffect(() => {
+    if (editingPlanId) return;
+    if (plan === 'Día') {
+      const selectedPlan = dbPlans.find(p => p.description === plan);
+      if (selectedPlan) {
+        const days = customDays !== '' && Number(customDays) > 0 ? Number(customDays) : 1;
+        setCosto((selectedPlan.price * days).toString());
+      }
+    }
+  }, [customDays, plan, editingPlanId, dbPlans]);
+
+  const calculatedFinalDate = React.useMemo(() => {
+    if (!fechaInicio || !plan) return '-';
+    const selectedSysPlan = dbPlans.find(p => p.description === plan);
+    let days = customDays !== '' ? Number(customDays) : selectedSysPlan?.days_active;
+    if (!days) days = 30; // fallback
+
+    try {
+      const start = new Date(fechaInicio + 'T12:00:00');
+      if (isNaN(start.getTime())) return '-';
+      
+      if (plan === 'Semanal') {
+        days = 6;
+      }
+      
+      let currentDate = start;
+      let validDaysCounted = 0;
+
+      if (getDay(currentDate) !== 0) {
+        validDaysCounted = 1;
+      }
+
+      while (validDaysCounted < days) {
+        currentDate = addDays(currentDate, 1);
+        if (getDay(currentDate) !== 0) {
+          validDaysCounted++;
+        }
+      }
+      
+      return formatDate(currentDate);
+    } catch {
+      return '-';
+    }
+  }, [fechaInicio, customDays, plan, dbPlans]);
 
   const selectSuggestion = (member: any) => {
       setNombre(member.nombre);
@@ -179,71 +259,76 @@ export default function AdminView({ onLogout }: AdminViewProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombre || !costo) return;
+    setSubmitAttempted(true);
+    if (!nombre || !costo || !plan || String(customDays) === '' || Number(customDays) <= 0) {
+      toast.error('Por favor completa todos los campos requeridos (*)');
+      return;
+    }
 
     try {
       const selectedSysPlan = dbPlans.find(p => p.description === plan);
-      const planDays = selectedSysPlan?.days_active;
+      const planDays = String(customDays) !== '' ? Number(customDays) : selectedSysPlan?.days_active;
       const planId = selectedSysPlan?.id;
 
       if (editingMemberId && editingPlanId) {
         // Updating BOTH specific member profile and specific plan
-        await db.members.update(editingMemberId, {
+        await supabase.from('members').update({
           nombre,
           telefono,
-          synced: 0,
-          updated_at: getCurrentDate(),
-        });
+          updated_at: new Date().toISOString(),
+        }).eq('id', editingMemberId);
 
-        await db.member_plans.update(editingPlanId, {
+        await supabase.from('member_plans').update({
           plan_id: planId,
           plan_tipo: plan as any,
           ...(planDays ? { plan_days: planDays } : {}),
           costo: Number(costo),
           is_promo: isPromo,
           notes: notes,
-          fecha_inicio: new Date(fechaInicio + 'T12:00:00'),
-          synced: 0,
-          updated_at: getCurrentDate(),
-        });
+          fecha_inicio: new Date(fechaInicio + 'T12:00:00').toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq('id', editingPlanId);
         
         setEditingMemberId(null);
         setEditingPlanId(null);
       } else {
         // Creating new plan (Renewal or New User)
-        // Use selectedMemberId if available, else new UUID
         const memberId = selectedMemberId || crypto.randomUUID();
         
-        // Only update profile if we selected one, else create new
         if (selectedMemberId) {
-           const existingMember = await db.members.where('memberId').equals(selectedMemberId).first();
-           if (existingMember && existingMember.id) {
-             await db.members.update(existingMember.id, { nombre, telefono, updated_at: getCurrentDate(), synced: 0 });
-           }
+           await supabase.from('members')
+            .update({ nombre, telefono, updated_at: new Date().toISOString() })
+            .eq('memberId', selectedMemberId);
         } else {
-           await db.members.add({
+           await supabase.from('members').insert({
              memberId,
              nombre,
              telefono,
-             updated_at: getCurrentDate(),
            });
         }
         
         // Add new purchase record to member_plans
-        await db.member_plans.add({
-          sync_id: crypto.randomUUID(),
+        const { data: insertedPlan, error: insertError } = await supabase.from('member_plans').insert({
           memberId,
-          plan_id: planId || undefined,
+          plan_id: planId || null,
           plan_tipo: plan as any,
           ...(planDays ? { plan_days: planDays } : { plan_days: 30 }),
           costo: Number(costo),
           is_promo: isPromo,
           notes: notes,
-          fecha_inicio: new Date(fechaInicio + 'T12:00:00'),
+          fecha_inicio: new Date(fechaInicio + 'T12:00:00').toISOString(),
           registered_by: user?.staffId,
           registered_by_name: user?.nombre,
-          updated_at: getCurrentDate(),
-        });
+        }).select().single();
+        
+        if (autoCheckIn && insertedPlan && !insertError) {
+          await supabase.from('attendances').insert({
+            memberId,
+            member_plan_id: insertedPlan.id,
+            fecha_hora: getCurrentDate().toISOString(),
+          });
+          toast.success('Check-in realizado de inmediato');
+        }
       }
       
       setSuccess(true);
@@ -251,6 +336,9 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       setTelefono('');
       setNotes('');
       setIsPromo(false);
+      setCustomDays('');
+      setAutoCheckIn(false);
+      setSubmitAttempted(false);
       setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
       setEditingMemberId(null);
       setEditingPlanId(null);
@@ -281,8 +369,10 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     setTelefono(combined.member.telefono || '');
     setPlan(combined.plan.plan_tipo);
     setCosto(combined.plan.costo.toString());
+    setCustomDays(combined.plan.plan_days || '');
     setIsPromo(!!combined.plan.is_promo);
     setNotes(combined.plan.notes || '');
+    setSubmitAttempted(false);
     setFechaInicio(format(new Date(combined.plan.fecha_inicio), 'yyyy-MM-dd'));
     setNameSuggestions([]); // Clear suggestions
   };
@@ -296,8 +386,10 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     setTelefono(combined.member.telefono || '');
     setPlan(combined.plan.plan_tipo);
     setCosto(combined.plan.costo.toString());
+    setCustomDays(combined.plan.plan_days || '');
     setIsPromo(!!combined.plan.is_promo);
     setNotes(combined.plan.notes || '');
+    setSubmitAttempted(false);
     setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setNameSuggestions([]);
@@ -306,9 +398,26 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   const handleDelete = async (combined: CombinedMember, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('¿Estás seguro de eliminar este registro?')) {
-      await db.members.update(combined.member.id!, { deleted: true, synced: 0, updated_at: new Date() });
-      await db.member_plans.update(combined.plan.id!, { deleted: true, synced: 0, updated_at: new Date() });
+      await supabase.from('members').update({ deleted: true, updated_at: new Date().toISOString() }).eq('id', combined.member.id);
+      await supabase.from('member_plans').update({ deleted: true, updated_at: new Date().toISOString() }).eq('id', combined.plan.id);
       window.dispatchEvent(new Event('request-sync'));
+    }
+  };
+
+  const handleCheckIn = async (combined: CombinedMember, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!combined.member.memberId || !combined.plan.id) return;
+    try {
+      await supabase.from('attendances').insert({
+        memberId: combined.member.memberId,
+        member_plan_id: combined.plan.id,
+        fecha_hora: getCurrentDate().toISOString(),
+      });
+      toast.success('Check-in registrado con éxito');
+      window.dispatchEvent(new Event('request-sync'));
+    } catch (err) {
+      console.error('Failed to log attendance', err);
+      toast.error('Error al registrar check-in');
     }
   };
 
@@ -320,6 +429,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     setTelefono('');
     setNotes('');
     setIsPromo(false);
+    setCustomDays('');
+    setSubmitAttempted(false);
     setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
     if (dbPlans.length > 0) {
       setPlan(dbPlans[0].description);
@@ -361,7 +472,6 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                   Asistencias
               </button>
           </div>
-          <SyncButton />
             <button 
               onClick={onLogout}
               className="p-3 bg-red-500/10 text-red-400 rounded-xl hover:bg-red-500/20 transition-colors border border-red-500/10"
@@ -379,8 +489,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
           <CardHeader>
              <CardTitle className="text-xl flex justify-between items-center">
                {editingMemberId ? 'Editar Miembro' : selectedMemberId ? 'Renovar Plan' : 'Nuevo Registro'}
-               {editingMemberId && (
-                 <button onClick={handleCancelEdit} className="text-xs text-muted-foreground hover:text-white border px-2 py-1 rounded">
+               {(editingMemberId || selectedMemberId) && (
+                 <button type="button" onClick={handleCancelEdit} className="text-xs text-muted-foreground hover:text-white border px-2 py-1 rounded">
                    Cancelar
                  </button>
                )}
@@ -389,7 +499,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground ml-1">Nombre</label>
+                <label className="text-xs font-medium text-muted-foreground ml-1">Nombre <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input 
@@ -401,7 +511,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                         setSelectedMemberId(null);
                       }
                     }}
-                    className="pl-10 h-12 text-base"
+                    className={`pl-10 h-12 text-base ${submitAttempted && !nombre ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                     autoComplete="off"
                     onFocus={() => { if (nameSuggestions.length > 0) setShowSuggestions(true); }}
                     onBlur={() => {
@@ -450,8 +560,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
               </div>
 
               <div className="space-y-4">
-                <label className="text-sm font-medium text-muted-foreground ml-1">Plan</label>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <label className="text-sm font-medium text-muted-foreground ml-1">Plan <span className="text-red-500">*</span></label>
+                <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 ${submitAttempted && !plan ? 'p-2 border border-red-500/50 rounded-xl bg-red-500/5' : ''}`}>
                   {dbPlans.map(sysPlan => (
                     <button
                       key={sysPlan.id}
@@ -473,32 +583,61 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground ml-1">Fecha de Inicio</label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    type="date"
-                    value={fechaInicio}
-                    onChange={(e) => setFechaInicio(e.target.value)}
-                    className="pl-10 h-12 text-base w-full"
-                  />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground ml-1">Fecha de Inicio</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      type="date"
+                      value={fechaInicio}
+                      onChange={(e) => setFechaInicio(e.target.value)}
+                      className="pl-10 h-12 text-base w-full"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground ml-1">Vencimiento</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
+                    <Input 
+                      type="text"
+                      disabled
+                      value={calculatedFinalDate}
+                      className="pl-10 h-12 text-base w-full bg-muted/30 text-muted-foreground font-medium opacity-80"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground ml-1">Precio</label>
+                  <label className="text-xs font-medium text-muted-foreground ml-1">Precio <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">C$</span>
                     <Input 
                       placeholder="0" 
                       value={costo}
+                      disabled={true}
                       onChange={(e) => setCosto(e.target.value)}
                       type="number"
-                      className="pl-8 h-12 font-mono text-base"
+                      className={`pl-8 h-12 font-mono text-base bg-muted/30 opacity-80 cursor-not-allowed ${submitAttempted && !costo ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground ml-1">Días activos <span className="text-red-500">*</span></label>
+                  <Input 
+                    placeholder="30" 
+                    value={customDays}
+                    onChange={(e) => setCustomDays(e.target.value === '' ? '' : Number(e.target.value))}
+                    type="number"
+                    min="1"
+                    disabled={plan !== 'Día'}
+                    className={`h-12 font-mono text-base text-center ${submitAttempted && (String(customDays) === '' || Number(customDays) <= 0) ? 'border-red-500 ring-1 ring-red-500' : ''} ${plan !== 'Día' ? 'opacity-50 cursor-not-allowed bg-muted/30' : ''}`}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -527,19 +666,45 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                  />
               </div>
 
-              <Button 
-                type="submit" 
-                className={`w-full h-14 text-lg rounded-xl shadow-lg shadow-primary/25 ${editingMemberId ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
-                disabled={!nombre || !costo}
-              >
-                {success ? (
-                  <span className="flex items-center animate-pulse">
-                    <CheckCircle className="mr-2 h-5 w-5" /> {editingMemberId ? 'Actualizado' : 'Guardado'}
-                  </span>
-                ) : (
-                  editingMemberId ? 'Actualizar Miembro' : 'Registrar'
+              {!editingMemberId && (
+              <div className="flex items-center gap-2 pt-2 pb-2 pl-1">
+                <input 
+                  type="checkbox" 
+                  id="autoCheckIn" 
+                  checked={autoCheckIn}
+                  onChange={(e) => setAutoCheckIn(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-primary focus:ring-primary"
+                />
+                <label htmlFor="autoCheckIn" className="text-sm font-medium text-muted-foreground select-none cursor-pointer">
+                  Hacer check-in automático
+                </label>
+              </div>
+              )}
+
+              <div className="flex gap-4">
+                {(editingMemberId || selectedMemberId) && (
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    className="w-1/3 h-14 text-lg rounded-xl border-white/10 hover:bg-white/5"
+                  >
+                    Cancelar
+                  </Button>
                 )}
-              </Button>
+                <Button 
+                  type="submit" 
+                  className={`${(editingMemberId || selectedMemberId) ? 'w-2/3' : 'w-full'} h-14 text-lg rounded-xl shadow-lg shadow-primary/25 ${editingMemberId ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
+                >
+                  {success ? (
+                    <span className="flex items-center animate-pulse">
+                      <CheckCircle className="mr-2 h-5 w-5" /> {editingMemberId ? 'Actualizado' : 'Guardado'}
+                    </span>
+                  ) : (
+                    editingMemberId ? 'Actualizar Miembro' : selectedMemberId ? 'Renovar Plan' : 'Registrar'
+                  )}
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
@@ -562,9 +727,35 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                 className="pl-10 h-10 bg-card/50"
               />
             </div>
-            {/* Sort Row */}
-            <div className="flex flex-row gap-2 items-center">
-              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Ordenar por:</span>
+            {/* Sort and Filters Row */}
+            <div className="flex flex-row flex-wrap gap-2 items-center">
+              <div className="flex items-center gap-1 bg-card/50 p-1 rounded-md border border-white/10">
+                <input 
+                  type="date"
+                  value={membersFilterDate}
+                  onChange={(e) => setMembersFilterDate(e.target.value)}
+                  className="bg-transparent border-none text-sm focus:outline-none focus:ring-0 text-white w-[125px]"
+                  title="Filtrar por fecha de registro"
+                />
+                {membersFilterDate && (
+                  <button onClick={() => setMembersFilterDate('')} className="text-muted-foreground hover:text-white px-1 font-bold text-xs" title="Limpiar fecha">
+                    ✕
+                  </button>
+                )}
+              </div>
+              <select
+                value={membersFilterPlan}
+                onChange={(e) => setMembersFilterPlan(e.target.value)}
+                className="h-9 rounded-md border border-white/10 bg-card/50 px-2 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-white"
+                title="Filtrar por plan"
+              >
+                <option value="all" className="bg-neutral-900">Todos los planes</option>
+                {dbPlans.map(sysPlan => (
+                   <option key={sysPlan.id} value={sysPlan.description} className="bg-neutral-900">{sysPlan.description}</option>
+                ))}
+              </select>
+
+              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap ml-auto">Ordenar:</span>
               <select
                 value={membersSort}
                 onChange={(e) => setMembersSort(e.target.value)}
@@ -593,8 +784,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
               const expirationDate = getExpirationDate(combined.plan);
 
               return (
-                <Card 
-                  key={combined.plan.sync_id || combined.member.id} 
+                  <Card 
+                  key={combined.plan.id || combined.member.id} 
                   className={`border-white/5 bg-card/60 transition-all cursor-pointer hover:bg-card/80 hover:border-primary/30 ${editingMemberId === combined.member.id ? 'border-primary ring-2 ring-primary/50' : ''}`}
                   onClick={() => setSelectedHistoryMember(combined.member)}
                 >
@@ -641,35 +832,46 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                         {combined.plan.is_promo && <span className="text-emerald-400 ml-1 text-xs" title="Promo Aplicada">★</span>}
                       </div>
                       
+                    </div>
+                  </div>
+                  
+                  {/* Action Buttons Row */}
+                  <div className="px-4 pb-4 flex justify-end gap-2 mt-2 pt-3 border-t border-white/5">
                       {!isExpired ? (
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex gap-2">
+                          <button 
+                             onClick={(e) => handleCheckIn(combined, e)}
+                             className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
+                             title="Check-in"
+                          >
+                            <CheckCircle size={14} /> Check-in
+                          </button>
                           <button 
                              onClick={(e) => handleEdit(combined, e)}
-                             className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors z-10"
+                             className="px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
                              title="Editar"
                           >
-                            <Edit size={14} />
+                            <Edit size={14} /> Editar
                           </button>
                           <button 
                              onClick={(e) => handleDelete(combined, e)}
-                             className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors z-10"
+                             className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
                              title="Eliminar"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={14} /> Eliminar
                           </button>
                         </div>
                       ) : (
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex gap-2 w-full">
                           <button 
                              onClick={(e) => handleRenew(combined, e)}
-                             className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
+                             className="px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors z-10 flex items-center justify-center gap-1 text-xs font-bold w-full"
                              title="Renovar Suscripción"
                           >
-                            <RefreshCcw size={12} /> Renovar
+                            <RefreshCcw size={14} /> Renovar Suscripción
                           </button>
                         </div>
                       )}
-                    </div>
                   </div>
                 </Card>
               );

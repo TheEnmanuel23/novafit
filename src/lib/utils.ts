@@ -1,6 +1,6 @@
 
 // src/lib/utils.ts
-import { addDays, isAfter, format, isBefore, endOfDay } from 'date-fns';
+import { addDays, isAfter, format, isBefore, endOfDay, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PlanType, MemberPlan, Member } from './types';
 import { ClassValue, clsx } from 'clsx';
@@ -28,6 +28,11 @@ export function getCurrentDate(): Date {
 // Calculate expiration date based on plan type
 export function getExpirationDate(plan: MemberPlan): Date {
   let daysActive = plan.plan_days;
+
+  // Force 6 days for Semanal to fix the 7 days bug
+  if (plan.plan_tipo === 'Semanal') {
+    daysActive = 6;
+  }
   
   // Fallback for older records or default
   if (!daysActive) {
@@ -37,10 +42,27 @@ export function getExpirationDate(plan: MemberPlan): Date {
     if (plan.plan_tipo === 'Día') daysActive = 1;
   }
 
-  // Adjust so that days are inclusive (e.g. 7 days starting today ends on the 6th day after today).
-  // Use endOfDay so it expires at 23:59:59 of that final day.
-  const targetDate = addDays(new Date(plan.fecha_inicio), Math.max(0, daysActive - 1));
-  return endOfDay(targetDate);
+  // We skip Sundays for all plans since the week is 6 days
+  let currentDate = new Date(plan.fecha_inicio);
+  
+  // Instead of assuming the first day is valid, we count valid days actively.
+  // We need to count exactly `daysActive` valid days.
+  let validDaysCounted = 0;
+
+  // If the start day itself is valid (not Sunday), it counts as day 1.
+  if (getDay(currentDate) !== 0) {
+    validDaysCounted = 1;
+  }
+
+  // Keep adding days until we have counted the required number of active days
+  while (validDaysCounted < daysActive) {
+    currentDate = addDays(currentDate, 1);
+    if (getDay(currentDate) !== 0) {
+      validDaysCounted++;
+    }
+  }
+
+  return endOfDay(currentDate);
 }
 
 // Check membership status
