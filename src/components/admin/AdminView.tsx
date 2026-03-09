@@ -44,13 +44,16 @@ export default function AdminView({ onLogout }: AdminViewProps) {
 
   React.useEffect(() => {
     // Initialize standard fechaInicio on mount
-    setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
+    const today = format(getCurrentDate(), 'yyyy-MM-dd');
+    setFechaInicio(today);
+    setMembersFilterDate(today);
 
     if (process.env.NODE_ENV !== 'development') return;
     const handleTimeChange = () => {
       setTimeTick(t => t + 1);
       // Also update default date picker date if we aren't editing explicitly
       setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
+      setMembersFilterDate(format(getCurrentDate(), 'yyyy-MM-dd'));
     };
     window.addEventListener('time-travel-changed', handleTimeChange);
     return () => window.removeEventListener('time-travel-changed', handleTimeChange);
@@ -60,6 +63,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   const [membersSearchTerm, setMembersSearchTerm] = useState('');
   const [membersSort, setMembersSort] = useState('created');
   const [membersSortOrder, setMembersSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [membersFilterDate, setMembersFilterDate] = useState<string>('');
+  const [membersFilterPlan, setMembersFilterPlan] = useState<string>('all');
   const [selectedHistoryMember, setSelectedHistoryMember] = useState<any>(null);
   const [dbPlans, setDbPlans] = useState<SystemPlan[]>([]);
 
@@ -93,7 +98,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       return;
     }
 
-    const combined: CombinedMember[] = [];
+    let combined: CombinedMember[] = [];
     const memberIds = profiles.map((p: any) => p.memberId);
     
     if (memberIds.length > 0) {
@@ -111,6 +116,16 @@ export default function AdminView({ onLogout }: AdminViewProps) {
           }
         }
       }
+    }
+    
+    // Filter by date if enabled
+    if (membersFilterDate) {
+      combined = combined.filter((c) => format(new Date(c.plan.fecha_inicio), 'yyyy-MM-dd') === membersFilterDate);
+    }
+    
+    // Filter by Plan Type
+    if (membersFilterPlan && membersFilterPlan !== 'all') {
+      combined = combined.filter((c) => c.plan.plan_tipo === membersFilterPlan);
     }
     
     // Sort overall results based on selected criteria
@@ -134,13 +149,13 @@ export default function AdminView({ onLogout }: AdminViewProps) {
 
   React.useEffect(() => {
     fetchMembers();
-  }, [membersSearchTerm, membersSort, membersSortOrder, timeTick]);
+  }, [membersSearchTerm, membersSort, membersSortOrder, membersFilterDate, membersFilterPlan, timeTick]);
 
   React.useEffect(() => {
     const handleSync = () => fetchMembers();
     window.addEventListener('request-sync', handleSync);
     return () => window.removeEventListener('request-sync', handleSync);
-  }, [membersSearchTerm, membersSort, membersSortOrder]);
+  }, [membersSearchTerm, membersSort, membersSortOrder, membersFilterDate, membersFilterPlan]);
 
   // Name Autocomplete
   React.useEffect(() => {
@@ -712,9 +727,35 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                 className="pl-10 h-10 bg-card/50"
               />
             </div>
-            {/* Sort Row */}
-            <div className="flex flex-row gap-2 items-center">
-              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Ordenar por:</span>
+            {/* Sort and Filters Row */}
+            <div className="flex flex-row flex-wrap gap-2 items-center">
+              <div className="flex items-center gap-1 bg-card/50 p-1 rounded-md border border-white/10">
+                <input 
+                  type="date"
+                  value={membersFilterDate}
+                  onChange={(e) => setMembersFilterDate(e.target.value)}
+                  className="bg-transparent border-none text-sm focus:outline-none focus:ring-0 text-white w-[125px]"
+                  title="Filtrar por fecha de registro"
+                />
+                {membersFilterDate && (
+                  <button onClick={() => setMembersFilterDate('')} className="text-muted-foreground hover:text-white px-1 font-bold text-xs" title="Limpiar fecha">
+                    ✕
+                  </button>
+                )}
+              </div>
+              <select
+                value={membersFilterPlan}
+                onChange={(e) => setMembersFilterPlan(e.target.value)}
+                className="h-9 rounded-md border border-white/10 bg-card/50 px-2 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-white"
+                title="Filtrar por plan"
+              >
+                <option value="all" className="bg-neutral-900">Todos los planes</option>
+                {dbPlans.map(sysPlan => (
+                   <option key={sysPlan.id} value={sysPlan.description} className="bg-neutral-900">{sysPlan.description}</option>
+                ))}
+              </select>
+
+              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap ml-auto">Ordenar:</span>
               <select
                 value={membersSort}
                 onChange={(e) => setMembersSort(e.target.value)}
