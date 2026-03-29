@@ -4,14 +4,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Member, MemberPlan } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import { getMembershipStatus, formatDate, getExpirationDate } from '@/lib/utils';
-import { Calendar, X, Clock, History } from 'lucide-react';
+import { Calendar, X, Clock, History, Edit } from 'lucide-react';
 
 interface MemberHistoryModalProps {
   member: Member | null;
   onClose: () => void;
+  onEdit?: (plan: MemberPlan) => void;
 }
 
-export const MemberHistoryModal: React.FC<MemberHistoryModalProps> = ({ member, onClose }) => {
+export const MemberHistoryModal: React.FC<MemberHistoryModalProps> = ({ member, onClose, onEdit }) => {
   const [history, setHistory] = useState<MemberPlan[]>([]);
 
   useEffect(() => {
@@ -24,7 +25,16 @@ export const MemberHistoryModal: React.FC<MemberHistoryModalProps> = ({ member, 
           .order('fecha_inicio', { ascending: false });
           
         if (!error && records) {
-          setHistory(records as MemberPlan[]);
+          const sorted = (records as MemberPlan[]).sort((a, b) => {
+            const statA = getMembershipStatus(a);
+            const statB = getMembershipStatus(b);
+            const score = { 'Active': 3, 'Scheduled': 2, 'Expired': 1 };
+            const wA = score[statA as keyof typeof score] || 0;
+            const wB = score[statB as keyof typeof score] || 0;
+            if (wA !== wB) return wB - wA;
+            return new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime();
+          });
+          setHistory(sorted);
         }
       };
       fetchHistory();
@@ -83,14 +93,14 @@ export const MemberHistoryModal: React.FC<MemberHistoryModalProps> = ({ member, 
                       key={record.id} 
                       className={`relative p-4 rounded-2xl border transition-all ${
                         isCurrent 
-                          ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20' 
+                          ? 'border-emerald-500/50 bg-emerald-500/5 ring-1 ring-emerald-500/20' 
                           : isExpired 
                             ? 'border-white/5 bg-white/5 opacity-80' 
-                            : 'border-emerald-500/30 bg-emerald-500/5'
+                            : 'border-amber-500/30 bg-amber-500/5'
                       }`}
                     >
                       {isCurrent && (
-                        <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-wider">
+                        <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
                           Actual
                         </div>
                       )}
@@ -128,9 +138,20 @@ export const MemberHistoryModal: React.FC<MemberHistoryModalProps> = ({ member, 
                         </div>
                       </div>
                       
-                      <div className="flex justify-between items-center mt-2 text-xs opacity-60">
-                        <span>{record.notes ? `"${record.notes}"` : ''}</span>
-                        <span className="font-mono">C$ {record.costo}</span>
+                      <div className="flex justify-between items-end mt-3 pt-3 border-t border-white/5 opacity-90">
+                        <div className="flex flex-col text-xs space-y-1">
+                          {record.notes && <span className="italic text-muted-foreground">"{record.notes}"</span>}
+                          <span className="font-mono">C$ {record.costo}</span>
+                        </div>
+                        {!isExpired && onEdit && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onEdit(record); }}
+                            className="px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
+                            title="Editar Plan"
+                          >
+                            <Edit size={14} /> Editar
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

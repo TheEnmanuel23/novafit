@@ -275,7 +275,7 @@ export function MemberFormModal({ isOpen, onClose, onSuccess, dbPlans, initialDa
           <Card className="border-0 bg-transparent shadow-none h-full m-0 w-full rounded-none">
             <CardHeader>
                <CardTitle className="text-xl flex justify-between items-center pr-10">
-                 {editingMemberId ? 'Editar Miembro' : selectedMemberId ? 'Renovar Plan' : 'Nuevo Registro'}
+                 {editingMemberId ? 'Editar Miembro' : selectedMemberId ? 'Agregar Plan' : 'Nuevo Registro'}
                </CardTitle>
             </CardHeader>
             <CardContent>

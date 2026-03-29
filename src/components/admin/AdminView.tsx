@@ -174,6 +174,15 @@ export default function AdminView({ onLogout }: AdminViewProps) {
         for (const p of profiles) {
           const userPlans = plans.filter((plan: any) => plan.memberId === p.memberId);
           if (userPlans.length > 0) {
+            userPlans.sort((a: any, b: any) => {
+              const statA = getMembershipStatus(a);
+              const statB = getMembershipStatus(b);
+              const score = { 'Active': 3, 'Scheduled': 2, 'Expired': 1 };
+              const wA = score[statA as keyof typeof score] || 0;
+              const wB = score[statB as keyof typeof score] || 0;
+              if (wA !== wB) return wB - wA;
+              return new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime();
+            });
             combined.push({ member: p, plan: userPlans[0] });
           }
         }
@@ -261,11 +270,11 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       selectedMemberId: combined.member.memberId,
       nombre: combined.member.nombre,
       telefono: combined.member.telefono || '',
-      plan: combined.plan.plan_tipo as any,
-      costo: combined.plan.costo.toString(),
-      customDays: combined.plan.plan_days || '',
-      isPromo: !!combined.plan.is_promo,
-      notes: combined.plan.notes || '',
+      plan: '',
+      costo: '',
+      customDays: '',
+      isPromo: false,
+      notes: '',
       fechaInicio: format(getCurrentDate(), 'yyyy-MM-dd'),
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -628,6 +637,23 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       <MemberHistoryModal 
         member={selectedHistoryMember} 
         onClose={() => setSelectedHistoryMember(null)} 
+        onEdit={(mappedPlan) => {
+          setSelectedHistoryMember(null);
+          setInitialData({
+            editingMemberId: selectedHistoryMember.id,
+            editingPlanId: mappedPlan.id!,
+            selectedMemberId: selectedHistoryMember.memberId,
+            nombre: selectedHistoryMember.nombre,
+            telefono: selectedHistoryMember.telefono || '',
+            plan: mappedPlan.plan_tipo as any,
+            costo: mappedPlan.costo.toString(),
+            customDays: mappedPlan.plan_days || '',
+            isPromo: !!mappedPlan.is_promo,
+            notes: mappedPlan.notes || '',
+            fechaInicio: format(new Date(mappedPlan.fecha_inicio), 'yyyy-MM-dd'),
+          });
+          setIsRegistrationModalOpen(true);
+        }}
       />
     </div>
   );
