@@ -46,14 +46,12 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     // Initialize standard fechaInicio on mount
     const today = format(getCurrentDate(), 'yyyy-MM-dd');
     setFechaInicio(today);
-    setMembersFilterDate(today);
 
     if (process.env.NODE_ENV !== 'development') return;
     const handleTimeChange = () => {
       setTimeTick(t => t + 1);
       // Also update default date picker date if we aren't editing explicitly
       setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
-      setMembersFilterDate(format(getCurrentDate(), 'yyyy-MM-dd'));
     };
     window.addEventListener('time-travel-changed', handleTimeChange);
     return () => window.removeEventListener('time-travel-changed', handleTimeChange);
