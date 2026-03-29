@@ -99,22 +99,33 @@ export const MemberHistoryModal: React.FC<MemberHistoryModalProps> = ({ member, 
                         <div>
                           <span className="font-bold text-lg">{record.plan_tipo}</span>
                           <div className="text-xs text-muted-foreground mt-0.5">
-                            Registrado: {formatDate(record.fecha_inicio)}
+                            Registrado: {formatDate((record as any).created_at || record.fecha_inicio)}
                           </div>
                         </div>
                         {!isCurrent && (
-                          <div className={`px-2 py-1 rounded-lg text-xs font-bold mt-1 ${isExpired ? 'bg-neutral-800 text-neutral-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                            {isExpired ? 'Vencido' : 'Activo'}
+                          <div className={`px-2 py-1 rounded-lg text-xs font-bold mt-1 ${isExpired ? 'bg-neutral-800 text-neutral-400' : 'bg-amber-500/20 text-amber-500'}`}>
+                            {isExpired ? 'Vencido' : 'Agendado'}
                           </div>
                         )}
                       </div>
                       
-                      <div className="flex items-center gap-2 text-sm pt-3 border-t border-white/5">
-                        <Calendar size={14} className="text-muted-foreground" />
-                        <span className="text-muted-foreground">Vence:</span>
-                        <span className={`font-medium ${isExpired ? 'text-red-400' : 'text-emerald-400'}`}>
-                          {formatDate(expirationDate)}
-                        </span>
+                      <div className="flex flex-col gap-1 pt-3 border-t border-white/5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground flex items-center gap-1 w-[70px]">
+                            <Calendar size={14} /> Inicio:
+                          </span>
+                          <span className="font-medium text-white/90">
+                            {formatDate(record.fecha_inicio)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground flex items-center gap-1 w-[70px]">
+                            <Calendar size={14} /> Vence:
+                          </span>
+                          <span className={`font-medium ${isExpired ? 'text-red-400' : 'text-emerald-400'}`}>
+                            {formatDate(expirationDate)}
+                          </span>
+                        </div>
                       </div>
                       
                       <div className="flex justify-between items-center mt-2 text-xs opacity-60">

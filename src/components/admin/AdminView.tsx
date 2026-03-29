@@ -1,12 +1,13 @@
 'use client';
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { PlanType, SystemPlan } from '@/lib/types';
 import { getMembershipStatus, formatDate, getExpirationDate, getCurrentDate } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Search, RefreshCcw, LogOut, Users } from 'lucide-react';
+import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Search, RefreshCcw, LogOut, Users, X } from 'lucide-react';
 import { MemberHistoryModal } from './MemberHistoryModal';
 import { AttendanceReport } from './AttendanceReport';
 import { useAuthStore } from '@/lib/store';
@@ -20,6 +21,7 @@ interface AdminViewProps {
 
 export default function AdminView({ onLogout }: AdminViewProps) {
   const [view, setView] = useState<'members' | 'report'>('members');
+  const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [plan, setPlan] = useState<PlanType>('');
@@ -28,7 +30,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   const [isPromo, setIsPromo] = useState(false);
   const [notes, setNotes] = useState('');
   const [fechaInicio, setFechaInicio] = useState<string>('');
-  const [autoCheckIn, setAutoCheckIn] = useState(false);
+  const [autoCheckIn, setAutoCheckIn] = useState(true);
   const [success, setSuccess] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<number | string | null>(null);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
@@ -41,6 +43,23 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   
   // Force re-render on time travel
   const [timeTick, setTimeTick] = useState(0);
+  
+  const [mounted, setMounted] = useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (isRegistrationModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isRegistrationModalOpen]);
 
   React.useEffect(() => {
     // Initialize standard fechaInicio on mount
@@ -352,7 +371,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       setNotes('');
       setIsPromo(false);
       setCustomDays('');
-      setAutoCheckIn(false);
+      setAutoCheckIn(true);
       setSubmitAttempted(false);
       setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
       setEditingMemberId(null);
@@ -368,6 +387,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
         setCosto('');
       }
       
+      setIsRegistrationModalOpen(false);
       setTimeout(() => setSuccess(false), 3000);
       window.dispatchEvent(new Event('request-sync'));
     } catch (error) {
@@ -390,6 +410,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     setSubmitAttempted(false);
     setFechaInicio(format(new Date(combined.plan.fecha_inicio), 'yyyy-MM-dd'));
     setNameSuggestions([]); // Clear suggestions
+    setIsRegistrationModalOpen(true);
   };
 
   const handleRenew = (combined: CombinedMember, e: React.MouseEvent) => {
@@ -408,6 +429,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setNameSuggestions([]);
+    setIsRegistrationModalOpen(true);
   };
 
   const handleDelete = async (combined: CombinedMember, e: React.MouseEvent) => {
@@ -445,6 +467,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     setNotes('');
     setIsPromo(false);
     setCustomDays('');
+    setAutoCheckIn(true);
     setSubmitAttempted(false);
     setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
     if (dbPlans.length > 0) {
@@ -455,52 +478,72 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       setCosto('');
     }
     setNameSuggestions([]);
+    setIsRegistrationModalOpen(false);
   };
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-8">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
         <div className="flex items-center space-x-4">
           <div className="p-3 bg-primary/20 rounded-xl">
-            {view === 'members' ? <UserPlus className="h-8 w-8 text-primary" /> : <Calendar className="h-8 w-8 text-primary" />}
+            {view === 'members' ? <Users className="h-8 w-8 text-primary" /> : <Calendar className="h-8 w-8 text-primary" />}
           </div>
           <div>
             <h1 className="text-3xl font-bold">Administración</h1>
             <p className="text-muted-foreground">
-              {view === 'members' ? 'Registro y control de miembros.' : 'Reporte de Accesos y Asistencia.'}
+              {view === 'members' ? 'Directorio de miembros y gestión.' : 'Reporte de Accesos y Asistencia.'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex bg-card/50 border border-white/10 p-1 rounded-xl">
-              <button 
-                  onClick={() => setView('members')}
-                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'members' ? 'bg-primary text-black shadow-lg' : 'text-muted-foreground hover:text-white'}`}
-              >
-                  Miembros
-              </button>
-              <button 
-                  onClick={() => setView('report')}
-                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'report' ? 'bg-primary text-black shadow-lg' : 'text-muted-foreground hover:text-white'}`}
-              >
-                  Asistencias
-              </button>
-          </div>
-            <button 
-              onClick={onLogout}
-              className="p-3 bg-red-500/10 text-red-400 rounded-xl hover:bg-red-500/20 transition-colors border border-red-500/10"
-              title="Cerrar Sesión"
-            >
-              <LogOut size={20} />
-            </button>
-        </div>
+        <button 
+          onClick={onLogout}
+          className="p-3 bg-red-500/10 text-red-400 rounded-xl hover:bg-red-500/20 transition-colors border border-red-500/10 w-full md:w-auto flex justify-center"
+          title="Cerrar Sesión"
+        >
+          <LogOut size={20} />
+        </button>
       </div>
 
-      {view === 'members' ? (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Registration Form */}
-        <Card className="border-primary/20 bg-card/40 backdrop-blur-xl shadow-2xl h-fit">
+      <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
+        <div className="flex bg-card/50 border border-white/10 p-1 rounded-xl w-full md:w-auto">
+            <button 
+                onClick={() => setView('members')}
+                className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'members' ? 'bg-primary text-black shadow-lg' : 'text-muted-foreground hover:text-white'}`}
+            >
+                Miembros
+            </button>
+            <button 
+                onClick={() => setView('report')}
+                className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'report' ? 'bg-primary text-black shadow-lg' : 'text-muted-foreground hover:text-white'}`}
+            >
+                Asistencias
+            </button>
+        </div>
+        <button 
+          onClick={() => {
+             handleCancelEdit(); // Clear before opening fresh
+             setIsRegistrationModalOpen(true);
+          }}
+          className="px-5 py-2.5 bg-primary text-black font-bold rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 w-full md:w-auto"
+        >
+          <UserPlus size={18} /> Nuevo Registro
+        </button>
+      </div>
+
+      {isRegistrationModalOpen && mounted && createPortal(
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4">
+        <div className="w-full max-w-2xl bg-card border border-white/10 rounded-3xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col relative animate-in fade-in zoom-in-95 duration-200">
+          <button 
+              onClick={handleCancelEdit} 
+              className="absolute top-4 right-4 z-[60] p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full transition-colors text-white border border-white/10"
+              title="Cerrar ventana"
+          >
+            <X size={20} />
+          </button>
+          
+          <div className="overflow-y-auto custom-scrollbar flex-1 relative z-10 w-full">
+            <Card className="border-0 bg-transparent shadow-none h-full m-0 rounded-none w-full">
           <CardHeader>
              <CardTitle className="text-xl flex justify-between items-center">
                {editingMemberId ? 'Editar Miembro' : selectedMemberId ? 'Renovar Plan' : 'Nuevo Registro'}
@@ -549,8 +592,8 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                                     <div className="font-bold text-sm">{s.nombre}</div>
                                     <div className="text-xs text-muted-foreground">{s.telefono}</div>
                                 </div>
-                                <div className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${status === 'Active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                                    {status === 'Active' ? 'Activo' : 'Vencido'}
+                                <div className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${status === 'Active' ? 'bg-emerald-500/20 text-emerald-400' : status === 'Scheduled' ? 'bg-amber-500/20 text-amber-500' : 'bg-red-500/20 text-red-400'}`}>
+                                    {status === 'Active' ? 'Activo' : status === 'Scheduled' ? 'Agendado' : 'Vencido'}
                                 </div>
                             </div>
                           );
@@ -722,9 +765,14 @@ export default function AdminView({ onLogout }: AdminViewProps) {
               </div>
             </form>
           </CardContent>
-        </Card>
+            </Card>
+          </div>
+        </div>
+      </div>,
+      document.body
+      )}
 
-        {/* Members List */}
+      {view === 'members' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold ml-1 flex items-center gap-2">
@@ -830,13 +878,23 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                         </span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-xs mt-2">
-                        <span className="text-muted-foreground flex items-center gap-1">
-                          <Calendar size={10} /> Expira:
-                        </span>
-                        <span className={`font-medium ${isExpired ? 'text-red-400' : 'text-emerald-400'}`}>
-                          {formatDate(expirationDate)}
-                        </span>
+                      <div className="flex flex-col gap-1 mt-3">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground flex items-center gap-1 w-16">
+                            <Calendar size={10} /> Inicio:
+                          </span>
+                          <span className="font-medium text-white/90">
+                            {formatDate(combined.plan.fecha_inicio)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground flex items-center gap-1 w-16">
+                            <Calendar size={10} /> Expira:
+                          </span>
+                          <span className={`font-medium ${isExpired ? 'text-red-400' : 'text-emerald-400'}`}>
+                            {formatDate(expirationDate)}
+                          </span>
+                        </div>
                       </div>
                       
                       {combined.plan.notes && (
@@ -854,9 +912,9 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                     
                     <div className="flex flex-col items-end gap-2">
                       <div className={`text-xs font-bold px-2 py-1 rounded-full inline-flex items-center gap-1 ${
-                        isExpired ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'
+                        isExpired ? 'bg-red-500/10 text-red-400' : status === 'Scheduled' ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-400'
                       }`}>
-                        {isExpired ? 'Vencido' : 'Activo'}
+                        {isExpired ? 'Vencido' : status === 'Scheduled' ? 'Agendado' : 'Activo'}
                       </div>
                       <div className="text-sm font-mono opacity-70">
                         C$ {combined.plan.costo}
@@ -869,13 +927,22 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                   {/* Action Buttons Row */}
                   <div className="px-4 pb-4 flex justify-end gap-2 mt-2 pt-3 border-t border-white/5">
                       {!isExpired ? (
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap justify-end">
+                          {status !== 'Scheduled' && (
+                            <button 
+                               onClick={(e) => handleCheckIn(combined, e)}
+                               className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
+                               title="Check-in"
+                            >
+                              <CheckCircle size={14} /> Check-in
+                            </button>
+                          )}
                           <button 
-                             onClick={(e) => handleCheckIn(combined, e)}
-                             className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
-                             title="Check-in"
+                             onClick={(e) => handleRenew(combined, e)}
+                             className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
+                             title="Agregar Plan"
                           >
-                            <CheckCircle size={14} /> Check-in
+                            <RefreshCcw size={14} /> Renovar
                           </button>
                           <button 
                              onClick={(e) => handleEdit(combined, e)}
@@ -912,8 +979,9 @@ export default function AdminView({ onLogout }: AdminViewProps) {
             )}
           </div>
         </div>
-      </div>
-      ) : (
+      )}
+
+      {view === 'report' && (
         <AttendanceReport />
       )}
       
