@@ -25,7 +25,7 @@ export const Header = () => {
   if (!pathname?.startsWith('/admin') || !isAuthenticated) return null;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/5 bg-background/80 backdrop-blur-xl">
+    <header className="border-b border-white/5 bg-background">
       <div className="container mx-auto flex items-center justify-between p-4">
         <Link href="/" className="flex items-center gap-2 transition hover:opacity-80">
           <img src="/logo.png" alt="Nova Fit" className="h-16 w-auto rounded-2xl" />

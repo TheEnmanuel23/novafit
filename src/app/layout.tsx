@@ -34,11 +34,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className="dark">
+    <html lang="es" className="dark" suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/icons/apple-icon-180.png" />
       </head>
-      <body className={`${inter.className} min-h-screen bg-background text-foreground selection:bg-primary selection:text-white antialiased`}>
+      <body suppressHydrationWarning className={`${inter.className} min-h-screen bg-background text-foreground selection:bg-primary selection:text-white antialiased`}>
         <div className="relative flex min-h-screen flex-col">
           <Header />
           <main className="flex-1 container mx-auto py-6 md:py-10">

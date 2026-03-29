@@ -1,19 +1,106 @@
 'use client';
 import React, { useState } from 'react';
-import { createPortal } from 'react-dom';
 import { PlanType, SystemPlan } from '@/lib/types';
-import { getMembershipStatus, formatDate, getExpirationDate, getCurrentDate } from '@/lib/utils';
+import { getExpirationDate, getCurrentDate, getMembershipStatus, formatDate } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Trash2, Edit, UserPlus, Phone, CheckCircle, Calendar, CreditCard, Search, RefreshCcw, LogOut, Users, X } from 'lucide-react';
+import { Trash2, Edit, UserPlus, Search, RefreshCcw, LogOut, Users, Calendar, CheckCircle, Phone, PlusCircle, Filter } from 'lucide-react';
 import { MemberHistoryModal } from './MemberHistoryModal';
+import { MemberFormModal, InitialMemberData } from './MemberFormModal';
 import { AttendanceReport } from './AttendanceReport';
 import { useAuthStore } from '@/lib/store';
-import { format, addDays, getDay } from 'date-fns';
+import { format } from 'date-fns';
 import { CombinedMember } from '../checkin/MemberCard';
 import { toast } from 'sonner';
+
+
+interface FilterOption { label: string; value: string; }
+interface FilterSelectProps {
+  value: string;
+  options: FilterOption[];
+  onChange: (val: string) => void;
+}
+function FilterSelect({ value, options, onChange }: FilterSelectProps) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  const btnRef = React.useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = React.useState({ top: 0, left: 0, width: 0 });
+  const selected = options.find(o => o.value === value);
+
+  // Use layout effect or normal effect but recalculate carefully
+  const updatePos = () => {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      // Use purely viewport relative coordinates with position: fixed
+      // Avoid adding scrollY/scrollX when using position: fixed
+      setPos({ 
+        top: r.bottom + 4, 
+        left: r.left, 
+        width: Math.max(r.width, 160) 
+      });
+    }
+  };
+
+  const openMenu = () => {
+    updatePos();
+    setOpen(true);
+  };
+
+  React.useEffect(() => {
+    if (!open) return;
+    updatePos(); // Recalculate if something shifts
+    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node) && btnRef.current && !btnRef.current.contains(e.target as Node)) setOpen(false); };
+    const handleScroll = () => updatePos();
+    
+    document.addEventListener('mousedown', close);
+    // document.addEventListener('scroll', handleScroll, true); // Update pos on scroll while open
+    return () => {
+      document.removeEventListener('mousedown', close);
+      // document.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => open ? setOpen(false) : openMenu()}
+        className="h-8 flex items-center justify-between gap-1.5 rounded-lg border border-white/10 bg-card/60 px-2.5 text-xs text-white whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-primary/50 hover:bg-white/5 transition-colors"
+      >
+        <span>{selected?.label ?? value}</span>
+        <svg className="h-3 w-3 text-muted-foreground opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {open && (
+        <div
+          ref={ref}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: pos.width, zIndex: 99999 }}
+          className="bg-neutral-900 border border-white/10 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] py-1.5 overflow-hidden ring-1 ring-white/5"
+        >
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              className={`w-full text-left px-3.5 py-2 text-xs transition-colors flex items-center justify-between ${
+                opt.value === value 
+                  ? 'text-primary font-bold bg-primary/10' 
+                  : 'text-white hover:bg-white/10'
+              }`}
+            >
+              {opt.label}
+              {opt.value === value && (
+                <svg className="h-3 w-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
 
 interface AdminViewProps {
   onLogout?: () => void;
@@ -22,56 +109,14 @@ interface AdminViewProps {
 export default function AdminView({ onLogout }: AdminViewProps) {
   const [view, setView] = useState<'members' | 'report'>('members');
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
-  const [nombre, setNombre] = useState('');
-  const [telefono, setTelefono] = useState('');
-  const [plan, setPlan] = useState<PlanType>('');
-  const [costo, setCosto] = useState<string>('');
-  const [customDays, setCustomDays] = useState<number | ''>('');
-  const [isPromo, setIsPromo] = useState(false);
-  const [notes, setNotes] = useState('');
-  const [fechaInicio, setFechaInicio] = useState<string>('');
-  const [autoCheckIn, setAutoCheckIn] = useState(true);
-  const [success, setSuccess] = useState(false);
-  const [editingMemberId, setEditingMemberId] = useState<number | string | null>(null);
-  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
-  const [submitAttempted, setSubmitAttempted] = useState(false);
-  
-  // Identity management
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
-  const [nameSuggestions, setNameSuggestions] = useState<any[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [initialData, setInitialData] = useState<InitialMemberData | null>(null);
   
   // Force re-render on time travel
   const [timeTick, setTimeTick] = useState(0);
-  
-  const [mounted, setMounted] = useState(false);
 
   React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  React.useEffect(() => {
-    if (isRegistrationModalOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isRegistrationModalOpen]);
-
-  React.useEffect(() => {
-    // Initialize standard fechaInicio on mount
-    const today = format(getCurrentDate(), 'yyyy-MM-dd');
-    setFechaInicio(today);
-
     if (process.env.NODE_ENV !== 'development') return;
-    const handleTimeChange = () => {
-      setTimeTick(t => t + 1);
-      // Also update default date picker date if we aren't editing explicitly
-      setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
-    };
+    const handleTimeChange = () => setTimeTick(t => t + 1);
     window.addEventListener('time-travel-changed', handleTimeChange);
     return () => window.removeEventListener('time-travel-changed', handleTimeChange);
   }, []);
@@ -80,7 +125,9 @@ export default function AdminView({ onLogout }: AdminViewProps) {
   const [membersSearchTerm, setMembersSearchTerm] = useState('');
   const [membersSort, setMembersSort] = useState('created');
   const [membersSortOrder, setMembersSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [membersFilterDate, setMembersFilterDate] = useState<string>('');
+  const [membersFilterDateFrom, setMembersFilterDateFrom] = useState<string>('');
+  const [membersFilterDateTo, setMembersFilterDateTo] = useState<string>('');
+  const [membersFilterDatePreset, setMembersFilterDatePreset] = useState<string>('all');
   const [membersFilterPlan, setMembersFilterPlan] = useState<string>('all');
   const [membersFilterSocio, setMembersFilterSocio] = useState<string>('all');
   const [selectedHistoryMember, setSelectedHistoryMember] = useState<any>(null);
@@ -92,9 +139,6 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       const { data } = await supabase.from('plans').select('*').eq('active', true).order('price', { ascending: false });
       if (data) {
         setDbPlans(data as SystemPlan[]);
-        if (!plan && data.length > 0) {
-          setPlan(data[0].description);
-        }
       }
     }
     fetchPlans();
@@ -136,9 +180,16 @@ export default function AdminView({ onLogout }: AdminViewProps) {
       }
     }
     
-    // Filter by date if enabled
-    if (membersFilterDate) {
-      combined = combined.filter((c) => format(new Date(c.plan.fecha_inicio), 'yyyy-MM-dd') === membersFilterDate);
+    // Filter by date range if enabled
+    if (membersFilterDateFrom || membersFilterDateTo) {
+      const from = membersFilterDateFrom ? new Date(membersFilterDateFrom + 'T00:00:00') : null;
+      const to = membersFilterDateTo ? new Date(membersFilterDateTo + 'T23:59:59') : null;
+      combined = combined.filter((c) => {
+        const d = new Date(c.plan.fecha_inicio);
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+        return true;
+      });
     }
     
     // Filter by Plan Type
@@ -176,259 +227,48 @@ export default function AdminView({ onLogout }: AdminViewProps) {
 
   React.useEffect(() => {
     fetchMembers();
-  }, [membersSearchTerm, membersSort, membersSortOrder, membersFilterDate, membersFilterPlan, membersFilterSocio, timeTick]);
+  }, [membersSearchTerm, membersSort, membersSortOrder, membersFilterDateFrom, membersFilterDateTo, membersFilterPlan, membersFilterSocio, timeTick]);
 
   React.useEffect(() => {
     const handleSync = () => fetchMembers();
     window.addEventListener('request-sync', handleSync);
     return () => window.removeEventListener('request-sync', handleSync);
-  }, [membersSearchTerm, membersSort, membersSortOrder, membersFilterDate, membersFilterPlan, membersFilterSocio]);
-
-  // Name Autocomplete
-  React.useEffect(() => {
-    if (nombre.length < 2 || editingMemberId) {
-      setNameSuggestions([]);
-      return;
-    }
-    
-    const timer = setTimeout(async () => {
-        try {
-            const { data: results } = await supabase
-                .from('members')
-                .select('*')
-                .eq('deleted', false)
-                .ilike('nombre', `%${nombre}%`)
-                .limit(20);
-            
-            if (results) {
-              const unique = new Map();
-              results.forEach((m: any) => {
-                  if (m.memberId && !unique.has(m.memberId)) {
-                      unique.set(m.memberId, m);
-                  }
-              });
-              setNameSuggestions(Array.from(unique.values()));
-              setShowSuggestions(true);
-            }
-        } catch (e) {
-            console.error(e);
-        }
-    }, 300);
-    
-    return () => clearTimeout(timer);
-  }, [nombre, editingMemberId]);
-
-  // Auto-update price suggestion when plan changes
-  React.useEffect(() => {
-    if (editingPlanId) return; // Don't auto-change price if editing an existing plan
-    const selectedPlan = dbPlans.find(p => p.description === plan);
-    if (selectedPlan) {
-      setCosto(selectedPlan.price.toString());
-      setCustomDays(selectedPlan.days_active || '');
-    }
-  }, [plan, editingPlanId, dbPlans]);
-
-  // Multiply price by customDays for Día plan and read-only
-  React.useEffect(() => {
-    if (editingPlanId) return;
-    if (plan === 'Dia') {
-      const selectedPlan = dbPlans.find(p => p.description === plan);
-      if (selectedPlan) {
-        const days = customDays !== '' && Number(customDays) > 0 ? Number(customDays) : 1;
-        setCosto((selectedPlan.price * days).toString());
-      }
-    }
-  }, [customDays, plan, editingPlanId, dbPlans]);
-
-  const calculatedFinalDate = React.useMemo(() => {
-    if (!fechaInicio || !plan) return '-';
-    const selectedSysPlan = dbPlans.find(p => p.description === plan);
-    let days = customDays !== '' ? Number(customDays) : selectedSysPlan?.days_active;
-    if (!days) days = 30; // fallback
-
-    try {
-      const start = new Date(fechaInicio + 'T12:00:00');
-      if (isNaN(start.getTime())) return '-';
-      
-      if (plan === 'Semanal') {
-        days = 6;
-      }
-      
-      let currentDate = start;
-      const isShortPlan = days <= 7 || plan === 'Semanal' || plan === 'Día' || plan === 'Dia';
-
-      if (isShortPlan) {
-        let validDaysCounted = 0;
-
-        if (getDay(currentDate) !== 0) {
-          validDaysCounted = 1;
-        }
-
-        while (validDaysCounted < days) {
-          currentDate = addDays(currentDate, 1);
-          if (getDay(currentDate) !== 0) {
-            validDaysCounted++;
-          }
-        }
-      } else {
-        // For biweekly/monthly, count natural calendar days
-        currentDate = addDays(currentDate, days - 1);
-      }
-      
-      return formatDate(currentDate);
-    } catch {
-      return '-';
-    }
-  }, [fechaInicio, customDays, plan, dbPlans]);
-
-  const selectSuggestion = (member: any) => {
-      setNombre(member.nombre);
-      setTelefono(member.telefono || '');
-      setSelectedMemberId(member.memberId);
-      setNameSuggestions([]);
-      setShowSuggestions(false);
-  };
-
-  const user = useAuthStore(state => state.user);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitAttempted(true);
-    if (!nombre || !costo || !plan || String(customDays) === '' || Number(customDays) <= 0) {
-      toast.error('Por favor completa todos los campos requeridos (*)');
-      return;
-    }
-
-    try {
-      const selectedSysPlan = dbPlans.find(p => p.description === plan);
-      const planDays = String(customDays) !== '' ? Number(customDays) : selectedSysPlan?.days_active;
-      const planId = selectedSysPlan?.id;
-
-      if (editingMemberId && editingPlanId) {
-        // Updating BOTH specific member profile and specific plan
-        await supabase.from('members').update({
-          nombre,
-          telefono,
-          updated_at: new Date().toISOString(),
-        }).eq('id', editingMemberId);
-
-        await supabase.from('member_plans').update({
-          plan_id: planId,
-          plan_tipo: plan as any,
-          ...(planDays ? { plan_days: planDays } : {}),
-          costo: Number(costo),
-          is_promo: isPromo,
-          notes: notes,
-          fecha_inicio: new Date(fechaInicio + 'T12:00:00').toISOString(),
-          updated_at: new Date().toISOString(),
-        }).eq('id', editingPlanId);
-        
-        setEditingMemberId(null);
-        setEditingPlanId(null);
-      } else {
-        // Creating new plan (Renewal or New User)
-        const memberId = selectedMemberId || crypto.randomUUID();
-        
-        if (selectedMemberId) {
-           await supabase.from('members')
-            .update({ nombre, telefono, updated_at: new Date().toISOString() })
-            .eq('memberId', selectedMemberId);
-        } else {
-           await supabase.from('members').insert({
-             memberId,
-             nombre,
-             telefono,
-           });
-        }
-        
-        // Add new purchase record to member_plans
-        const { data: insertedPlan, error: insertError } = await supabase.from('member_plans').insert({
-          memberId,
-          plan_id: planId || null,
-          plan_tipo: plan as any,
-          ...(planDays ? { plan_days: planDays } : { plan_days: 30 }),
-          costo: Number(costo),
-          is_promo: isPromo,
-          notes: notes,
-          fecha_inicio: new Date(fechaInicio + 'T12:00:00').toISOString(),
-          registered_by: user?.staffId,
-          registered_by_name: user?.nombre,
-        }).select().single();
-        
-        if (autoCheckIn && insertedPlan && !insertError) {
-          await supabase.from('attendances').insert({
-            memberId,
-            member_plan_id: insertedPlan.id,
-            fecha_hora: getCurrentDate().toISOString(),
-          });
-          toast.success('Check-in realizado de inmediato');
-        }
-      }
-      
-      setSuccess(true);
-      setNombre('');
-      setTelefono('');
-      setNotes('');
-      setIsPromo(false);
-      setCustomDays('');
-      setAutoCheckIn(true);
-      setSubmitAttempted(false);
-      setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
-      setEditingMemberId(null);
-      setEditingPlanId(null);
-      setSelectedMemberId(null);
-      setNameSuggestions([]);
-      // Reset plan default
-      if (dbPlans.length > 0) {
-        setPlan(dbPlans[0].description);
-        setCosto(dbPlans[0].price.toString());
-      } else {
-        setPlan('');
-        setCosto('');
-      }
-      
-      setIsRegistrationModalOpen(false);
-      setTimeout(() => setSuccess(false), 3000);
-      window.dispatchEvent(new Event('request-sync'));
-    } catch (error) {
-      console.error('Error adding/updating member:', error);
-    }
-  };
+  }, [membersSearchTerm, membersSort, membersSortOrder, membersFilterDateFrom, membersFilterDateTo, membersFilterPlan, membersFilterSocio]);
 
   const handleEdit = (combined: CombinedMember, e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditingMemberId(combined.member.id!);
-    setEditingPlanId(combined.plan.id!);
-    setSelectedMemberId(combined.member.memberId); // Track ID
-    setNombre(combined.member.nombre);
-    setTelefono(combined.member.telefono || '');
-    setPlan(combined.plan.plan_tipo);
-    setCosto(combined.plan.costo.toString());
-    setCustomDays(combined.plan.plan_days || '');
-    setIsPromo(!!combined.plan.is_promo);
-    setNotes(combined.plan.notes || '');
-    setSubmitAttempted(false);
-    setFechaInicio(format(new Date(combined.plan.fecha_inicio), 'yyyy-MM-dd'));
-    setNameSuggestions([]); // Clear suggestions
+    setInitialData({
+      editingMemberId: combined.member.id!,
+      editingPlanId: combined.plan.id!,
+      selectedMemberId: combined.member.memberId,
+      nombre: combined.member.nombre,
+      telefono: combined.member.telefono || '',
+      plan: combined.plan.plan_tipo as any,
+      costo: combined.plan.costo.toString(),
+      customDays: combined.plan.plan_days || '',
+      isPromo: !!combined.plan.is_promo,
+      notes: combined.plan.notes || '',
+      fechaInicio: format(new Date(combined.plan.fecha_inicio), 'yyyy-MM-dd'),
+    });
     setIsRegistrationModalOpen(true);
   };
 
   const handleRenew = (combined: CombinedMember, e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditingMemberId(null); // New record
-    setEditingPlanId(null);
-    setSelectedMemberId(combined.member.memberId); // Reuse Identity
-    setNombre(combined.member.nombre);
-    setTelefono(combined.member.telefono || '');
-    setPlan(combined.plan.plan_tipo);
-    setCosto(combined.plan.costo.toString());
-    setCustomDays(combined.plan.plan_days || '');
-    setIsPromo(!!combined.plan.is_promo);
-    setNotes(combined.plan.notes || '');
-    setSubmitAttempted(false);
-    setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
+    setInitialData({
+      editingMemberId: null,
+      editingPlanId: null,
+      selectedMemberId: combined.member.memberId,
+      nombre: combined.member.nombre,
+      telefono: combined.member.telefono || '',
+      plan: combined.plan.plan_tipo as any,
+      costo: combined.plan.costo.toString(),
+      customDays: combined.plan.plan_days || '',
+      isPromo: !!combined.plan.is_promo,
+      notes: combined.plan.notes || '',
+      fechaInicio: format(getCurrentDate(), 'yyyy-MM-dd'),
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    setNameSuggestions([]);
     setIsRegistrationModalOpen(true);
   };
 
@@ -458,26 +298,13 @@ export default function AdminView({ onLogout }: AdminViewProps) {
     }
   };
 
-  const handleCancelEdit = () => {
-    setEditingMemberId(null);
-    setEditingPlanId(null);
-    setSelectedMemberId(null);
-    setNombre('');
-    setTelefono('');
-    setNotes('');
-    setIsPromo(false);
-    setCustomDays('');
-    setAutoCheckIn(true);
-    setSubmitAttempted(false);
-    setFechaInicio(format(getCurrentDate(), 'yyyy-MM-dd'));
-    if (dbPlans.length > 0) {
-      setPlan(dbPlans[0].description);
-      setCosto(dbPlans[0].price.toString());
-    } else {
-      setPlan('');
-      setCosto('');
-    }
-    setNameSuggestions([]);
+  const handleNewRegistration = () => {
+    setInitialData(null);
+    setIsRegistrationModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setInitialData(null);
     setIsRegistrationModalOpen(false);
   };
 
@@ -521,256 +348,22 @@ export default function AdminView({ onLogout }: AdminViewProps) {
             </button>
         </div>
         <button 
-          onClick={() => {
-             handleCancelEdit(); // Clear before opening fresh
-             setIsRegistrationModalOpen(true);
-          }}
+          onClick={handleNewRegistration}
           className="px-5 py-2.5 bg-primary text-black font-bold rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 w-full md:w-auto"
         >
           <UserPlus size={18} /> Nuevo Registro
         </button>
       </div>
 
-      {isRegistrationModalOpen && mounted && createPortal(
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4">
-        <div className="w-full max-w-2xl bg-card border border-white/10 rounded-3xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col relative animate-in fade-in zoom-in-95 duration-200">
-          <button 
-              onClick={handleCancelEdit} 
-              className="absolute top-4 right-4 z-[60] p-2 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full transition-colors text-white border border-white/10"
-              title="Cerrar ventana"
-          >
-            <X size={20} />
-          </button>
-          
-          <div className="overflow-y-auto custom-scrollbar flex-1 relative z-10 w-full">
-            <Card className="border-0 bg-transparent shadow-none h-full m-0 rounded-none w-full">
-          <CardHeader>
-             <CardTitle className="text-xl flex justify-between items-center">
-               {editingMemberId ? 'Editar Miembro' : selectedMemberId ? 'Renovar Plan' : 'Nuevo Registro'}
-               {(editingMemberId || selectedMemberId) && (
-                 <button type="button" onClick={handleCancelEdit} className="text-xs text-muted-foreground hover:text-white border px-2 py-1 rounded">
-                   Cancelar
-                 </button>
-               )}
-             </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground ml-1">Nombre <span className="text-red-500">*</span></label>
-                <div className="relative">
-                  <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Nombre Completo" 
-                    value={nombre}
-                    onChange={(e) => {
-                      setNombre(e.target.value);
-                      if (selectedMemberId && !editingMemberId) {
-                        setSelectedMemberId(null);
-                      }
-                    }}
-                    className={`pl-10 h-12 text-base ${submitAttempted && !nombre ? 'border-red-500 ring-1 ring-red-500' : ''}`}
-                    autoComplete="off"
-                    onFocus={() => { if (nameSuggestions.length > 0) setShowSuggestions(true); }}
-                    onBlur={() => {
-                        // Delay hiding so clicks on suggestions can register
-                        setTimeout(() => setShowSuggestions(false), 200);
-                    }}
-                  />
-                  {/* Suggestions Dropdown */}
-                  {showSuggestions && nameSuggestions.length > 0 && (
-                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-neutral-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
-                      {nameSuggestions.map(s => {
-                          const status = getMembershipStatus(s);
-                          return (
-                            <div 
-                                key={s.id} 
-                                className="p-3 hover:bg-white/5 cursor-pointer flex justify-between items-center transition-colors border-b border-white/5 last:border-0"
-                                onClick={() => selectSuggestion(s)}
-                            >
-                                <div>
-                                    <div className="font-bold text-sm">{s.nombre}</div>
-                                    <div className="text-xs text-muted-foreground">{s.telefono}</div>
-                                </div>
-                                <div className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${status === 'Active' ? 'bg-emerald-500/20 text-emerald-400' : status === 'Scheduled' ? 'bg-amber-500/20 text-amber-500' : 'bg-red-500/20 text-red-400'}`}>
-                                    {status === 'Active' ? 'Activo' : status === 'Scheduled' ? 'Agendado' : 'Vencido'}
-                                </div>
-                            </div>
-                          );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
+      <MemberFormModal 
+        isOpen={isRegistrationModalOpen}
+        onClose={handleCloseModal}
+        onSuccess={() => window.dispatchEvent(new Event('request-sync'))}
+        dbPlans={dbPlans}
+        initialData={initialData}
+      />
 
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground ml-1">Teléfono (Opcional)</label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Teléfono" 
-                    value={telefono}
-                    onChange={(e) => setTelefono(e.target.value)}
-                    type="tel"
-                    className="pl-10 h-12 text-base"
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-4">
-                <label className="text-sm font-medium text-muted-foreground ml-1">Plan <span className="text-red-500">*</span></label>
-                <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 ${submitAttempted && !plan ? 'p-2 border border-red-500/50 rounded-xl bg-red-500/5' : ''}`}>
-                  {dbPlans.map(sysPlan => (
-                    <button
-                      key={sysPlan.id}
-                      type="button"
-                      onClick={() => setPlan(sysPlan.description)}
-                      className={`flex flex-col items-center justify-center aspect-square rounded-2xl border-2 transition-all ${
-                        plan === sysPlan.description 
-                          ? 'border-primary bg-primary/10 text-primary shadow-lg shadow-primary/20' 
-                          : 'border-muted bg-card hover:bg-muted/50 text-muted-foreground'
-                      }`}
-                    >
-                      <Calendar className="h-8 w-8 mb-2" />
-                      <span className="font-bold text-sm sm:text-base text-center break-words px-2">{sysPlan.description}</span>
-                    </button>
-                  ))}
-                  {dbPlans.length === 0 && (
-                    <div className="col-span-full text-center text-sm text-muted-foreground py-4">Cargando planes...</div>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground ml-1">Fecha de Inicio</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      type="date"
-                      value={fechaInicio}
-                      onChange={(e) => setFechaInicio(e.target.value)}
-                      className="pl-10 h-12 text-base w-full"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground ml-1">Vencimiento</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
-                    <Input 
-                      type="text"
-                      disabled
-                      value={calculatedFinalDate}
-                      className="pl-10 h-12 text-base w-full bg-muted/30 text-muted-foreground font-medium opacity-80"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground ml-1">Precio <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">C$</span>
-                    <Input 
-                      placeholder="0" 
-                      value={costo}
-                      disabled={true}
-                      onChange={(e) => setCosto(e.target.value)}
-                      type="number"
-                      className={`pl-8 h-12 font-mono text-base bg-muted/30 opacity-80 cursor-not-allowed ${submitAttempted && !costo ? 'border-red-500 ring-1 ring-red-500' : ''}`}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground ml-1">Días activos <span className="text-red-500">*</span></label>
-                  <Input 
-                    placeholder="30" 
-                    value={customDays}
-                    onChange={(e) => setCustomDays(e.target.value === '' ? '' : Number(e.target.value))}
-                    type="number"
-                    min="1"
-                    disabled={plan !== 'Dia'}
-                    className={`h-12 font-mono text-base text-center ${submitAttempted && (String(customDays) === '' || Number(customDays) <= 0) ? 'border-red-500 ring-1 ring-red-500' : ''} ${plan !== 'Dia' ? 'opacity-50 cursor-not-allowed bg-muted/30' : ''}`}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground ml-1">Promo</label>
-                  <button
-                    type="button"
-                    onClick={() => setIsPromo(!isPromo)}
-                    className={`flex items-center justify-center w-full h-12 rounded-lg border transition-all text-sm font-bold ${
-                      isPromo 
-                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-500' 
-                        : 'border-muted bg-card hover:bg-muted/50 text-muted-foreground'
-                    }`}
-                  >
-                    {isPromo ? 'Aplicada' : 'No'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                 <label className="text-xs font-medium text-muted-foreground ml-1">Notas</label>
-                 <textarea
-                   className="flex w-full rounded-xl border border-input bg-muted/30 px-3 py-2 text-sm shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[60px]"
-                   placeholder="Notas opcionales..."
-                   value={notes}
-                   onChange={(e) => setNotes(e.target.value)}
-                 />
-              </div>
-
-              {!editingMemberId && (
-              <div className="flex items-center gap-2 pt-2 pb-2 pl-1">
-                <input 
-                  type="checkbox" 
-                  id="autoCheckIn" 
-                  checked={autoCheckIn}
-                  onChange={(e) => setAutoCheckIn(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-primary focus:ring-primary"
-                />
-                <label htmlFor="autoCheckIn" className="text-sm font-medium text-muted-foreground select-none cursor-pointer">
-                  Hacer check-in automático
-                </label>
-              </div>
-              )}
-
-              <div className="flex gap-4">
-                {(editingMemberId || selectedMemberId) && (
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={handleCancelEdit}
-                    className="w-1/3 h-14 text-lg rounded-xl border-white/10 hover:bg-white/5"
-                  >
-                    Cancelar
-                  </Button>
-                )}
-                <Button 
-                  type="submit" 
-                  className={`${(editingMemberId || selectedMemberId) ? 'w-2/3' : 'w-full'} h-14 text-lg rounded-xl shadow-lg shadow-primary/25 ${editingMemberId ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
-                >
-                  {success ? (
-                    <span className="flex items-center animate-pulse">
-                      <CheckCircle className="mr-2 h-5 w-5" /> {editingMemberId ? 'Actualizado' : 'Guardado'}
-                    </span>
-                  ) : (
-                    editingMemberId ? 'Actualizar Miembro' : selectedMemberId ? 'Renovar Plan' : 'Registrar'
-                  )}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>,
-      document.body
-      )}
 
       {view === 'members' && (
         <div className="space-y-4">
@@ -783,77 +376,123 @@ export default function AdminView({ onLogout }: AdminViewProps) {
             </h2>
           </div>
           
-          {/* Filters Row */}
-          <div className="flex flex-col gap-3">
-            {/* Search Box */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Buscar por nombre o teléfono..." 
-                value={membersSearchTerm}
-                onChange={(e) => setMembersSearchTerm(e.target.value)}
-                className="pl-10 h-10 bg-card/50"
+          {/* Filters Card */}
+          <div className="bg-card/40 border border-white/8 rounded-2xl">
+
+            {/* Search Row */}
+            <div className="p-3 border-b border-white/5">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nombre o teléfono..."
+                  value={membersSearchTerm}
+                  onChange={(e) => setMembersSearchTerm(e.target.value)}
+                  className="pl-10 h-9 bg-transparent border-transparent focus:border-primary/50 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Filters Row */}
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 border-b border-white/5">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Filtros</span>
+              <FilterSelect
+                value={membersFilterDatePreset}
+                options={[
+                  { value: 'all',    label: '📅 Todas las fechas' },
+                  { value: 'today',  label: '📅 Hoy' },
+                  { value: 'week',   label: '📅 Últimos 7 días' },
+                  { value: 'month',  label: '📅 Este mes' },
+                  { value: 'custom', label: '📅 Personalizado…' },
+                ]}
+                onChange={(val) => {
+                  setMembersFilterDatePreset(val);
+                  const today = format(getCurrentDate(), 'yyyy-MM-dd');
+                  if (val === 'all') { setMembersFilterDateFrom(''); setMembersFilterDateTo(''); }
+                  else if (val === 'today') { setMembersFilterDateFrom(today); setMembersFilterDateTo(today); }
+                  else if (val === 'week') {
+                    const from = format(new Date(new Date(getCurrentDate()).setDate(getCurrentDate().getDate() - 7)), 'yyyy-MM-dd');
+                    setMembersFilterDateFrom(from); setMembersFilterDateTo(today);
+                  } else if (val === 'month') {
+                    const from = format(new Date(new Date(getCurrentDate()).setDate(1)), 'yyyy-MM-dd');
+                    setMembersFilterDateFrom(from); setMembersFilterDateTo(today);
+                  }
+                }}
+              />
+              <FilterSelect
+                value={membersFilterPlan}
+                options={[
+                  { value: 'all', label: 'Todos los planes' },
+                  ...dbPlans.map(p => ({ value: p.description, label: p.description })),
+                ]}
+                onChange={setMembersFilterPlan}
+              />
+              <FilterSelect
+                value={membersFilterSocio}
+                options={[
+                  { value: 'all', label: 'Todos los socios' },
+                  { value: 'yes', label: 'Solo Fundadores' },
+                  { value: 'no',  label: 'No Fundadores' },
+                ]}
+                onChange={setMembersFilterSocio}
               />
             </div>
-            {/* Sort and Filters Row */}
-            <div className="flex flex-row flex-wrap gap-2 items-center">
-              <div className="flex items-center gap-1 bg-card/50 p-1 rounded-md border border-white/10">
-                <input 
-                  type="date"
-                  value={membersFilterDate}
-                  onChange={(e) => setMembersFilterDate(e.target.value)}
-                  className="bg-transparent border-none text-sm focus:outline-none focus:ring-0 text-white w-[125px]"
-                  title="Filtrar por fecha de registro"
-                />
-                {membersFilterDate && (
-                  <button onClick={() => setMembersFilterDate('')} className="text-muted-foreground hover:text-white px-1 font-bold text-xs" title="Limpiar fecha">
-                    ✕
-                  </button>
-                )}
-              </div>
-              <select
-                value={membersFilterPlan}
-                onChange={(e) => setMembersFilterPlan(e.target.value)}
-                className="h-9 rounded-md border border-white/10 bg-card/50 px-2 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-white"
-                title="Filtrar por plan"
-              >
-                <option value="all" className="bg-neutral-900">Todos los planes</option>
-                {dbPlans.map(sysPlan => (
-                   <option key={sysPlan.id} value={sysPlan.description} className="bg-neutral-900">{sysPlan.description}</option>
-                ))}
-              </select>
 
-              <select
-                value={membersFilterSocio}
-                onChange={(e) => setMembersFilterSocio(e.target.value)}
-                className="h-9 rounded-md border border-white/10 bg-card/50 px-2 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-white"
-                title="Filtrar por Socio Fundador"
-              >
-                <option value="all" className="bg-neutral-900">Todos los Socios</option>
-                <option value="yes" className="bg-neutral-900">Solo Fundadores</option>
-                <option value="no" className="bg-neutral-900">No Fundadores</option>
-              </select>
-
-              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap ml-auto">Ordenar:</span>
-              <select
+            {/* Sort Row */}
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 border-b border-white/5">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Ordenar</span>
+              <FilterSelect
                 value={membersSort}
-                onChange={(e) => setMembersSort(e.target.value)}
-                className="h-9 flex-1 rounded-md border border-white/10 bg-card/50 px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-white"
-              >
-                <option value="created" className="bg-neutral-900">Fecha de Creación</option>
-                <option value="name" className="bg-neutral-900">Nombre</option>
-                <option value="date_expire" className="bg-neutral-900">Vencimiento</option>
-                <option value="date_start" className="bg-neutral-900">Inicio de Plan</option>
-              </select>
+                options={[
+                  { value: 'created',     label: 'Fecha de Creación' },
+                  { value: 'name',        label: 'Nombre' },
+                  { value: 'date_expire', label: 'Vencimiento' },
+                  { value: 'date_start',  label: 'Inicio de Plan' },
+                ]}
+                onChange={setMembersSort}
+              />
               <button
                 type="button"
                 onClick={() => setMembersSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                className="flex items-center justify-center p-2 rounded-md border border-white/10 bg-card/50 hover:bg-card/80 transition-colors text-white h-9 px-3 text-sm font-medium"
-                title={membersSortOrder === 'asc' ? 'Ascendente (A-Z / Más Antiguos Primero)' : 'Descendente (Z-A / Más Nuevos Primero)'}
+                className="h-8 px-3 rounded-lg border border-white/10 bg-card/60 hover:bg-card/90 transition-colors text-white text-xs font-medium whitespace-nowrap"
               >
-                {membersSortOrder === 'asc' ? 'Ascendente' : 'Descendente'}
+                {membersSortOrder === 'asc' ? '↑ Ascendente' : '↓ Descendente'}
               </button>
             </div>
+
+            {/* Custom date range row — only shown when preset is custom */}
+            {membersFilterDatePreset === 'custom' && (
+              <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-primary/5 border-b border-primary/10">
+                <Calendar className="h-3.5 w-3.5 text-primary/60 shrink-0" />
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Rango:</span>
+                <div className="flex items-center gap-1.5 bg-card/60 border border-white/10 rounded-lg px-2 py-1">
+                  <span className="text-[10px] text-muted-foreground">Desde</span>
+                  <input
+                    type="date"
+                    value={membersFilterDateFrom}
+                    onChange={(e) => setMembersFilterDateFrom(e.target.value)}
+                    className="bg-transparent border-none text-xs focus:outline-none text-white w-[115px]"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 bg-card/60 border border-white/10 rounded-lg px-2 py-1">
+                  <span className="text-[10px] text-muted-foreground">Hasta</span>
+                  <input
+                    type="date"
+                    value={membersFilterDateTo}
+                    onChange={(e) => setMembersFilterDateTo(e.target.value)}
+                    className="bg-transparent border-none text-xs focus:outline-none text-white w-[115px]"
+                  />
+                </div>
+                {(membersFilterDateFrom || membersFilterDateTo) && (
+                  <button
+                    onClick={() => { setMembersFilterDateFrom(''); setMembersFilterDateTo(''); setMembersFilterDatePreset('all'); }}
+                    className="text-xs text-muted-foreground hover:text-white transition-colors underline underline-offset-2"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+            )}
+
           </div>
 
           <div className="space-y-3 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
@@ -865,7 +504,7 @@ export default function AdminView({ onLogout }: AdminViewProps) {
               return (
                   <Card 
                   key={combined.plan.id || combined.member.id} 
-                  className={`border-white/5 bg-card/60 transition-all cursor-pointer hover:bg-card/80 hover:border-primary/30 ${editingMemberId === combined.member.id ? 'border-primary ring-2 ring-primary/50' : ''}`}
+                  className={`border-white/5 bg-card/60 transition-all cursor-pointer hover:bg-card/80 hover:border-primary/30 ${initialData?.editingMemberId === combined.member.id ? 'border-primary ring-2 ring-primary/50' : ''}`}
                   onClick={() => setSelectedHistoryMember(combined.member)}
                 >
                   <div className="p-4 flex items-center justify-between">
@@ -939,10 +578,10 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                           )}
                           <button 
                              onClick={(e) => handleRenew(combined, e)}
-                             className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
-                             title="Agregar Plan"
+                             className="px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
+                             title="Agregar otro plan al miembro"
                           >
-                            <RefreshCcw size={14} /> Renovar
+                            <PlusCircle size={14} /> Agregar Plan
                           </button>
                           <button 
                              onClick={(e) => handleEdit(combined, e)}
