@@ -72,8 +72,19 @@ export function getExpirationDate(plan: MemberPlan): Date {
 }
 
 // Check membership status
-export function getMembershipStatus(plan: MemberPlan): 'Active' | 'Expired' {
+export function getMembershipStatus(plan: MemberPlan): 'Active' | 'Expired' | 'Scheduled' {
   const expirationDate = getExpirationDate(plan);
+  const startDate = new Date(plan.fecha_inicio);
+  
+  // Ignore time for start date comparison
+  const now = getCurrentDate();
+  now.setHours(0, 0, 0, 0);
+  const startDay = new Date(startDate);
+  startDay.setHours(0, 0, 0, 0);
+  
+  if (isBefore(now, startDay)) {
+    return 'Scheduled';
+  }
   
   if (isAfter(getCurrentDate(), expirationDate)) {
     return 'Expired';
