@@ -608,13 +608,27 @@ export default function AdminView({ onLogout }: AdminViewProps) {
                           </button>
                         </div>
                       ) : (
-                        <div className="flex gap-2 w-full">
+                        <div className="flex gap-2 flex-wrap w-full">
                           <button 
                              onClick={(e) => handleRenew(combined, e)}
-                             className="px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors z-10 flex items-center justify-center gap-1 text-xs font-bold w-full"
+                             className="flex-1 px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors z-10 flex items-center justify-center gap-1 text-xs font-bold whitespace-nowrap min-w-fit"
                              title="Renovar Suscripción"
                           >
                             <RefreshCcw size={14} /> Renovar Suscripción
+                          </button>
+                          <button 
+                             onClick={(e) => handleEdit(combined, e)}
+                             className="px-3 py-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors z-10 flex items-center justify-center gap-1 text-xs font-bold"
+                             title="Editar"
+                          >
+                            <Edit size={14} /> Editar
+                          </button>
+                          <button 
+                             onClick={(e) => handleDelete(combined, e)}
+                             className="px-3 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors z-10 flex items-center justify-center gap-1 text-xs font-bold"
+                             title="Eliminar"
+                          >
+                            <Trash2 size={14} /> Eliminar
                           </button>
                         </div>
                       )}
