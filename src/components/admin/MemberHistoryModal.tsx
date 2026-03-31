@@ -22,6 +22,7 @@ export const MemberHistoryModal: React.FC<MemberHistoryModalProps> = ({ member, 
           .from('member_plans')
           .select('*')
           .eq('memberId', member.memberId)
+          .eq('deleted', false)
           .order('fecha_inicio', { ascending: false });
           
         if (!error && records) {
