@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Member, MemberPlan } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import { getMembershipStatus, formatDate, getExpirationDate } from '@/lib/utils';
-import { Calendar, X, Clock, History, Edit } from 'lucide-react';
+import { Calendar, X, Clock, History, Edit, Trash2 } from 'lucide-react';
 
 interface MemberHistoryModalProps {
   member: Member | null;
@@ -143,15 +143,31 @@ export const MemberHistoryModal: React.FC<MemberHistoryModalProps> = ({ member, 
                           {record.notes && <span className="italic text-muted-foreground">"{record.notes}"</span>}
                           <span className="font-mono">C$ {record.costo}</span>
                         </div>
-                        {!isExpired && onEdit && (
+                        <div className="flex gap-2">
+                          {!isExpired && onEdit && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onEdit(record); }}
+                              className="px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
+                              title="Editar Plan"
+                            >
+                              <Edit size={14} /> Editar
+                            </button>
+                          )}
                           <button
-                            onClick={(e) => { e.stopPropagation(); onEdit(record); }}
-                            className="px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
-                            title="Editar Plan"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (window.confirm('¿Estás seguro de eliminar este plan del historial?')) {
+                                await supabase.from('member_plans').update({ deleted: true, updated_at: new Date().toISOString() }).eq('id', record.id);
+                                window.dispatchEvent(new Event('request-sync'));
+                                setHistory(prev => prev.filter(p => p.id !== record.id));
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors z-10 flex items-center gap-1 text-xs font-bold"
+                            title="Eliminar Plan"
                           >
-                            <Edit size={14} /> Editar
+                            <Trash2 size={14} /> Eliminar
                           </button>
-                        )}
+                        </div>
                       </div>
                     </div>
                   );
