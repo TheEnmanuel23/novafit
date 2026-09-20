@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getStaffById, getCurrentStaff, hasRole } from '@novafit/supabase'
+import { getStaffById, getCurrentStaff, hasRole, isGlobalAdmin } from '@novafit/supabase'
 
 export default async function StaffDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -65,14 +65,15 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
           </div>
         </section>
 
-        <section className="glass p-5 flex flex-col gap-4">
-          <h2 className="section-title !mb-0">Permisos Asignados</h2>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {staff.profile.roles.map(role => (
-              <div key={role.id} className="bg-surface px-3 py-1 rounded text-sm text-foreground/80 border border-border">
-                {role.name}
-              </div>
-            ))}
+        <section className="glass p-5 flex flex-col gap-2">
+          <h2 className="section-title !mb-0">Perfil Asignado</h2>
+          <div className="flex flex-col gap-1 mt-2">
+            <span className="text-base font-medium">{staff.profile.name}</span>
+            {staff.profile.description ? (
+              <p className="text-sm text-muted-foreground leading-relaxed">{staff.profile.description}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Sin descripción de perfil</p>
+            )}
           </div>
         </section>
 

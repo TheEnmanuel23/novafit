@@ -87,6 +87,18 @@ export async function updateStaffProfile(prevState: any, formData: FormData) {
   if (!isGlobalAdmin) return { error: 'Acceso denegado.' }
 
   const supabaseAdmin = createServiceClient()
+
+  // Prevent modifying another Global Admin
+  const { data: targetStaff } = await supabaseAdmin
+    .from('staff')
+    .select(`profile:profiles(name)`)
+    .eq('id', staffId)
+    .single()
+
+  if ((targetStaff?.profile as any)?.name === 'Global Admin') {
+    return { error: 'No se puede modificar el nivel de acceso de un administrador global.' }
+  }
+
   const { error } = await supabaseAdmin
     .from('staff')
     .update({ profile_id: profileId })

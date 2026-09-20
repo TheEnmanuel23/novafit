@@ -11,6 +11,8 @@ export default function StaffEditForm({
   profiles: any[] 
 }) {
   const [state, formAction, pending] = useActionState(updateStaffProfile, null)
+  
+  const isTargetGlobalAdmin = staff.profile?.name === 'Global Admin'
 
   if (state?.success) {
     return (
@@ -48,11 +50,18 @@ export default function StaffEditForm({
 
       <section className="glass p-5 flex flex-col gap-4">
         <h2 className="section-title !mb-0">Perfil Asignado</h2>
-        <p className="text-xs text-muted-foreground mb-2">Selecciona el nuevo nivel de acceso para este empleado.</p>
+        
+        {isTargetGlobalAdmin ? (
+          <div className="bg-destructive/10 text-destructive p-3 rounded text-sm border border-destructive/20 mb-2">
+            No se puede modificar el nivel de acceso de un administrador global.
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground mb-2">Selecciona el nuevo nivel de acceso para este empleado.</p>
+        )}
         
         <div className="grid grid-cols-1 gap-3">
           {profiles.map((profile) => (
-            <label key={profile.id} className="cursor-pointer">
+            <label key={profile.id} className={isTargetGlobalAdmin ? "cursor-not-allowed opacity-70" : "cursor-pointer"}>
               <input 
                 type="radio" 
                 name="profile_id" 
@@ -60,6 +69,7 @@ export default function StaffEditForm({
                 defaultChecked={staff.profile_id === profile.id}
                 className="peer sr-only" 
                 required 
+                disabled={isTargetGlobalAdmin}
               />
               <div className="glass p-3 rounded-lg border-2 border-transparent peer-checked:border-accent peer-checked:bg-accent-subtle transition-all flex flex-col">
                 <span className="font-bold text-sm">{profile.name}</span>
@@ -72,9 +82,11 @@ export default function StaffEditForm({
         </div>
       </section>
 
-      <button type="submit" className="btn btn-primary btn-lg mt-4 shadow-lg shadow-accent/20" disabled={pending}>
-        {pending ? 'Guardando...' : 'Guardar Cambios'}
-      </button>
+      {!isTargetGlobalAdmin && (
+        <button type="submit" className="btn btn-primary btn-lg mt-4 shadow-lg shadow-accent/20" disabled={pending}>
+          {pending ? 'Guardando...' : 'Guardar Cambios'}
+        </button>
+      )}
     </form>
   )
 }
