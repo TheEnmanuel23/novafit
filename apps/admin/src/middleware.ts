@@ -2,14 +2,14 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/login', '/setup', '/checkin']
+const PUBLIC_ROUTES = ['/login', '/signup', '/checkin']
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {
@@ -46,8 +46,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // If logged in and hitting /login or /setup, redirect to dashboard
-  if (user && (pathname === '/login' || pathname === '/setup')) {
+  // If logged in and hitting /login or /signup, redirect to dashboard
+  if (user && (pathname === '/login' || pathname === '/signup')) {
     const dashboardUrl = request.nextUrl.clone()
     dashboardUrl.pathname = '/dashboard'
     return NextResponse.redirect(dashboardUrl)

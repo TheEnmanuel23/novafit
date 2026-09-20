@@ -1,6 +1,17 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { getCurrentStaff, hasRole } from '@novafit/supabase'
 
-export default function NewMemberPage() {
+export default async function NewMemberPage() {
+  const supabase = await createClient()
+
+  // RBAC Check
+  const currentUser = await getCurrentStaff(supabase)
+  if (!currentUser || !(await hasRole(currentUser, 'manage_members'))) {
+    redirect('/dashboard')
+  }
+
   return (
     <div className="app-container">
       <header className="page-header items-center gap-4 border-b border-border pb-4">

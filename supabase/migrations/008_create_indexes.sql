@@ -15,8 +15,7 @@ CREATE INDEX IF NOT EXISTS idx_member_plans_active ON member_plans(member_id, st
 -- Attendances
 CREATE INDEX IF NOT EXISTS idx_attendances_member_id ON attendances(member_id);
 CREATE INDEX IF NOT EXISTS idx_attendances_scanned_at ON attendances(scanned_at DESC);
-CREATE INDEX IF NOT EXISTS idx_attendances_today ON attendances(scanned_at)
-  WHERE scanned_at >= CURRENT_DATE;
+
 
 -- Transactions
 CREATE INDEX IF NOT EXISTS idx_transactions_member_id ON transactions(member_id);

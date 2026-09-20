@@ -1,9 +1,18 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getMembers } from '@novafit/supabase'
+import { getMembers, getCurrentStaff, hasRole } from '@novafit/supabase'
+import { BottomNav } from '@/components/BottomNav'
 
 export default async function MembersPage() {
   const supabase = await createClient()
+  
+  // RBAC Check
+  const staff = await getCurrentStaff(supabase)
+  if (!staff || !(await hasRole(staff, 'manage_members'))) {
+    redirect('/dashboard')
+  }
+
   const { members, total } = await getMembers(supabase, { limit: 50 })
 
   return (
@@ -55,21 +64,7 @@ export default async function MembersPage() {
         </div>
       </main>
       
-      {/* Bottom Nav Placeholder (same as Dashboard) */}
-      <nav className="bottom-nav">
-        <Link href="/dashboard" className="bottom-nav-item">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-          Panel
-        </Link>
-        <Link href="/members" className="bottom-nav-item active">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          Miembros
-        </Link>
-        <Link href="/staff" className="bottom-nav-item">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Staff
-        </Link>
-      </nav>
+      <BottomNav currentPath="/members" />
     </div>
   )
 }

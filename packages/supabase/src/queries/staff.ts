@@ -81,3 +81,53 @@ export async function getStaffCount(supabase: SupabaseClient): Promise<number> {
   if (error) return 0
   return count ?? 0
 }
+
+export async function getProfiles(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('name')
+
+  if (error) throw new Error(`Failed to fetch profiles: ${error.message}`)
+  return data
+}
+
+export async function getCurrentStaff(supabase: SupabaseClient): Promise<StaffWithProfile | null> {
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return null
+
+  return getStaffByAuthId(supabase, user.id)
+}
+
+export async function getStaffById(
+  supabase: SupabaseClient,
+  id: string
+): Promise<StaffWithProfile | null> {
+  const { data, error } = await supabase
+    .from('staff')
+    .select(
+      `
+      *,
+      profile:profiles (
+        *,
+        roles:profile_roles (
+          role:roles (*)
+        )
+      )
+    `
+    )
+    .eq('id', id)
+    .eq('deleted', false)
+    .maybeSingle()
+
+  if (error) throw new Error(`Failed to fetch staff: ${error.message}`)
+  if (!data) return null
+
+  const profile = data.profile as any
+  const flattenedProfile = {
+    ...profile,
+    roles: (profile.roles as any[]).map((pr: any) => pr.role),
+  }
+
+  return { ...data, profile: flattenedProfile } as StaffWithProfile
+}

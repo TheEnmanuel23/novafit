@@ -1,12 +1,12 @@
 'use client'
 
 import { useActionState } from 'react'
-import { signIn } from '../actions/auth'
+import { signUpGlobalAdmin } from '../actions/signup'
 
-export default function LoginPage() {
+export default function SignupPage() {
   const [state, formAction, pending] = useActionState(
     async (prevState: any, formData: FormData) => {
-      return await signIn(formData)
+      return await signUpGlobalAdmin(formData)
     },
     null
   )
@@ -21,12 +21,11 @@ export default function LoginPage() {
       <div className="w-full max-w-md animate-in fade-in zoom-in duration-500">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] mb-4 backdrop-blur-xl">
-            {/* Dumbbell Icon */}
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent"><path d="m14.4 14.4 5.2-5.2"/><path d="M22.5 7.5 16.5 1.5"/><path d="M18.4 5.6l-3.2 3.2"/><path d="m4.4 14.4-3.2 3.2"/><path d="m22.5 22.5-6-6"/><path d="m7.5 22.5-6-6"/><path d="m5.6 18.4 3.2-3.2"/><path d="M9.6 9.6 4.4 4.4"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
-          <h1 className="text-4xl font-black tracking-tight text-white mb-2">NovaFit</h1>
+          <h1 className="text-4xl font-black tracking-tight text-white mb-2">Configuración Inicial</h1>
           <p className="text-muted-foreground text-sm tracking-widest uppercase font-bold text-accent">
-            Portal de Administración
+            Crear Global Admin
           </p>
         </div>
 
@@ -41,25 +40,37 @@ export default function LoginPage() {
             )}
 
             <div className="input-group">
-              <label className="input-label text-[11px]" htmlFor="identifier">Usuario o Correo</label>
+              <label className="input-label text-[11px]" htmlFor="nombre">Nombre Completo</label>
               <div className="relative flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 text-muted-foreground"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 <input 
-                  id="identifier"
-                  name="identifier"
+                  id="nombre"
+                  name="nombre"
                   type="text" 
                   className="input pl-12 bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 transition-all rounded-xl h-14" 
-                  placeholder="carlos o admin@novafit.com"
+                  placeholder="Tu nombre"
                   required 
                 />
               </div>
             </div>
 
             <div className="input-group">
-              <div className="flex justify-between items-center mb-1">
-                <label className="input-label !mb-0 text-[11px]" htmlFor="password">Contraseña</label>
-                <a href="#" className="text-xs font-semibold text-accent hover:text-accent-hover transition-colors">¿Olvidaste tu contraseña?</a>
+              <label className="input-label text-[11px]" htmlFor="email">Correo Electrónico</label>
+              <div className="relative flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 text-muted-foreground"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                <input 
+                  id="email"
+                  name="email"
+                  type="email" 
+                  className="input pl-12 bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 transition-all rounded-xl h-14" 
+                  placeholder="admin@novafit.com"
+                  required 
+                />
               </div>
+            </div>
+
+            <div className="input-group">
+              <label className="input-label text-[11px]" htmlFor="password">Contraseña</label>
               <div className="relative flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 text-muted-foreground"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 <input 
@@ -69,6 +80,7 @@ export default function LoginPage() {
                   className="input pl-12 bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 transition-all rounded-xl h-14" 
                   placeholder="••••••••"
                   required 
+                  minLength={6}
                 />
               </div>
             </div>
@@ -78,13 +90,13 @@ export default function LoginPage() {
               disabled={pending}
               className="btn h-14 rounded-xl mt-4 text-base font-bold text-white bg-gradient-to-r from-accent to-[#818cf8] border-none shadow-[0_0_30px_-5px_rgba(99,102,241,0.6)] hover:shadow-[0_0_50px_-5px_rgba(99,102,241,0.8)] hover:scale-[1.02] transition-all"
             >
-              {pending ? 'Ingresando...' : 'Ingresar al Sistema'}
+              {pending ? 'Configurando...' : 'Crear Administrador'}
             </button>
           </form>
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-8 font-medium">
-          ¿Primera vez? <a href="/signup" className="text-white hover:text-accent transition-colors font-bold underline underline-offset-4">Registrarse</a>
+          ¿Ya existe un Global Admin? <a href="/login" className="text-white hover:text-accent transition-colors font-bold underline underline-offset-4">Iniciar Sesión</a>
         </p>
       </div>
     </div>
