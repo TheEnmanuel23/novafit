@@ -63,13 +63,19 @@ export default function UpdatePasswordPage() {
               </div>
             </div>
 
-            <button 
-              type="submit" 
-              disabled={pending}
-              className="btn h-14 rounded-xl mt-4 text-base font-bold text-white bg-gradient-to-r from-accent to-[#818cf8] border-none shadow-[0_0_30px_-5px_rgba(99,102,241,0.6)] hover:shadow-[0_0_50px_-5px_rgba(99,102,241,0.8)] hover:scale-[1.02] transition-all"
-            >
-              {pending ? 'Actualizando...' : 'Guardar Contraseña'}
-            </button>
+            <div className="flex flex-col gap-3 mt-4">
+              <button 
+                type="submit" 
+                disabled={pending}
+                className="btn h-14 rounded-xl text-base font-bold text-white bg-gradient-to-r from-accent to-[#818cf8] border-none shadow-[0_0_30px_-5px_rgba(99,102,241,0.6)] hover:shadow-[0_0_50px_-5px_rgba(99,102,241,0.8)] hover:scale-[1.02] transition-all w-full"
+              >
+                {pending ? 'Actualizando...' : 'Guardar Contraseña'}
+              </button>
+              
+              <a href="/dashboard" className="btn h-14 rounded-xl text-base font-bold bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-white w-full text-center flex items-center justify-center">
+                Cancelar
+              </a>
+            </div>
           </form>
         </div>
       </div>
