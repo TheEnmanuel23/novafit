@@ -109,3 +109,40 @@ export async function updateStaffProfile(prevState: any, formData: FormData) {
   revalidatePath(`/staff/${staffId}`)
   return { success: true }
 }
+
+export async function resetStaffPassword(staffId: string) {
+  const supabase = await createServerClient()
+  const { data: isGlobalAdmin } = await supabase.rpc('is_global_admin')
+  
+  if (!isGlobalAdmin) return { error: 'Acceso denegado.' }
+
+  const supabaseAdmin = createServiceClient()
+
+  const { data: targetStaff, error: fetchError } = await supabaseAdmin
+    .from('staff')
+    .select('auth_user_id')
+    .eq('id', staffId)
+    .single()
+
+  if (fetchError || !targetStaff) {
+    return { error: 'No se encontró al empleado.' }
+  }
+
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*'
+  let newPassword = ''
+  for (let i = 0; i < 12; i++) {
+    newPassword += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+
+  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+    targetStaff.auth_user_id,
+    { password: newPassword }
+  )
+
+  if (updateError) {
+    console.error('Password Reset Error:', updateError)
+    return { error: 'Error al restablecer la contraseña en autenticación.' }
+  }
+
+  return { success: true, newPassword }
+}

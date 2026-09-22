@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getStaffById, getCurrentStaff, hasRole, isGlobalAdmin } from '@novafit/supabase'
+import ResetPasswordButton from './ResetPasswordButton'
 
 export default async function StaffDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -32,9 +33,12 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
           <p className="text-muted-foreground text-xs">Información del empleado</p>
         </div>
         {isGlobal && (
-          <Link href={`/staff/${id}/edit`} className="btn bg-surface hover:bg-surface-hover border border-border btn-sm">
-            Editar
-          </Link>
+          <div className="flex items-center gap-2">
+            <ResetPasswordButton staffId={staff.id} />
+            <Link href={`/staff/${id}/edit`} className="btn bg-surface hover:bg-surface-hover border border-border btn-sm">
+              Editar
+            </Link>
+          </div>
         )}
       </header>
 

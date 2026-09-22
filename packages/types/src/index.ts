@@ -109,6 +109,7 @@ export interface Staff {
   id: string;
   auth_user_id: string;
   nombre: string;
+  username: string;
   email: string;
   profile_id: string;
   deleted: boolean;

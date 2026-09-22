@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/login', '/signup', '/checkin']
+const PUBLIC_ROUTES = ['/login', '/signup', '/checkin', '/forgot-password', '/auth/callback']
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -40,9 +40,12 @@ export async function middleware(request: NextRequest) {
     (route) => pathname === route || pathname.startsWith(route + '/')
   )
 
+  console.log(`Middleware: ${pathname} - isPublic: ${isPublic} - user: ${!!user}`)
+
   if (!user && !isPublic) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/login'
+    console.log(`Middleware redirecting to loginUrl: ${loginUrl.toString()}`)
     return NextResponse.redirect(loginUrl)
   }
 
