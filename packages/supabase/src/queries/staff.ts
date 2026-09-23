@@ -10,7 +10,7 @@ export async function getStaffByAuthId(
     .select(
       `
       *,
-      profile:profiles (
+      profile:profiles!profile_id (
         *,
         roles:profile_roles (
           role:roles (*)
@@ -41,7 +41,7 @@ export async function getStaffList(supabase: SupabaseClient): Promise<StaffWithP
     .select(
       `
       *,
-      profile:profiles (
+      profile:profiles!profile_id (
         *,
         roles:profile_roles (role:roles (*))
       )
@@ -108,7 +108,7 @@ export async function getStaffById(
     .select(
       `
       *,
-      profile:profiles (
+      profile:profiles!profile_id (
         *,
         roles:profile_roles (
           role:roles (*)

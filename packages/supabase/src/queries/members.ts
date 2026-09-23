@@ -259,3 +259,43 @@ export async function updateMemberUsername(
 
   if (error) throw new Error(`Failed to update username: ${error.message}`)
 }
+
+export async function updateMemberDetails(
+  supabase: SupabaseClient,
+  memberId: string,
+  input: {
+    nombre: string
+    telefono?: string
+  },
+  staffId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('members')
+    .update({
+      nombre: input.nombre,
+      telefono: input.telefono || null,
+      updated_by: staffId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('member_id', memberId)
+
+  if (error) throw new Error(`Failed to update member: ${error.message}`)
+}
+
+export async function softDeleteMember(
+  supabase: SupabaseClient,
+  memberId: string,
+  staffId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('members')
+    .update({
+      deleted: true,
+      updated_by: staffId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('member_id', memberId)
+
+  if (error) throw new Error(`Failed to deactivate member: ${error.message}`)
+}
+

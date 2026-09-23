@@ -3,8 +3,16 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getMembers, getCurrentStaff, hasRole } from '@novafit/supabase'
 import { BottomNav } from '@/components/BottomNav'
+import { SearchInput } from '@/components/SearchInput'
 
-export default async function MembersPage() {
+type Props = {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export default async function MembersPage({ searchParams }: Props) {
+  const resolvedSearchParams = await searchParams
+  const search = typeof resolvedSearchParams.q === 'string' ? resolvedSearchParams.q : undefined
+
   const supabase = await createClient()
   
   // RBAC Check
@@ -13,7 +21,7 @@ export default async function MembersPage() {
     redirect('/dashboard')
   }
 
-  const { members, total } = await getMembers(supabase, { limit: 50 })
+  const { members, total } = await getMembers(supabase, { limit: 50, search })
 
   return (
     <div className="app-container">
@@ -32,10 +40,7 @@ export default async function MembersPage() {
 
       <main className="page-content mt-6">
         <div className="glass p-2 mb-6 flex gap-2">
-          <div className="relative flex-1">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            <input type="text" className="input pl-9 border-none bg-transparent h-10 w-full focus:ring-0 shadow-none" placeholder="Buscar por nombre o ID..." />
-          </div>
+          <SearchInput placeholder="Buscar por nombre o ID..." />
         </div>
 
         <div className="flex flex-col gap-3">

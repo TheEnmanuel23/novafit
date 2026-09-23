@@ -46,7 +46,17 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
 
         <div className="input-group">
           <label className="input-label" htmlFor="telefono">Teléfono (Opcional)</label>
-          <input id="telefono" name="telefono" type="tel" className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl" placeholder="Ej. 8888-8888" />
+          <input 
+            id="telefono" 
+            name="telefono" 
+            type="tel" 
+            inputMode="numeric"
+            className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl" 
+            placeholder="Ej. 8888-8888" 
+            onInput={(e) => {
+              e.currentTarget.value = e.currentTarget.value.replace(/[^0-9-]/g, '')
+            }}
+          />
         </div>
       </section>
 

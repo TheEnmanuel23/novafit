@@ -2,8 +2,9 @@
 
 import { createServerClient } from '@novafit/supabase/src/server'
 import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 import { getCurrentStaff, hasRole } from '@novafit/supabase'
-import { generateUniqueUsername, createMember } from '@novafit/supabase/src/queries/members'
+import { generateUniqueUsername, createMember, updateMemberDetails, softDeleteMember } from '@novafit/supabase/src/queries/members'
 
 export async function registerMember(prevState: any, formData: FormData) {
   const supabase = await createServerClient()
@@ -92,5 +93,60 @@ export async function registerMember(prevState: any, formData: FormData) {
   }
 
   // Redirect to members list
+  redirect('/members')
+}
+
+export async function updateMemberAction(prevState: any, formData: FormData) {
+  const supabase = await createServerClient()
+  
+  try {
+    const staff = await getCurrentStaff(supabase)
+    if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      throw new Error('No tienes permisos para editar miembros.')
+    }
+    
+    const memberId = formData.get('member_id') as string
+    const nombre = formData.get('nombre') as string
+    const telefono = formData.get('telefono') as string
+    
+    if (!memberId || !nombre) {
+      return { error: 'ID y Nombre son requeridos.' }
+    }
+    
+    await updateMemberDetails(
+      supabase,
+      memberId,
+      { nombre, telefono },
+      staff.id
+    )
+
+  } catch (error: any) {
+    return { error: error.message || 'Error inesperado al actualizar el miembro.' }
+  }
+
+  // The caller can use the success state or we just let it finish.
+  // Revalidate the member's detail page
+  const memberId = formData.get('member_id') as string
+  revalidatePath(`/members/${memberId}`)
+  revalidatePath('/members')
+  return { success: true }
+}
+
+export async function deactivateMemberAction(memberId: string) {
+  const supabase = await createServerClient()
+  
+  try {
+    const staff = await getCurrentStaff(supabase)
+    if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      throw new Error('No tienes permisos para desactivar miembros.')
+    }
+    
+    await softDeleteMember(supabase, memberId, staff.id)
+
+  } catch (error: any) {
+    throw new Error(error.message || 'Error inesperado al desactivar el miembro.')
+  }
+
+  revalidatePath('/members')
   redirect('/members')
 }

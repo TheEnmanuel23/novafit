@@ -3,6 +3,8 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentStaff, hasRole } from '@novafit/supabase'
 import { getMemberById } from '@novafit/supabase/src/queries/members'
+import { EditMemberModal } from '@/components/EditMemberModal'
+import { DeactivateMemberButton } from '@/components/DeactivateMemberButton'
 
 export default async function MemberDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -40,9 +42,13 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
         <Link href="/members" className="w-10 h-10 flex items-center justify-center rounded-full bg-surface hover:bg-surface-hover transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold">{member.nombre}</h1>
           <p className="text-muted-foreground text-xs">{member.username}</p>
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <EditMemberModal member={member} />
+          <DeactivateMemberButton memberId={member.member_id} />
         </div>
       </header>
 
@@ -90,7 +96,6 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
                 <p className="font-medium">{new Date(member.active_plan.expiration_date).toLocaleDateString()}</p>
               </div>
             </div>
-          </div>
           </div>
         )}
 
