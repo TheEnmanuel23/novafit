@@ -1,7 +1,20 @@
 import { getBusinessSettings } from '@/app/actions/settings'
 import { BusinessSettingsForm } from './BusinessSettingsForm'
+import { createClient } from '@/lib/supabase/server'
+import { getCurrentStaff, hasRole, isGlobalAdmin } from '@novafit/supabase'
+import { redirect } from 'next/navigation'
 
 export default async function BusinessSettingsPage() {
+  const supabase = await createClient()
+  const staff = await getCurrentStaff(supabase)
+  
+  const isGlobal = staff ? await isGlobalAdmin(staff) : false
+  const canManageSettings = staff ? (await hasRole(staff, 'manage_settings')) || isGlobal : false
+
+  if (!canManageSettings) {
+    redirect('/dashboard')
+  }
+
   const settings = await getBusinessSettings()
 
   return (

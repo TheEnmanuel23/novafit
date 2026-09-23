@@ -19,6 +19,7 @@ INSERT INTO roles (name, description)
 VALUES
   ('manage_members',   'Create, edit, and view member records and plans'),
   ('manage_staff',     'Create and manage staff accounts and profiles'),
+  ('manage_settings',  'Modify business settings'),
   ('view_reports',     'Access reports and analytics dashboards'),
   ('process_checkin',  'Register gym visits (QR scan or username lookup)'),
   ('process_recharge', 'Process plan purchases and recharges for members')
@@ -46,7 +47,7 @@ INSERT INTO profile_roles (profile_id, role_id)
 SELECT p.id, r.id
 FROM profiles p, roles r
 WHERE p.name = 'Administrador'
-  AND r.name IN ('manage_members', 'view_reports', 'process_checkin', 'process_recharge')
+  AND r.name IN ('manage_members', 'manage_settings', 'view_reports', 'process_checkin', 'process_recharge')
 ON CONFLICT DO NOTHING;
 
 -- Recepcionista: check-in and recharge only

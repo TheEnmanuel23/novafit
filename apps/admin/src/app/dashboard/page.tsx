@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { getCurrentStaff, hasRole } from '@novafit/supabase'
+import { getCurrentStaff, hasRole, isGlobalAdmin } from '@novafit/supabase'
 import { BottomNav } from '@/components/BottomNav'
 import { UserDropdown } from '@/components/UserDropdown'
 import { getBusinessSettings } from '@/app/actions/settings'
@@ -9,7 +9,9 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const staff = await getCurrentStaff(supabase)
   
-  const canManageMembers = staff ? await hasRole(staff, 'manage_members') : false
+  const isGlobal = staff ? await isGlobalAdmin(staff) : false
+  const canManageMembers = staff ? (await hasRole(staff, 'manage_members')) || isGlobal : false
+  const canManageSettings = staff ? (await hasRole(staff, 'manage_settings')) || isGlobal : false
   const settings = await getBusinessSettings()
 
   return (
@@ -27,7 +29,10 @@ export default async function DashboardPage() {
           </div>
         </div>
         
-        <UserDropdown userName={staff?.nombre || 'Usuario'} />
+        <UserDropdown 
+          userName={staff?.nombre || 'Usuario'} 
+          permissions={{ canManageSettings, canManageMembers }}
+        />
       </header>
 
       <main className="page-content mt-6 flex flex-col gap-6">

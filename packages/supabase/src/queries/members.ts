@@ -182,8 +182,10 @@ export async function getMemberById(
     .select(
       `
       *,
+      creator:staff!members_created_by_fkey(nombre),
+      updater:staff!members_updated_by_fkey(nombre),
       member_plans (
-        id, plan_id, visits_purchased, visits_used, expiration_date, status, created_at, updated_at,
+        id, plan_id, visits_purchased, visits_used, expiration_date, starts_at, status, created_at, updated_at,
         plan:plans (*)
       )
     `
