@@ -43,7 +43,7 @@ export default function StaffEditForm({
       <section className="glass p-5 flex flex-col gap-4">
         <h2 className="section-title !mb-0">Información del Empleado</h2>
         <div className="flex flex-col gap-1">
-          <span className="font-semibold text-lg">{staff.nombre}</span>
+          <span className="font-semibold text-lg">{staff.name}</span>
           <span className="text-sm text-muted-foreground">@{staff.username}</span>
         </div>
       </section>

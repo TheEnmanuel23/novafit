@@ -50,7 +50,7 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         </Link>
         <div className="flex-1">
-          <h1 className="text-xl font-bold">{member.nombre}</h1>
+          <h1 className="text-xl font-bold">{member.name}</h1>
           <p className="text-muted-foreground text-xs">{member.username}</p>
         </div>
         <div className="flex items-center gap-2 ml-auto">
@@ -65,11 +65,11 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Nombre</p>
-              <p className="font-medium">{member.nombre}</p>
+              <p className="font-medium">{member.name}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Teléfono</p>
-              <p className="font-medium">{member.telefono || 'N/A'}</p>
+              <p className="font-medium">{member.phone || 'N/A'}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">ID de Usuario</p>
@@ -167,7 +167,7 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Creado por</p>
-              <p className="font-medium">{(member as any).creator?.nombre || 'Sistema'}</p>
+              <p className="font-medium">{(member as any).creator?.name || 'Sistema'}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Última Actualización</p>
@@ -175,7 +175,7 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Actualizado por</p>
-              <p className="font-medium">{(member as any).updater?.nombre || 'Sistema'}</p>
+              <p className="font-medium">{(member as any).updater?.name || 'Sistema'}</p>
             </div>
           </div>
         </div>

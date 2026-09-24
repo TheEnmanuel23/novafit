@@ -72,7 +72,7 @@ export default function CheckinPage() {
         </div>
         
         <div className="text-center">
-          <h2 className="feedback-name">{result.member?.nombre || 'Error'}</h2>
+          <h2 className="feedback-name">{result.member?.name || 'Error'}</h2>
           <p className="text-muted-foreground mt-2">{result.message}</p>
         </div>
         

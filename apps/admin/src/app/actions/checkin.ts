@@ -27,7 +27,7 @@ export async function manualCheckinAction(query: string, specificMemberId?: stri
         } else {
           return { 
             type: 'needs_selection', 
-            members: members.map(m => ({ id: m.member_id, name: m.nombre, username: m.username, phone: (m as any).telefono, status: m.status })) 
+            members: members.map(m => ({ id: m.member_id, name: m.name, username: m.username, phone: (m as any).phone, status: m.status })) 
           }
         }
       } else {
@@ -54,7 +54,7 @@ export async function manualCheckinAction(query: string, specificMemberId?: stri
 
     return {
       type: 'success',
-      member: { nombre: member.nombre },
+      member: { name: member.name },
       balance_after: result.visitsRemaining,
       message: 'Visita registrada correctamente'
     }
@@ -85,9 +85,9 @@ export async function searchMembersAction(query: string) {
       })
       .map(m => ({
         id: m.member_id,
-        name: m.nombre,
+        name: m.name,
         username: m.username,
-        phone: (m as any).telefono,
+        phone: (m as any).phone,
         status: m.status,
         active_plan: m.active_plan ? {
           description: m.active_plan.plan?.description,

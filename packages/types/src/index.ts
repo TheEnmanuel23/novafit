@@ -16,8 +16,8 @@ export interface Plan {
 export interface Member {
   id: string;
   member_id: string;
-  nombre: string;
-  telefono: string | null;
+  name: string;
+  phone: string | null;
   username: string; // short unique human-readable ID e.g. "ABCD-1234"
   qr_code: string | null;
   deleted: boolean;
@@ -108,7 +108,7 @@ export interface ProfileRole {
 export interface Staff {
   id: string;
   auth_user_id: string;
-  nombre: string;
+  name: string;
   username: string;
   email: string;
   profile_id: string;
@@ -142,3 +142,7 @@ export interface CheckInResult {
   expiration_date?: string;
   message: string;
 }
+
+// ─── Database Gen Types ───────────────────────────────────────────────────────
+
+export type { Database } from './database.types';

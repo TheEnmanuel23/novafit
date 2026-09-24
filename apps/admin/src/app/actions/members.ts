@@ -16,8 +16,8 @@ export async function registerMember(prevState: any, formData: FormData) {
       throw new Error('No tienes permisos para registrar miembros.')
     }
     
-    const nombre = formData.get('nombre') as string
-    const telefono = formData.get('telefono') as string
+    const nombre = formData.get('name') as string
+    const telefono = formData.get('phone') as string
     const planId = formData.get('plan_id') as string
     
     // Custom overrides
@@ -53,9 +53,7 @@ export async function registerMember(prevState: any, formData: FormData) {
     const qrCode = `NOVA-${username}` // Simplistic QR generation for now
     
     // 3. Create Member
-    const member = await createMember(supabase, {
-      nombre,
-      telefono,
+    const member = await createMember(supabase, { name, phone,
       username,
       qr_code: qrCode
     })
@@ -111,8 +109,8 @@ export async function updateMemberAction(prevState: any, formData: FormData) {
     }
     
     const memberId = formData.get('member_id') as string
-    const nombre = formData.get('nombre') as string
-    const telefono = formData.get('telefono') as string
+    const nombre = formData.get('name') as string
+    const telefono = formData.get('phone') as string
     
     if (!memberId || !nombre) {
       return { error: 'ID y Nombre son requeridos.' }
@@ -121,7 +119,7 @@ export async function updateMemberAction(prevState: any, formData: FormData) {
     await updateMemberDetails(
       supabase,
       memberId,
-      { nombre, telefono },
+      { name, phone},
       staff.id
     )
 

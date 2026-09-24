@@ -23,8 +23,8 @@ export default function SetupPage() {
         }} className="flex flex-col gap-4 text-left">
           
           <div className="input-group">
-            <label className="input-label" htmlFor="nombre">Tu Nombre</label>
-            <input id="nombre" name="nombre" type="text" className="input" required placeholder="Ej. Carlos Administrador" />
+            <label className="input-label" htmlFor="name">Tu Nombre</label>
+            <input id="name" name="name" type="text" className="input" required placeholder="Ej. Carlos Administrador" />
           </div>
 
           <div className="input-group">

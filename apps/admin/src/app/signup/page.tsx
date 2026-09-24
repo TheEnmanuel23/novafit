@@ -40,12 +40,12 @@ export default function SignupPage() {
             )}
 
             <div className="input-group">
-              <label className="input-label text-[11px]" htmlFor="nombre">Nombre Completo</label>
+              <label className="input-label text-[11px]" htmlFor="name">Nombre Completo</label>
               <div className="relative flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 text-muted-foreground"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 <input 
-                  id="nombre"
-                  name="nombre"
+                  id="name"
+                  name="name"
                   type="text" 
                   className="input pl-12 bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 transition-all rounded-xl h-14" 
                   placeholder="Tu nombre"

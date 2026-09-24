@@ -106,6 +106,6 @@ export async function processCheckIn(
     balance_before: balanceBefore,
     balance_after: balanceAfter,
     expiration_date: activePlan.expiration_date,
-    message: `¡Bienvenido, ${member.nombre}!`,
+    message: `¡Bienvenido, ${member.name}!`,
   }
 }

@@ -4,7 +4,7 @@ import { createServiceClient, createServerClient } from '@novafit/supabase/src/s
 import { redirect } from 'next/navigation'
 
 export async function signUpGlobalAdmin(formData: FormData) {
-  const nombre = formData.get('nombre') as string
+  const nombre = formData.get('name') as string
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
@@ -54,8 +54,7 @@ export async function signUpGlobalAdmin(formData: FormData) {
   const { error: staffError } = await supabaseAdmin
     .from('staff')
     .insert({
-      auth_user_id: authUser.user.id,
-      nombre,
+      auth_user_id: authUser.user.id, name,
       username: email, // Global Admin uses email as username
       email,
       profile_id: globalAdminProfile.id,

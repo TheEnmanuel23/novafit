@@ -27,7 +27,7 @@ export default async function EditStaffPage({ params }: { params: Promise<{ id: 
         </Link>
         <div>
           <h1 className="text-xl font-bold">Reasignar Perfil</h1>
-          <p className="text-muted-foreground text-xs">Modificar permisos de {staff.nombre}</p>
+          <p className="text-muted-foreground text-xs">Modificar permisos de {staff.name}</p>
         </div>
       </header>
 

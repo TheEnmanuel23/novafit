@@ -44,25 +44,25 @@ export function EditMemberModal({ member }: { member: any }) {
               )}
 
               <div className="input-group">
-                <label className="input-label" htmlFor="nombre">Nombre Completo *</label>
+                <label className="input-label" htmlFor="name">Nombre Completo *</label>
                 <input 
-                  id="nombre" 
-                  name="nombre" 
+                  id="name" 
+                  name="name" 
                   type="text" 
-                  defaultValue={member.nombre}
+                  defaultValue={member.name}
                   className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl" 
                   required 
                 />
               </div>
 
               <div className="input-group">
-                <label className="input-label" htmlFor="telefono">Teléfono (Opcional)</label>
+                <label className="input-label" htmlFor="phone">Teléfono (Opcional)</label>
                 <input 
-                  id="telefono" 
-                  name="telefono" 
+                  id="phone" 
+                  name="phone" 
                   type="tel" 
                   inputMode="numeric"
-                  defaultValue={member.telefono || ''}
+                  defaultValue={member.phone || ''}
                   className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl" 
                   onInput={(e) => {
                     e.currentTarget.value = e.currentTarget.value.replace(/[^0-9-]/g, '')

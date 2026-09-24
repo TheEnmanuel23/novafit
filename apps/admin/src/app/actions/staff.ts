@@ -4,7 +4,7 @@ import { createServiceClient, createServerClient } from '@novafit/supabase/src/s
 import { revalidatePath } from 'next/cache'
 
 export async function createStaffAccount(prevState: any, formData: FormData) {
-  const nombre = formData.get('nombre') as string
+  const nombre = formData.get('name') as string
   const username = formData.get('username') as string
   const profile_id = formData.get('profile_id') as string
 
@@ -54,8 +54,7 @@ export async function createStaffAccount(prevState: any, formData: FormData) {
   const { error: staffError } = await supabaseAdmin
     .from('staff')
     .insert({
-      auth_user_id: authUser.user.id,
-      nombre,
+      auth_user_id: authUser.user.id, name,
       username: cleanUsername,
       profile_id,
     })

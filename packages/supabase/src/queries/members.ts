@@ -55,7 +55,7 @@ export async function getMembers(
     .range(offset, offset + limit - 1)
 
   if (search) {
-    query = query.or(`nombre.ilike.%${search}%,username.ilike.%${search}%,telefono.ilike.%${search}%`)
+    query = query.or(`name.ilike.%${search}%,username.ilike.%${search}%,phone.ilike.%${search}%`)
   }
 
   const { data, error, count } = await query
@@ -234,8 +234,7 @@ export async function getMemberById(
 
 export async function createMember(
   supabase: SupabaseClient,
-  input: {
-    nombre: string
+  input: { name: string
     telefono?: string
     username: string
     qr_code: string
@@ -243,9 +242,7 @@ export async function createMember(
 ): Promise<Member> {
   const { data, error } = await supabase
     .from('members')
-    .insert({
-      nombre: input.nombre,
-      telefono: input.telefono ?? null,
+    .insert({ name: input.name, phone: input.phone ?? null,
       username: input.username.toUpperCase(),
       qr_code: input.qr_code,
     })
@@ -272,17 +269,14 @@ export async function updateMemberUsername(
 export async function updateMemberDetails(
   supabase: SupabaseClient,
   memberId: string,
-  input: {
-    nombre: string
+  input: { name: string
     telefono?: string
   },
   staffId: string
 ): Promise<void> {
   const { error } = await supabase
     .from('members')
-    .update({
-      nombre: input.nombre,
-      telefono: input.telefono || null,
+    .update({ name: input.name, phone: input.phone || null,
       updated_by: staffId,
       updated_at: getAppDate().toISOString(),
     })

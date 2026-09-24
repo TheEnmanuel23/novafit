@@ -40,15 +40,15 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
         <h2 className="section-title !mb-0">Datos Personales</h2>
         
         <div className="input-group">
-          <label className="input-label" htmlFor="nombre">Nombre Completo *</label>
-          <input id="nombre" name="nombre" type="text" className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl" required placeholder="Ej. Juan Pérez" />
+          <label className="input-label" htmlFor="name">Nombre Completo *</label>
+          <input id="name" name="name" type="text" className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl" required placeholder="Ej. Juan Pérez" />
         </div>
 
         <div className="input-group">
-          <label className="input-label" htmlFor="telefono">Teléfono (Opcional)</label>
+          <label className="input-label" htmlFor="phone">Teléfono (Opcional)</label>
           <input 
-            id="telefono" 
-            name="telefono" 
+            id="phone" 
+            name="phone" 
             type="tel" 
             inputMode="numeric"
             className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl" 

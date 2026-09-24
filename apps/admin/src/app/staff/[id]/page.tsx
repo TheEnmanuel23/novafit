@@ -46,10 +46,10 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
         
         <section className="glass p-5 flex flex-col items-center gap-4 text-center">
           <div className="w-20 h-20 bg-accent/10 text-accent rounded-full flex items-center justify-center text-3xl font-bold uppercase">
-            {staff.nombre.charAt(0)}
+            {staff.name.charAt(0)}
           </div>
           <div>
-            <h2 className="text-2xl font-bold">{staff.nombre}</h2>
+            <h2 className="text-2xl font-bold">{staff.name}</h2>
             <p className="text-muted-foreground mt-1">@{staff.username}</p>
           </div>
           <span className="badge badge-active mt-2">{staff.profile.name}</span>

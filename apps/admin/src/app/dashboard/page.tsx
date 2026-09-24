@@ -24,13 +24,13 @@ export default async function DashboardPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{settings?.name || 'Panel'}</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              {staff ? `Hola, ${staff.nombre}` : 'Resumen de hoy'}
+              {staff ? `Hola, ${staff.name}` : 'Resumen de hoy'}
             </p>
           </div>
         </div>
         
         <UserDropdown 
-          userName={staff?.nombre || 'Usuario'} 
+          userName={staff?.name || 'Usuario'} 
           permissions={{ canManageSettings, canManageMembers }}
         />
       </header>

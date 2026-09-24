@@ -38,8 +38,8 @@ export default function StaffForm({ profiles }: { profiles: any[] }) {
         <h2 className="section-title !mb-0">Datos del Empleado</h2>
         
         <div className="input-group">
-          <label className="input-label" htmlFor="nombre">Nombre Completo *</label>
-          <input id="nombre" name="nombre" type="text" className="input" required placeholder="Ej. Ana Martínez" />
+          <label className="input-label" htmlFor="name">Nombre Completo *</label>
+          <input id="name" name="name" type="text" className="input" required placeholder="Ej. Ana Martínez" />
         </div>
 
         <div className="input-group">

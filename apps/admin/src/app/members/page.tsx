@@ -47,7 +47,7 @@ export default async function MembersPage({ searchParams }: Props) {
           {members.map((member) => (
             <Link key={member.id} href={`/members/${member.id}`} className="glass p-4 flex justify-between items-center hover-lift group">
               <div>
-                <div className="font-semibold group-hover:text-accent transition-colors">{member.nombre}</div>
+                <div className="font-semibold group-hover:text-accent transition-colors">{member.name}</div>
                 <div className="text-sm text-muted-foreground mt-0.5">{member.username}</div>
               </div>
               <div className="text-right">
