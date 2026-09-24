@@ -1,3 +1,4 @@
+import { getAppDate } from '@novafit/supabase/src/utils/date';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Member, MemberWithStatus } from '@novafit/types'
 
@@ -63,7 +64,7 @@ export async function getMembers(
   const members = (data ?? []).map((m: any) => {
     const activePlan = (m.member_plans as any[])?.find(
       (mp: any) =>
-        mp.status === 'active' && new Date(mp.expiration_date) > new Date()
+        mp.status === 'active' && new Date(mp.expiration_date) > getAppDate()
     )
 
     let status: MemberWithStatus['status'] = 'no_plan'
@@ -73,7 +74,7 @@ export async function getMembers(
       else status = 'active'
     } else {
       const hasExpired = (m.member_plans as any[])?.some(
-        (mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= new Date()
+        (mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= getAppDate()
       )
       if (hasExpired) status = 'expired'
     }
@@ -117,7 +118,7 @@ export async function getMemberByUsername(
 
   const activePlan = (data.member_plans as any[])?.find(
     (mp: any) =>
-      mp.status === 'active' && new Date(mp.expiration_date) > new Date()
+      mp.status === 'active' && new Date(mp.expiration_date) > getAppDate()
   )
 
   return {
@@ -132,7 +133,7 @@ export async function getMemberByUsername(
       ? activePlan.visits_purchased - activePlan.visits_used <= 3
         ? 'low_balance'
         : 'active'
-      : (data.member_plans as any[])?.some((mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= new Date())
+      : (data.member_plans as any[])?.some((mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= getAppDate())
         ? 'expired'
         : 'no_plan',
   } as MemberWithStatus
@@ -162,7 +163,7 @@ export async function getMemberByQrCode(
 
   const activePlan = (data.member_plans as any[])?.find(
     (mp: any) =>
-      mp.status === 'active' && new Date(mp.expiration_date) > new Date()
+      mp.status === 'active' && new Date(mp.expiration_date) > getAppDate()
   )
 
   return {
@@ -175,7 +176,7 @@ export async function getMemberByQrCode(
       : null,
     status: activePlan
       ? 'active'
-      : (data.member_plans as any[])?.some((mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= new Date())
+      : (data.member_plans as any[])?.some((mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= getAppDate())
         ? 'expired'
         : 'no_plan',
   } as MemberWithStatus
@@ -208,14 +209,14 @@ export async function getMemberById(
   const plans = data.member_plans as any[]
   const activePlan = plans?.find(
     (mp: any) =>
-      mp.status === 'active' && new Date(mp.expiration_date) > new Date()
+      mp.status === 'active' && new Date(mp.expiration_date) > getAppDate()
   )
 
   let status: MemberWithStatus['status'] = 'no_plan'
   if (activePlan) {
     const remaining = activePlan.visits_purchased - activePlan.visits_used
     status = remaining <= 3 ? 'low_balance' : 'active'
-  } else if (plans?.some((mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= new Date())) {
+  } else if (plans?.some((mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= getAppDate())) {
     status = 'expired'
   }
 
@@ -262,7 +263,7 @@ export async function updateMemberUsername(
 ): Promise<void> {
   const { error } = await supabase
     .from('members')
-    .update({ username: username.toUpperCase(), updated_at: new Date().toISOString() })
+    .update({ username: username.toUpperCase(), updated_at: getAppDate().toISOString() })
     .eq('member_id', memberId)
 
   if (error) throw new Error(`Failed to update username: ${error.message}`)
@@ -283,7 +284,7 @@ export async function updateMemberDetails(
       nombre: input.nombre,
       telefono: input.telefono || null,
       updated_by: staffId,
-      updated_at: new Date().toISOString(),
+      updated_at: getAppDate().toISOString(),
     })
     .eq('member_id', memberId)
 
@@ -300,7 +301,7 @@ export async function softDeleteMember(
     .update({
       deleted: true,
       updated_by: staffId,
-      updated_at: new Date().toISOString(),
+      updated_at: getAppDate().toISOString(),
     })
     .eq('member_id', memberId)
 

@@ -1,3 +1,4 @@
+import { getAppDate } from '@novafit/supabase/src/utils/date';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MemberPlan } from '@novafit/types'
 
@@ -10,7 +11,7 @@ export async function getActiveMemberPlan(
     .select('*, plan:plans(*)')
     .eq('member_id', memberId)
     .eq('status', 'active')
-    .gt('expiration_date', new Date().toISOString())
+    .gt('expiration_date', getAppDate().toISOString())
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -54,6 +55,9 @@ export async function processRecharge(
     planId: string
     amountPaid: number
     registeredBy: string | null
+    startsAt?: Date
+    customVisits?: number
+    customDays?: number
   }
 ): Promise<{ newPlan: MemberPlan; balanceBefore: number; balanceAfter: number }> {
   // Fetch new plan details
@@ -71,7 +75,7 @@ export async function processRecharge(
     .select('*')
     .eq('member_id', input.memberId)
     .eq('status', 'active')
-    .gt('expiration_date', new Date().toISOString())
+    .gt('expiration_date', getAppDate().toISOString())
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -84,20 +88,23 @@ export async function processRecharge(
     ? currentPlan.visits_purchased - currentPlan.visits_used
     : 0
 
-  const rawNewBalance = rollover + plan.visits_included
+  const visitsIncluded = input.customVisits ?? plan.visits_included
+  const expirationDays = input.customDays ?? plan.expiration_days
+
+  const rawNewBalance = rollover + visitsIncluded
   const newBalance = Math.min(rawNewBalance, plan.max_balance)
   const balanceAfter = newBalance
 
-  const newExpiration = new Date()
-  // If a plan is for 1 day, it expires today. If 30 days, it expires on the 30th day (29 days from now).
-  newExpiration.setDate(newExpiration.getDate() + Math.max(0, plan.expiration_days - 1))
+  const startsAt = input.startsAt || getAppDate()
+  const newExpiration = new Date(startsAt)
+  newExpiration.setDate(newExpiration.getDate() + Math.max(0, expirationDays - 1))
   newExpiration.setHours(23, 59, 59, 999)
 
   // Mark old plan as expired
   if (currentPlan) {
     await supabase
       .from('member_plans')
-      .update({ status: 'expired', updated_at: new Date().toISOString() })
+      .update({ status: 'expired', updated_at: getAppDate().toISOString() })
       .eq('id', currentPlan.id)
   }
 
@@ -109,6 +116,7 @@ export async function processRecharge(
       plan_id: input.planId,
       visits_purchased: newBalance,
       visits_used: 0,
+      starts_at: startsAt.toISOString(),
       expiration_date: newExpiration.toISOString(),
       status: 'active',
     })
@@ -122,7 +130,7 @@ export async function processRecharge(
     member_id: input.memberId,
     member_plan_id: newMemberPlan.id,
     plan_id: input.planId,
-    visits_added: plan.visits_included,
+    visits_added: visitsIncluded,
     balance_before: balanceBefore,
     balance_after: balanceAfter,
     amount_paid: input.amountPaid,
@@ -152,7 +160,7 @@ export async function previewRecharge(
     .select('*')
     .eq('member_id', memberId)
     .eq('status', 'active')
-    .gt('expiration_date', new Date().toISOString())
+    .gt('expiration_date', getAppDate().toISOString())
     .maybeSingle()
 
   const rollover = currentPlan ? currentPlan.visits_purchased - currentPlan.visits_used : 0
@@ -160,7 +168,7 @@ export async function previewRecharge(
   const rawNew = rollover + plan.visits_included
   const balanceAfter = Math.min(rawNew, plan.max_balance)
 
-  const newExpiration = new Date()
+  const newExpiration = getAppDate()
   newExpiration.setDate(newExpiration.getDate() + Math.max(0, plan.expiration_days - 1))
   newExpiration.setHours(23, 59, 59, 999)
 

@@ -17,6 +17,8 @@ export const viewport: Viewport = {
   themeColor: '#0a0b0f',
 }
 
+import { DevDateTools } from '@/components/DevDateTools'
+
 export default function RootLayout({
   children,
 }: {
@@ -26,6 +28,7 @@ export default function RootLayout({
     <html lang="es" className={inter.variable} suppressHydrationWarning>
       <body className="bg-background text-foreground antialiased" suppressHydrationWarning>
         {children}
+        <DevDateTools />
       </body>
     </html>
   )

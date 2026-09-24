@@ -10,6 +10,8 @@ export function AssignPlanModal({ memberId, plans }: { memberId: string, plans: 
   
   const [selectedPlanId, setSelectedPlanId] = useState<string>('')
   const [customPrice, setCustomPrice] = useState<number>(0)
+  const [customVisits, setCustomVisits] = useState<number>(0)
+  const [customDays, setCustomDays] = useState<number>(0)
 
   useEffect(() => {
     if (state?.success) {
@@ -23,6 +25,8 @@ export function AssignPlanModal({ memberId, plans }: { memberId: string, plans: 
     const plan = plans.find(p => p.id === planId)
     if (plan) {
       setCustomPrice(plan.price)
+      setCustomVisits(plan.visits_included)
+      setCustomDays(plan.expiration_days)
     }
   }
 
@@ -84,6 +88,48 @@ export function AssignPlanModal({ memberId, plans }: { memberId: string, plans: 
 
               {selectedPlanId && (
                 <div className="mt-2 p-4 rounded-xl bg-black/20 border border-white/5 flex flex-col gap-4 animate-in fade-in zoom-in-95">
+                  <div className="input-group">
+                    <label className="input-label text-xs" htmlFor="starts_at">Fecha de Inicio</label>
+                    <input 
+                      id="starts_at"
+                      name="starts_at"
+                      type="date" 
+                      defaultValue={new Date().toISOString().split('T')[0]}
+                      className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
+                      required 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="input-group">
+                      <label className="input-label text-xs" htmlFor="custom_visits">Visitas a Asignar</label>
+                      <input 
+                        id="custom_visits"
+                        name="custom_visits"
+                        type="number" 
+                        min="1"
+                        value={customVisits}
+                        onChange={(e) => setCustomVisits(parseInt(e.target.value) || 0)}
+                        className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
+                        required 
+                      />
+                    </div>
+
+                    <div className="input-group">
+                      <label className="input-label text-xs" htmlFor="custom_days">Días de Vigencia</label>
+                      <input 
+                        id="custom_days"
+                        name="custom_days"
+                        type="number" 
+                        min="1"
+                        value={customDays}
+                        onChange={(e) => setCustomDays(parseInt(e.target.value) || 0)}
+                        className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
+                        required 
+                      />
+                    </div>
+                  </div>
+
                   <div className="input-group">
                     <label className="input-label text-xs" htmlFor="custom_price">Precio a Cobrar (C$)</label>
                     <input 

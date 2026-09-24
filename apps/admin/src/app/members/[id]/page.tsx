@@ -4,9 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import { getCurrentStaff, hasRole } from '@novafit/supabase'
 import { getMemberById } from '@novafit/supabase/src/queries/members'
 import { getActivePlans } from '@novafit/supabase/src/queries/plans'
+import { getMemberPlanHistory } from '@novafit/supabase/src/queries/member-plans'
 import { EditMemberModal } from '@/components/EditMemberModal'
 import { DeactivateMemberButton } from '@/components/DeactivateMemberButton'
 import { AssignPlanModal } from '@/components/AssignPlanModal'
+import { EditPlanModal } from '@/components/EditPlanModal'
 
 export default async function MemberDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -39,6 +41,7 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
   }
 
   const plans = await getActivePlans(supabase)
+  const planHistory = await getMemberPlanHistory(supabase, member.member_id)
 
   return (
     <div className="app-container">
@@ -83,7 +86,10 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
           <div className="glass p-6 rounded-xl flex flex-col gap-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold">Plan Activo</h2>
-              <AssignPlanModal memberId={member.member_id} plans={plans} />
+              <div className="flex gap-2">
+                <EditPlanModal memberPlan={member.active_plan} memberId={member.member_id} />
+                <AssignPlanModal memberId={member.member_id} plans={plans} />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -111,6 +117,46 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
             <AssignPlanModal memberId={member.member_id} plans={plans} />
           </div>
         )}
+
+        <div className="glass p-6 rounded-xl flex flex-col gap-4">
+          <h2 className="text-lg font-semibold">Historial de Planes</h2>
+          {planHistory.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay planes registrados.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {planHistory.map((mp: any) => (
+                <div key={mp.id} className="p-4 rounded-lg bg-black/20 border border-white/5 flex flex-col gap-2 relative">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-semibold text-sm">{mp.plan?.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {mp.starts_at ? new Date(mp.starts_at).toLocaleDateString() : 'N/A'} - {mp.expiration_date ? new Date(mp.expiration_date).toLocaleDateString() : 'N/A'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        mp.status === 'active' ? 'bg-accent/20 text-accent border border-accent/20' : 
+                        mp.status === 'expired' ? 'bg-error/20 text-error border border-error/20' : 
+                        'bg-white/10 text-white/70'
+                      }`}>
+                        {mp.status}
+                      </span>
+                      {mp.status !== 'expired' && (
+                         <EditPlanModal memberPlan={mp} memberId={member.member_id} />
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-4 mt-2">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Visitas</p>
+                      <p className="text-xs font-medium">{mp.visits_used} / {mp.visits_purchased}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="glass p-6 rounded-xl flex flex-col gap-4">
           <h2 className="text-lg font-semibold">Registro y Auditoría</h2>

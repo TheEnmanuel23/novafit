@@ -1,4 +1,5 @@
 'use server'
+import { getAppDate } from '@novafit/supabase/src/utils/date';
 
 import { createServerClient } from '@novafit/supabase/src/server'
 import { redirect } from 'next/navigation'
@@ -167,9 +168,18 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
     const memberId = formData.get('member_id') as string
     const planId = formData.get('plan_id') as string
     const customPrice = parseInt(formData.get('custom_price') as string, 10)
+    const customVisits = parseInt(formData.get('custom_visits') as string, 10)
+    const customDays = parseInt(formData.get('custom_days') as string, 10)
+    const startsAtStr = formData.get('starts_at') as string
     
     if (!memberId || !planId) {
       return { error: 'Miembro y Plan son requeridos.' }
+    }
+    
+    let startsAt: Date | undefined
+    if (startsAtStr) {
+      const [year, month, day] = startsAtStr.split('-').map(Number)
+      startsAt = new Date(year, month - 1, day)
     }
     
     const { processRecharge } = await import('@novafit/supabase/src/queries/member-plans')
@@ -178,7 +188,10 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
       memberId,
       planId,
       amountPaid: isNaN(customPrice) ? 0 : customPrice,
-      registeredBy: staff.id
+      registeredBy: staff.id,
+      startsAt,
+      customVisits: isNaN(customVisits) ? undefined : customVisits,
+      customDays: isNaN(customDays) ? undefined : customDays
     })
 
   } catch (error: any) {
@@ -188,5 +201,63 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
   const memberId = formData.get('member_id') as string
   revalidatePath(`/members/${memberId}`)
   revalidatePath('/members')
+  return { success: true }
+}
+
+export async function updatePlanAction(prevState: any, formData: FormData) {
+  const supabase = await createServerClient()
+  
+  try {
+    const staff = await getCurrentStaff(supabase)
+    if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      throw new Error('No tienes permisos para editar planes.')
+    }
+    
+    const planId = formData.get('plan_id') as string
+    const memberId = formData.get('member_id') as string
+    const visitsPurchased = parseInt(formData.get('visits_purchased') as string, 10)
+    const visitsUsed = parseInt(formData.get('visits_used') as string, 10)
+    const startsAtStr = formData.get('starts_at') as string
+    const expiresAtStr = formData.get('expiration_date') as string
+    const status = formData.get('status') as string
+    
+    if (!planId || !memberId) {
+      return { error: 'ID de plan y miembro son requeridos.' }
+    }
+    
+    let startsAtISO: string | undefined
+    if (startsAtStr) {
+      const [y, m, d] = startsAtStr.split('-').map(Number)
+      startsAtISO = new Date(y, m - 1, d).toISOString()
+    }
+
+    let expiresAtISO: string | undefined
+    if (expiresAtStr) {
+      const [y, m, d] = expiresAtStr.split('-').map(Number)
+      const expDate = new Date(y, m - 1, d)
+      expDate.setHours(23, 59, 59, 999)
+      expiresAtISO = expDate.toISOString()
+    }
+    
+    const { error } = await supabase
+      .from('member_plans')
+      .update({
+        visits_purchased: isNaN(visitsPurchased) ? undefined : visitsPurchased,
+        visits_used: isNaN(visitsUsed) ? undefined : visitsUsed,
+        starts_at: startsAtISO,
+        expiration_date: expiresAtISO,
+        status: status === 'active' || status === 'expired' ? status : undefined,
+        updated_at: getAppDate().toISOString()
+      })
+      .eq('id', planId)
+      
+    if (error) throw new Error(error.message)
+
+  } catch (error: any) {
+    return { error: error.message || 'Error inesperado al editar el plan.' }
+  }
+
+  const memberId2 = formData.get('member_id') as string
+  revalidatePath(`/members/${memberId2}`)
   return { success: true }
 }

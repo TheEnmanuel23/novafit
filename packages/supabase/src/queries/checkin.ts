@@ -1,3 +1,4 @@
+import { getAppDate } from '@novafit/supabase/src/utils/date';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CheckInResult, MemberWithStatus } from '@novafit/types'
 
@@ -42,7 +43,9 @@ export async function processCheckIn(
   // 2. Find active plan
   const activePlan = (member.member_plans as any[]).find(
     (mp: any) =>
-      mp.status === 'active' && new Date(mp.expiration_date) > new Date()
+      mp.status === 'active' && 
+      new Date(mp.expiration_date) > getAppDate() &&
+      (!mp.starts_at || new Date(mp.starts_at) <= getAppDate())
   )
 
   if (!activePlan) {
@@ -78,7 +81,7 @@ export async function processCheckIn(
     .from('member_plans')
     .update({
       visits_used: activePlan.visits_used + 1,
-      updated_at: new Date().toISOString(),
+      updated_at: getAppDate().toISOString(),
     })
     .eq('id', activePlan.id)
 

@@ -54,7 +54,7 @@ export default async function MembersPage({ searchParams }: Props) {
                 <StatusBadge status={member.status} />
                 {member.active_plan && (
                   <div className="text-sm font-medium mt-1">
-                    {member.active_plan.visits_remaining} <span className="text-muted-foreground text-xs font-normal">visitas</span>
+                    {member.active_plan.visits_remaining} / {member.active_plan.visits_purchased} <span className="text-muted-foreground text-xs font-normal">visitas</span>
                   </div>
                 )}
               </div>
