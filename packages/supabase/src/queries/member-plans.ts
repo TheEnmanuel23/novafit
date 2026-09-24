@@ -89,7 +89,9 @@ export async function processRecharge(
   const balanceAfter = newBalance
 
   const newExpiration = new Date()
-  newExpiration.setDate(newExpiration.getDate() + plan.expiration_days)
+  // If a plan is for 1 day, it expires today. If 30 days, it expires on the 30th day (29 days from now).
+  newExpiration.setDate(newExpiration.getDate() + Math.max(0, plan.expiration_days - 1))
+  newExpiration.setHours(23, 59, 59, 999)
 
   // Mark old plan as expired
   if (currentPlan) {
@@ -159,7 +161,8 @@ export async function previewRecharge(
   const balanceAfter = Math.min(rawNew, plan.max_balance)
 
   const newExpiration = new Date()
-  newExpiration.setDate(newExpiration.getDate() + plan.expiration_days)
+  newExpiration.setDate(newExpiration.getDate() + Math.max(0, plan.expiration_days - 1))
+  newExpiration.setHours(23, 59, 59, 999)
 
   return {
     balanceBefore,

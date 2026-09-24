@@ -3,8 +3,10 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentStaff, hasRole } from '@novafit/supabase'
 import { getMemberById } from '@novafit/supabase/src/queries/members'
+import { getActivePlans } from '@novafit/supabase/src/queries/plans'
 import { EditMemberModal } from '@/components/EditMemberModal'
 import { DeactivateMemberButton } from '@/components/DeactivateMemberButton'
+import { AssignPlanModal } from '@/components/AssignPlanModal'
 
 export default async function MemberDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -35,6 +37,8 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
   if (!member) {
     notFound()
   }
+
+  const plans = await getActivePlans(supabase)
 
   return (
     <div className="app-container">
@@ -75,9 +79,12 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
           </div>
         </div>
 
-        {member.active_plan && (
+        {member.active_plan ? (
           <div className="glass p-6 rounded-xl flex flex-col gap-4">
-            <h2 className="text-lg font-semibold">Plan Activo</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold">Plan Activo</h2>
+              <AssignPlanModal memberId={member.member_id} plans={plans} />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Plan</p>
@@ -96,6 +103,12 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
                 <p className="font-medium">{new Date(member.active_plan.expiration_date).toLocaleDateString()}</p>
               </div>
             </div>
+          </div>
+        ) : (
+          <div className="glass p-8 rounded-xl flex flex-col items-center justify-center gap-4 text-center">
+            <h2 className="text-xl font-bold text-muted-foreground">Sin Plan Activo</h2>
+            <p className="text-sm text-muted-foreground max-w-sm mb-2">Este miembro no tiene un plan activo. Asigna uno nuevo para continuar.</p>
+            <AssignPlanModal memberId={member.member_id} plans={plans} />
           </div>
         )}
 

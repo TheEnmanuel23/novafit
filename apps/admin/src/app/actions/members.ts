@@ -33,15 +33,19 @@ export async function registerMember(prevState: any, formData: FormData) {
       return { error: 'Los valores personalizados del plan deben ser números válidos.' }
     }
 
-    // 1. Calculate dates
-    const startsAt = new Date(startsAtStr)
+    // 1. Calculate dates (avoid timezone parsing issues by parsing manually)
+    const [year, month, day] = startsAtStr.split('-').map(Number)
+    const startsAt = new Date(year, month - 1, day)
+    
     if (isNaN(startsAt.getTime())) {
       return { error: 'Fecha de inicio inválida.' }
     }
     
     const expirationDate = new Date(startsAt)
     // Add calendar days (including Sundays)
-    expirationDate.setDate(expirationDate.getDate() + customDays)
+    // If a plan is for 1 day, it expires on the same day.
+    expirationDate.setDate(expirationDate.getDate() + Math.max(0, customDays - 1))
+    expirationDate.setHours(23, 59, 59, 999)
 
     // 2. Generate Username and QR code
     const username = await generateUniqueUsername(supabase)
@@ -149,4 +153,40 @@ export async function deactivateMemberAction(memberId: string) {
 
   revalidatePath('/members')
   redirect('/members')
+}
+
+export async function assignPlanAction(prevState: any, formData: FormData) {
+  const supabase = await createServerClient()
+  
+  try {
+    const staff = await getCurrentStaff(supabase)
+    if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      throw new Error('No tienes permisos para asignar planes.')
+    }
+    
+    const memberId = formData.get('member_id') as string
+    const planId = formData.get('plan_id') as string
+    const customPrice = parseInt(formData.get('custom_price') as string, 10)
+    
+    if (!memberId || !planId) {
+      return { error: 'Miembro y Plan son requeridos.' }
+    }
+    
+    const { processRecharge } = await import('@novafit/supabase/src/queries/member-plans')
+    
+    await processRecharge(supabase, {
+      memberId,
+      planId,
+      amountPaid: isNaN(customPrice) ? 0 : customPrice,
+      registeredBy: staff.id
+    })
+
+  } catch (error: any) {
+    return { error: error.message || 'Error inesperado al asignar el plan.' }
+  }
+
+  const memberId = formData.get('member_id') as string
+  revalidatePath(`/members/${memberId}`)
+  revalidatePath('/members')
+  return { success: true }
 }

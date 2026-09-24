@@ -54,7 +54,7 @@ export async function getMembers(
     .range(offset, offset + limit - 1)
 
   if (search) {
-    query = query.or(`nombre.ilike.%${search}%,username.ilike.%${search}%`)
+    query = query.or(`nombre.ilike.%${search}%,username.ilike.%${search}%,telefono.ilike.%${search}%`)
   }
 
   const { data, error, count } = await query
@@ -72,7 +72,9 @@ export async function getMembers(
       if (remaining <= 3) status = 'low_balance'
       else status = 'active'
     } else {
-      const hasExpired = (m.member_plans as any[])?.some((mp: any) => mp.status === 'expired')
+      const hasExpired = (m.member_plans as any[])?.some(
+        (mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= new Date()
+      )
       if (hasExpired) status = 'expired'
     }
 
@@ -130,7 +132,9 @@ export async function getMemberByUsername(
       ? activePlan.visits_purchased - activePlan.visits_used <= 3
         ? 'low_balance'
         : 'active'
-      : 'no_plan',
+      : (data.member_plans as any[])?.some((mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= new Date())
+        ? 'expired'
+        : 'no_plan',
   } as MemberWithStatus
 }
 
@@ -169,7 +173,11 @@ export async function getMemberByQrCode(
           visits_remaining: activePlan.visits_purchased - activePlan.visits_used,
         }
       : null,
-    status: activePlan ? 'active' : 'no_plan',
+    status: activePlan
+      ? 'active'
+      : (data.member_plans as any[])?.some((mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= new Date())
+        ? 'expired'
+        : 'no_plan',
   } as MemberWithStatus
 }
 
@@ -207,7 +215,7 @@ export async function getMemberById(
   if (activePlan) {
     const remaining = activePlan.visits_purchased - activePlan.visits_used
     status = remaining <= 3 ? 'low_balance' : 'active'
-  } else if (plans?.some((mp: any) => mp.status === 'expired')) {
+  } else if (plans?.some((mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= new Date())) {
     status = 'expired'
   }
 

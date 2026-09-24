@@ -40,7 +40,7 @@ export default async function MembersPage({ searchParams }: Props) {
 
       <main className="page-content mt-6">
         <div className="glass p-2 mb-6 flex gap-2">
-          <SearchInput placeholder="Buscar por nombre o ID..." />
+          <SearchInput placeholder="Buscar por nombre, ID o teléfono..." />
         </div>
 
         <div className="flex flex-col gap-3">
