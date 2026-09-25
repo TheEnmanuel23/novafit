@@ -50,12 +50,12 @@ export async function manualCheckinAction(query: string, specificMemberId?: stri
     }
     
     // Process checkin
-    const result = await processCheckIn(supabase, targetMemberId)
+    const result = await processCheckIn(supabase, { type: 'member_id', value: targetMemberId })
 
     return {
       type: 'success',
       member: { name: member.name },
-      balance_after: result.visitsRemaining,
+      balance_after: result.type === 'success' || result.type === 'no_visits' ? result.balance_after : 0,
       message: 'Visita registrada correctamente'
     }
 

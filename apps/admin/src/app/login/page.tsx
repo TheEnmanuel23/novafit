@@ -43,7 +43,7 @@ export default function LoginPage() {
 
             <div className="input-group">
               <label className="input-label text-[11px]" htmlFor="identifier">Usuario o Correo</label>
-              <div className="relative flex items-center">
+              <div className="relative flex items-center" suppressHydrationWarning>
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 text-muted-foreground"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 <input 
                   id="identifier"
@@ -61,7 +61,7 @@ export default function LoginPage() {
                 <label className="input-label !mb-0 text-[11px]" htmlFor="password">Contraseña</label>
                 <Link href="/forgot-password" className="text-xs font-semibold text-accent hover:text-accent-hover transition-colors">¿Olvidaste tu contraseña?</Link>
               </div>
-              <div className="relative flex items-center">
+              <div className="relative flex items-center" suppressHydrationWarning>
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 text-muted-foreground"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 <input 
                   id="password"

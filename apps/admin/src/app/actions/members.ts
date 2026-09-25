@@ -16,8 +16,8 @@ export async function registerMember(prevState: any, formData: FormData) {
       throw new Error('No tienes permisos para registrar miembros.')
     }
     
-    const nombre = formData.get('name') as string
-    const telefono = formData.get('phone') as string
+    const name = formData.get('name') as string
+    const phone = formData.get('phone') as string
     const planId = formData.get('plan_id') as string
     
     // Custom overrides
@@ -26,7 +26,7 @@ export async function registerMember(prevState: any, formData: FormData) {
     const customDays = parseInt(formData.get('custom_days') as string, 10)
     const customPrice = parseInt(formData.get('custom_price') as string, 10)
     
-    if (!nombre || !planId) {
+    if (!name || !planId) {
       return { error: 'Nombre y plan son requeridos.' }
     }
     
@@ -109,10 +109,10 @@ export async function updateMemberAction(prevState: any, formData: FormData) {
     }
     
     const memberId = formData.get('member_id') as string
-    const nombre = formData.get('name') as string
-    const telefono = formData.get('phone') as string
+    const name = formData.get('name') as string
+    const phone = formData.get('phone') as string
     
-    if (!memberId || !nombre) {
+    if (!memberId || !name) {
       return { error: 'ID y Nombre son requeridos.' }
     }
     

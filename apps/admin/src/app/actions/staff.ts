@@ -4,11 +4,11 @@ import { createServiceClient, createServerClient } from '@novafit/supabase/src/s
 import { revalidatePath } from 'next/cache'
 
 export async function createStaffAccount(prevState: any, formData: FormData) {
-  const nombre = formData.get('name') as string
+  const name = formData.get('name') as string
   const username = formData.get('username') as string
   const profile_id = formData.get('profile_id') as string
 
-  if (!nombre || !username || !profile_id) {
+  if (!name || !username || !profile_id) {
     return { error: 'Por favor, complete todos los campos requeridos.' }
   }
 

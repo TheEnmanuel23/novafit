@@ -191,8 +191,8 @@ export async function getMemberById(
     .select(
       `
       *,
-      creator:staff!members_created_by_fkey(nombre),
-      updater:staff!members_updated_by_fkey(nombre),
+      creator:staff!members_created_by_fkey(name),
+      updater:staff!members_updated_by_fkey(name),
       member_plans (
         id, plan_id, visits_purchased, visits_used, expiration_date, starts_at, status, created_at, updated_at,
         plan:plans (*)
@@ -235,7 +235,7 @@ export async function getMemberById(
 export async function createMember(
   supabase: SupabaseClient,
   input: { name: string
-    telefono?: string
+    phone?: string
     username: string
     qr_code: string
   }
@@ -270,7 +270,7 @@ export async function updateMemberDetails(
   supabase: SupabaseClient,
   memberId: string,
   input: { name: string
-    telefono?: string
+    phone?: string
   },
   staffId: string
 ): Promise<void> {

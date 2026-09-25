@@ -9,18 +9,27 @@ export default function CheckinPage() {
   const [result, setResult] = useState<any | null>(null)
   const [isPending, startTransition] = useTransition()
   const [searchResults, setSearchResults] = useState<any[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
 
   useEffect(() => {
     if (username.length < 2) {
       setSearchResults([])
+      setHasSearched(false)
+      setIsSearching(false)
       return
     }
+    setIsSearching(true)
     const timer = setTimeout(async () => {
       const results = await searchMembersAction(username)
       setSearchResults(results)
+      setHasSearched(true)
+      setIsSearching(false)
     }, 300)
     return () => clearTimeout(timer)
   }, [username])
+
+  const notFound = hasSearched && !isSearching && searchResults.length === 0 && username.length >= 2;
 
   const handleCheckin = (memberId?: string) => {
     startTransition(async () => {
@@ -131,6 +140,7 @@ export default function CheckinPage() {
             <div className="relative">
               <form onSubmit={(e) => {
                 e.preventDefault();
+                if (notFound || isSearching) return;
                 handleCheckin();
               }} className="flex flex-col gap-4 relative z-20">
                 <input 
@@ -143,8 +153,17 @@ export default function CheckinPage() {
                   disabled={isPending}
                   autoComplete="off"
                 />
-                <button type="submit" className="btn btn-primary btn-lg w-full" disabled={username.length < 3 || isPending}>
-                  {isPending ? 'Buscando...' : 'Registrar Visita'}
+
+                {notFound && (
+                  <div className="bg-error/10 border border-error/20 rounded-lg p-3 text-center animate-in fade-in zoom-in duration-200">
+                    <p className="text-error text-sm font-medium">
+                      No se encontró ningún miembro con esa información.
+                    </p>
+                  </div>
+                )}
+
+                <button type="submit" className="btn btn-primary btn-lg w-full" disabled={username.length < 3 || isPending || isSearching || notFound}>
+                  {isPending || isSearching ? 'Buscando...' : 'Registrar Visita'}
                 </button>
               </form>
 
@@ -172,7 +191,7 @@ export default function CheckinPage() {
                         </span>
                         {m.active_plan && (
                           <span className="text-[10px] font-medium text-muted-foreground mt-1">
-                            {m.active_plan.visits_remaining} visitas
+                            {m.active_plan.visits_remaining} visitas restantes
                           </span>
                         )}
                       </div>

@@ -4,11 +4,11 @@ import { createServiceClient, createServerClient } from '@novafit/supabase/src/s
 import { redirect } from 'next/navigation'
 
 export async function signUpGlobalAdmin(formData: FormData) {
-  const nombre = formData.get('name') as string
+  const name = formData.get('name') as string
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
-  if (!nombre || !email || !password) {
+  if (!name || !email || !password) {
     return { error: 'Por favor, complete todos los campos.' }
   }
 
