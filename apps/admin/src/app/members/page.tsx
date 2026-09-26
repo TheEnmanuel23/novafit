@@ -100,7 +100,9 @@ export default async function MembersPage({ searchParams }: Props) {
               <Link key={member.id} href={`/members/${member.id}`} className="glass p-4 flex justify-between items-start hover-lift group">
                 <div className="flex-1">
                   <div className="font-semibold group-hover:text-accent transition-colors">{member.name}</div>
-                  <div className="text-sm text-muted-foreground mt-0.5">{member.username}</div>
+                  <div className="text-sm text-muted-foreground mt-0.5">
+                    {member.username} {member.phone && `• ${member.phone}`}
+                  </div>
                   
                   <div className="flex flex-col gap-1 mt-3">
                     <div className="text-[10px] text-muted-foreground">

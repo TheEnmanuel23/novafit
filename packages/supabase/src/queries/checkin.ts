@@ -232,7 +232,7 @@ export async function processCheckIn(
   }
 
   // 5. Write attendance record
-  await supabase.from('attendances').insert({
+  const { error: insertError } = await supabase.from('attendances').insert({
     member_id: member.member_id,
     member_plan_id: activePlan.id,
     balance_before: balanceBefore,
@@ -243,6 +243,13 @@ export async function processCheckIn(
     checkin_type: options?.checkinType || 'manual',
     scanned_at: getAppDate().toISOString(),
   })
+
+  if (insertError) {
+    console.error('Error inserting attendance:', insertError);
+    // Even if it fails, the visits were updated, but we should log it
+    // Or we could return an error, but the member was already checked in (visits deducted)
+    // Ideally we should do it in a transaction via RPC, but for now log it.
+  }
 
   return {
     type: 'success',
