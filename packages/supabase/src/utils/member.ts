@@ -8,16 +8,22 @@ export function isPlanActive(plan: Partial<MemberPlanWithDetails>): boolean {
   if (plan.status !== 'active') return false;
   if (!plan.expiration_date) return false;
   
+  const remaining = (plan.visits_purchased || 0) - (plan.visits_used || 0);
+  if (remaining <= 0) return false;
+  
   return new Date(plan.expiration_date) > getAppDate();
 }
 
 /**
- * Determines if a given plan is expired based on its status or expiration date.
+ * Determines if a given plan is expired based on its status, expiration date, or empty balance.
  */
 export function isPlanExpired(plan: Partial<MemberPlanWithDetails>): boolean {
   if (plan.status === 'expired') return true;
-  if (!plan.expiration_date) return false;
   
+  const remaining = (plan.visits_purchased || 0) - (plan.visits_used || 0);
+  if (remaining <= 0) return true;
+  
+  if (!plan.expiration_date) return false;
   return new Date(plan.expiration_date) <= getAppDate();
 }
 

@@ -215,11 +215,14 @@ export async function processCheckIn(
     }
   }
 
-  // 4. Decrement visits_used
+  const balanceAfter = balanceBefore - 1
+
+  // 4. Update visits_used and status if empty
   const { error: updateError } = await supabase
     .from('member_plans')
     .update({
       visits_used: activePlan.visits_used + 1,
+      status: balanceAfter <= 0 ? 'expired' : activePlan.status,
       updated_at: getAppDate().toISOString(),
     })
     .eq('id', activePlan.id)
@@ -227,8 +230,6 @@ export async function processCheckIn(
   if (updateError) {
     return { type: 'no_plan', message: 'Error al registrar la visita.' }
   }
-
-  const balanceAfter = balanceBefore - 1
 
   // 5. Write attendance record
   await supabase.from('attendances').insert({
