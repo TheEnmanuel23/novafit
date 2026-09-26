@@ -92,12 +92,25 @@ export async function processRecharge(
   const expirationDays = input.customDays ?? plan.expiration_days
 
   const rawNewBalance = rollover + visitsIncluded
-  const newBalance = Math.min(rawNewBalance, plan.max_balance)
+  const newBalance = rawNewBalance // Removed Math.min(..., plan.max_balance) to respect admin overrides
   const balanceAfter = newBalance
 
   const startsAt = input.startsAt || getAppDate()
-  const newExpiration = new Date(startsAt)
-  newExpiration.setDate(newExpiration.getDate() + Math.max(0, expirationDays - 1))
+  let newExpiration = new Date(startsAt)
+
+  if (currentPlan && !input.startsAt) {
+    const currentExp = new Date(currentPlan.expiration_date)
+    if (currentExp > newExpiration) {
+      // Extend from the current plan's expiration date
+      newExpiration = new Date(currentExp)
+      newExpiration.setDate(newExpiration.getDate() + expirationDays)
+    } else {
+      newExpiration.setDate(newExpiration.getDate() + Math.max(0, expirationDays - 1))
+    }
+  } else {
+    newExpiration.setDate(newExpiration.getDate() + Math.max(0, expirationDays - 1))
+  }
+  
   newExpiration.setHours(23, 59, 59, 999)
 
   // Mark old plan as expired
@@ -166,10 +179,22 @@ export async function previewRecharge(
   const rollover = currentPlan ? currentPlan.visits_purchased - currentPlan.visits_used : 0
   const balanceBefore = rollover
   const rawNew = rollover + plan.visits_included
-  const balanceAfter = Math.min(rawNew, plan.max_balance)
+  const balanceAfter = rawNew // Removed Math.min(..., plan.max_balance) to respect admin overrides
 
-  const newExpiration = getAppDate()
-  newExpiration.setDate(newExpiration.getDate() + Math.max(0, plan.expiration_days - 1))
+  const startsAt = getAppDate()
+  let newExpiration = new Date(startsAt)
+
+  if (currentPlan) {
+    const currentExp = new Date(currentPlan.expiration_date)
+    if (currentExp > newExpiration) {
+      newExpiration = new Date(currentExp)
+      newExpiration.setDate(newExpiration.getDate() + plan.expiration_days)
+    } else {
+      newExpiration.setDate(newExpiration.getDate() + Math.max(0, plan.expiration_days - 1))
+    }
+  } else {
+    newExpiration.setDate(newExpiration.getDate() + Math.max(0, plan.expiration_days - 1))
+  }
   newExpiration.setHours(23, 59, 59, 999)
 
   return {

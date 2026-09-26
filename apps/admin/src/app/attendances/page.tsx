@@ -14,7 +14,9 @@ export default async function AttendancesPage({ searchParams }: Props) {
   const resolvedSearchParams = await searchParams
   const search = typeof resolvedSearchParams.q === 'string' ? resolvedSearchParams.q : undefined
   
-  const todayStr = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
+  const { getAppDate } = await import('@novafit/supabase/src/utils/date')
+  const appDate = getAppDate()
+  const todayStr = appDate.toISOString().split('T')[0] // YYYY-MM-DD
   const startDate = typeof resolvedSearchParams.startDate === 'string' ? resolvedSearchParams.startDate : todayStr
   const endDate = typeof resolvedSearchParams.endDate === 'string' ? resolvedSearchParams.endDate : todayStr
   const status = typeof resolvedSearchParams.status === 'string' ? resolvedSearchParams.status : undefined
