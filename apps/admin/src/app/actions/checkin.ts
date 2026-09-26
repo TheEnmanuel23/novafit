@@ -1,11 +1,11 @@
 'use server'
 
-import { createServerClient } from '@novafit/supabase/src/server'
+import { createServerClient, createServiceClient } from '@novafit/supabase/src/server'
 import { getMembers } from '@novafit/supabase/src/queries/members'
 import { processCheckIn } from '@novafit/supabase/src/queries/checkin'
 
 export async function manualCheckinAction(query: string, specificMemberId?: string) {
-  const supabase = await createServerClient()
+  const supabase = createServiceClient()
 
   try {
     let targetMemberId = specificMemberId
@@ -52,10 +52,18 @@ export async function manualCheckinAction(query: string, specificMemberId?: stri
     // Process checkin
     const result = await processCheckIn(supabase, { type: 'member_id', value: targetMemberId })
 
+    if (result.type !== 'success') {
+      return {
+        type: result.type === 'no_visits' ? 'no_visits' : 'error',
+        message: result.message || 'Error al registrar la visita.',
+        member: { name: member.name }
+      }
+    }
+
     return {
       type: 'success',
       member: { name: member.name },
-      balance_after: result.type === 'success' || result.type === 'no_visits' ? result.balance_after : 0,
+      balance_after: result.balance_after,
       message: 'Visita registrada correctamente'
     }
 

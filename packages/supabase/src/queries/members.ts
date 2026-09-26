@@ -1,4 +1,5 @@
 import { getAppDate } from '@novafit/supabase/src/utils/date';
+import { computeMemberState } from '@novafit/supabase/src/utils/member';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Member, MemberWithStatus } from '@novafit/types'
 
@@ -62,31 +63,11 @@ export async function getMembers(
   if (error) throw new Error(`Failed to fetch members: ${error.message}`)
 
   const members = (data ?? []).map((m: any) => {
-    const activePlan = (m.member_plans as any[])?.find(
-      (mp: any) =>
-        mp.status === 'active' && new Date(mp.expiration_date) > getAppDate()
-    )
-
-    let status: MemberWithStatus['status'] = 'no_plan'
-    if (activePlan) {
-      const remaining = activePlan.visits_purchased - activePlan.visits_used
-      if (remaining <= 3) status = 'low_balance'
-      else status = 'active'
-    } else {
-      const hasExpired = (m.member_plans as any[])?.some(
-        (mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= getAppDate()
-      )
-      if (hasExpired) status = 'expired'
-    }
+    const { status, active_plan } = computeMemberState(m.member_plans as any[]);
 
     return {
       ...m,
-      active_plan: activePlan
-        ? {
-            ...activePlan,
-            visits_remaining: activePlan.visits_purchased - activePlan.visits_used,
-          }
-        : null,
+      active_plan,
       status,
     } satisfies MemberWithStatus
   })
@@ -116,26 +97,12 @@ export async function getMemberByUsername(
   if (error) throw new Error(`Failed to fetch member: ${error.message}`)
   if (!data) return null
 
-  const activePlan = (data.member_plans as any[])?.find(
-    (mp: any) =>
-      mp.status === 'active' && new Date(mp.expiration_date) > getAppDate()
-  )
+  const { status, active_plan } = computeMemberState(data.member_plans as any[]);
 
   return {
     ...data,
-    active_plan: activePlan
-      ? {
-          ...activePlan,
-          visits_remaining: activePlan.visits_purchased - activePlan.visits_used,
-        }
-      : null,
-    status: activePlan
-      ? activePlan.visits_purchased - activePlan.visits_used <= 3
-        ? 'low_balance'
-        : 'active'
-      : (data.member_plans as any[])?.some((mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= getAppDate())
-        ? 'expired'
-        : 'no_plan',
+    active_plan,
+    status,
   } as MemberWithStatus
 }
 
@@ -161,24 +128,12 @@ export async function getMemberByQrCode(
   if (error) throw new Error(`Failed to fetch member by QR: ${error.message}`)
   if (!data) return null
 
-  const activePlan = (data.member_plans as any[])?.find(
-    (mp: any) =>
-      mp.status === 'active' && new Date(mp.expiration_date) > getAppDate()
-  )
+  const { status, active_plan } = computeMemberState(data.member_plans as any[]);
 
   return {
     ...data,
-    active_plan: activePlan
-      ? {
-          ...activePlan,
-          visits_remaining: activePlan.visits_purchased - activePlan.visits_used,
-        }
-      : null,
-    status: activePlan
-      ? 'active'
-      : (data.member_plans as any[])?.some((mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= getAppDate())
-        ? 'expired'
-        : 'no_plan',
+    active_plan,
+    status,
   } as MemberWithStatus
 }
 
@@ -206,28 +161,11 @@ export async function getMemberById(
   if (error) throw new Error(`Failed to fetch member: ${error.message}`)
   if (!data) return null
 
-  const plans = data.member_plans as any[]
-  const activePlan = plans?.find(
-    (mp: any) =>
-      mp.status === 'active' && new Date(mp.expiration_date) > getAppDate()
-  )
-
-  let status: MemberWithStatus['status'] = 'no_plan'
-  if (activePlan) {
-    const remaining = activePlan.visits_purchased - activePlan.visits_used
-    status = remaining <= 3 ? 'low_balance' : 'active'
-  } else if (plans?.some((mp: any) => mp.status === 'expired' || new Date(mp.expiration_date) <= getAppDate())) {
-    status = 'expired'
-  }
+  const { status, active_plan } = computeMemberState(data.member_plans as any[]);
 
   return {
     ...data,
-    active_plan: activePlan
-      ? {
-          ...activePlan,
-          visits_remaining: activePlan.visits_purchased - activePlan.visits_used,
-        }
-      : null,
+    active_plan,
     status,
   } as MemberWithStatus
 }

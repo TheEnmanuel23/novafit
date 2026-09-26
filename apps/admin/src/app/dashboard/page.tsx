@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getCurrentStaff, hasRole, isGlobalAdmin } from '@novafit/supabase'
 import { BottomNav } from '@/components/BottomNav'
 import { UserDropdown } from '@/components/UserDropdown'
@@ -7,12 +7,16 @@ import { getBusinessSettings } from '@/app/actions/settings'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
+  const supabaseAdmin = createServiceClient()
   const staff = await getCurrentStaff(supabase)
   
   const isGlobal = staff ? await isGlobalAdmin(staff) : false
   const canManageMembers = staff ? (await hasRole(staff, 'manage_members')) || isGlobal : false
   const canManageSettings = staff ? (await hasRole(staff, 'manage_settings')) || isGlobal : false
   const settings = await getBusinessSettings()
+  
+  const { getTodayVisitsCount } = await import('@novafit/supabase/src/queries/checkin')
+  const visitsToday = await getTodayVisitsCount(supabaseAdmin)
 
   return (
     <div className="app-container">
@@ -39,12 +43,12 @@ export default async function DashboardPage() {
         
         {/* Stats Row */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="glass p-5 flex flex-col gap-1">
-            <span className="text-muted-foreground text-xs uppercase font-bold tracking-wider">
+          <Link href="/attendances" className="glass p-5 flex flex-col gap-1 hover:bg-white/5 transition-colors group">
+            <span className="text-muted-foreground text-xs uppercase font-bold tracking-wider group-hover:text-white transition-colors">
               Visitas Hoy
             </span>
-            <span className="text-3xl font-black">0</span>
-          </div>
+            <span className="text-3xl font-black">{visitsToday}</span>
+          </Link>
           <div className="glass p-5 flex flex-col gap-1">
             <span className="text-muted-foreground text-xs uppercase font-bold tracking-wider">
               Ingresos Hoy
