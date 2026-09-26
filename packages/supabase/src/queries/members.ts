@@ -34,9 +34,18 @@ export async function generateUniqueUsername(supabase: SupabaseClient): Promise<
 
 export async function getMembers(
   supabase: SupabaseClient,
-  opts: { search?: string; status?: string; page?: number; limit?: number } = {}
+  opts: { 
+    search?: string; 
+    status?: string; 
+    startDate?: string; 
+    endDate?: string; 
+    page?: number; 
+    limit?: number;
+    sort_by?: string;
+    order?: 'asc' | 'desc';
+  } = {}
 ): Promise<{ members: MemberWithStatus[]; total: number }> {
-  const { search, page = 1, limit = 20 } = opts
+  const { search, startDate, endDate, page = 1, limit = 50, sort_by = 'created_at', order = 'desc' } = opts
   const offset = (page - 1) * limit
 
   let query = supabase
@@ -44,6 +53,7 @@ export async function getMembers(
     .select(
       `
       *,
+      creator:staff!members_created_by_fkey(name),
       member_plans (
         id, plan_id, visits_purchased, visits_used, expiration_date, status, created_at, updated_at, starts_at,
         creator:staff!member_plans_created_by_fkey(name),
@@ -54,17 +64,38 @@ export async function getMembers(
       { count: 'exact' }
     )
     .eq('deleted', false)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1)
 
   if (search) {
     query = query.or(`name.ilike.%${search}%,username.ilike.%${search}%,phone.ilike.%${search}%`)
   }
 
+  if (startDate) {
+    const start = new Date(startDate)
+    start.setHours(0, 0, 0, 0)
+    query = query.gte('created_at', start.toISOString())
+  }
+  
+  if (endDate) {
+    const end = new Date(endDate)
+    end.setHours(23, 59, 59, 999)
+    query = query.lte('created_at', end.toISOString())
+  }
+
+  // Database sorting for direct columns
+  if (sort_by === 'name' || sort_by === 'created_at') {
+    query = query.order(sort_by, { ascending: order === 'asc' })
+  }
+
+  // To avoid pagination issues with post-filtering or JS sorting, we'll fetch more and filter/sort
+  const needsJSPostProcess = opts.status || ['status', 'plan', 'start_date'].includes(sort_by)
+  if (!needsJSPostProcess) {
+    query = query.range(offset, offset + limit - 1)
+  }
+
   const { data, error, count } = await query
   if (error) throw new Error(`Failed to fetch members: ${error.message}`)
 
-  const members = (data ?? []).map((m: any) => {
+  let members = (data ?? []).map((m: any) => {
     const { status, active_plan } = computeMemberState(m.member_plans as any[]);
 
     return {
@@ -74,7 +105,44 @@ export async function getMembers(
     } satisfies MemberWithStatus
   })
 
-  return { members, total: count ?? 0 }
+  if (opts.status) {
+    if (opts.status === 'active') {
+      members = members.filter((m) => m.status === 'active' || m.status === 'low_balance')
+    } else {
+      members = members.filter((m) => m.status === opts.status)
+    }
+  }
+
+  if (needsJSPostProcess) {
+    if (sort_by === 'status') {
+      const orderMap: Record<string, number> = { 'active': 1, 'low_balance': 2, 'expired': 3, 'no_plan': 4 }
+      members.sort((a, b) => {
+        const diff = (orderMap[a.status] || 99) - (orderMap[b.status] || 99)
+        return order === 'asc' ? diff : -diff
+      })
+    } else if (sort_by === 'plan') {
+      members.sort((a, b) => {
+        const valA = a.active_plan?.plan?.description || ''
+        const valB = b.active_plan?.plan?.description || ''
+        if (valA < valB) return order === 'asc' ? -1 : 1
+        if (valA > valB) return order === 'asc' ? 1 : -1
+        return 0
+      })
+    } else if (sort_by === 'start_date') {
+      members.sort((a, b) => {
+        const valA = a.active_plan?.starts_at || '0000-00-00'
+        const valB = b.active_plan?.starts_at || '0000-00-00'
+        if (valA < valB) return order === 'asc' ? -1 : 1
+        if (valA > valB) return order === 'asc' ? 1 : -1
+        return 0
+      })
+    }
+    
+    // Apply JS pagination
+    members = members.slice(offset, offset + limit)
+  }
+
+  return { members, total: opts.status ? members.length : (count ?? 0) }
 }
 
 export async function getMemberByUsername(

@@ -97,7 +97,6 @@ export async function searchMembersAction(query: string) {
       .filter(m => m.status === 'active' || m.status === 'low_balance')
       .filter(m => {
         if (!m.active_plan) return false
-        if (m.active_plan.starts_at && new Date(m.active_plan.starts_at) > today) return false
         return true
       })
       .map(m => ({

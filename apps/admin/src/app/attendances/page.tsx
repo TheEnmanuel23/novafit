@@ -4,8 +4,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getCurrentStaff, hasRole } from '@novafit/supabase'
 import { getAttendances } from '@novafit/supabase/src/queries/checkin'
 import { BottomNav } from '@/components/BottomNav'
-import { SearchInput } from '@/components/SearchInput'
-import { AttendanceFilters } from './AttendanceFilters'
+import { StatusDateFilters } from '@/components/StatusDateFilters'
 
 type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -14,6 +13,7 @@ type Props = {
 export default async function AttendancesPage({ searchParams }: Props) {
   const resolvedSearchParams = await searchParams
   const search = typeof resolvedSearchParams.q === 'string' ? resolvedSearchParams.q : undefined
+  
   const todayStr = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
   const startDate = typeof resolvedSearchParams.startDate === 'string' ? resolvedSearchParams.startDate : todayStr
   const endDate = typeof resolvedSearchParams.endDate === 'string' ? resolvedSearchParams.endDate : todayStr
@@ -66,12 +66,15 @@ export default async function AttendancesPage({ searchParams }: Props) {
       </header>
 
       <main className="page-content mt-6">
-        <div className="glass p-2 mb-4 flex flex-col gap-2">
-          <SearchInput placeholder="Buscar por nombre, ID o teléfono..." />
-        </div>
-        
         <div className="glass p-4 mb-6">
-          <AttendanceFilters />
+          <StatusDateFilters 
+            dateLabelStart="Desde"
+            dateLabelEnd="Hasta"
+            defaultStart={todayStr}
+            defaultEnd={todayStr}
+            searchPlaceholder="Buscar por nombre, ID o teléfono..."
+            totalResults={attendances.length}
+          />
         </div>
 
         <div className="glass rounded-xl overflow-x-auto">
@@ -131,7 +134,7 @@ export default async function AttendancesPage({ searchParams }: Props) {
         </div>
       </main>
       
-      <BottomNav currentPath="/dashboard" />
+      <BottomNav currentPath="/attendances" />
     </div>
   )
 }
