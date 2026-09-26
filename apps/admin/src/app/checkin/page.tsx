@@ -12,6 +12,16 @@ export default function CheckinPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
 
+  // Auto-close feedback screen after 3 seconds for success, 5 for errors/warnings
+  useEffect(() => {
+    if (result && result.type !== 'needs_selection') {
+      const timeout = setTimeout(() => {
+        setResult(null)
+      }, result.type === 'success' ? 3000 : 5000)
+      return () => clearTimeout(timeout)
+    }
+  }, [result])
+
   useEffect(() => {
     if (username.length < 2) {
       setSearchResults([])
@@ -73,37 +83,47 @@ export default function CheckinPage() {
     )
   }
   
-  if (result) {
-    return (
-      <div className={`feedback-screen ${result.type === 'success' ? 'success' : result.type === 'no_visits' ? 'warning' : 'error'}`}>
-        <div className={`feedback-icon ${result.type === 'success' ? 'success' : result.type === 'no_visits' ? 'warning' : 'error'}`}>
-          {result.type === 'success' ? '✓' : '!'}
-        </div>
-        
-        <div className="text-center">
-          <h2 className="feedback-name">{result.member?.name || 'Error'}</h2>
-          <p className="text-muted-foreground mt-2">{result.message}</p>
-        </div>
-        
-        {(result.type === 'success' || result.type === 'no_visits') && (
-          <div className="glass-strong p-6 text-center w-full max-w-sm mt-4">
-            <div className="feedback-label mb-4">Visitas Restantes</div>
-            <div className="feedback-balance text-white">{result.balance_after}</div>
-          </div>
-        )}
-
-        <button 
-          onClick={() => setResult(null)} 
-          className="btn btn-ghost btn-lg w-full max-w-sm mt-8"
-        >
-          Siguiente
-        </button>
-      </div>
-    )
-  }
 
   return (
     <div className="app-container p-4 flex flex-col h-screen">
+      {result && result.type !== 'needs_selection' && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-top-4 fade-in duration-300">
+          <div className={`bg-[#151720] shadow-2xl rounded-2xl p-4 pr-12 flex items-center gap-4 border-t border-r border-b border-white/10 border-l-4 min-w-[300px] ${
+            result.type === 'success' ? 'border-l-success' : 
+            result.type === 'no_visits' ? 'border-l-warning' : 
+            'border-l-error'
+          }`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+              result.type === 'success' ? 'bg-success/20 text-success' : 
+              result.type === 'no_visits' ? 'bg-warning/20 text-warning' : 
+              'bg-error/20 text-error'
+            }`}>
+              {result.type === 'success' ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              )}
+            </div>
+            
+            <div className="flex-1">
+              <h3 className="font-bold text-white text-sm">{result.member?.name || 'Error'}</h3>
+              <p className="text-muted-foreground text-xs leading-tight mt-0.5">{result.message}</p>
+              {(result.type === 'success' || result.type === 'no_visits') && (
+                <p className="text-xs font-semibold mt-1">
+                  Visitas restantes: <span className="text-white">{result.balance_after}</span>
+                </p>
+              )}
+            </div>
+            
+            <button 
+              onClick={() => setResult(null)}
+              className="absolute top-4 right-4 text-muted-foreground hover:text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex justify-between items-center mb-6 pt-4 relative z-10">
         <h1 className="text-xl font-bold tracking-tight">Kiosco de Visitas</h1>
         <div className="bg-surface rounded-full p-1 flex gap-1 border border-border">
@@ -148,7 +168,7 @@ export default function CheckinPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="input text-center text-xl font-bold tracking-wide placeholder:text-muted/30 h-16" 
-                  placeholder="Juan Perez..."
+                  placeholder="Busca por nombre, teléfono o ID"
                   autoFocus
                   disabled={isPending}
                   autoComplete="off"
