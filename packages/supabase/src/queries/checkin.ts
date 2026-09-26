@@ -148,7 +148,7 @@ export async function getAttendances(
 export async function processCheckIn(
   supabase: SupabaseClient,
   lookup: { type: 'member_id' | 'username'; value: string },
-  options?: { staffId?: string; checkinType?: string }
+  options?: { staff?: any; checkinType?: string }
 ): Promise<CheckInResult> {
   // 1. Fetch member with active plan
   const memberQuery = supabase
@@ -237,9 +237,9 @@ export async function processCheckIn(
     member_plan_id: activePlan.id,
     balance_before: balanceBefore,
     balance_after: balanceAfter,
-    registered_by: options?.staffId || null,
-    created_by: options?.staffId || null,
-    updated_by: options?.staffId || null,
+    registered_by: options?.staff?.id || null,
+    created_by: options?.staff?.id || null,
+    updated_by: options?.staff?.id || null,
     checkin_type: options?.checkinType || 'manual',
     scanned_at: getAppDate().toISOString(),
   })

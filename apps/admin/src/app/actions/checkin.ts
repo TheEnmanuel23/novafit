@@ -60,7 +60,7 @@ export async function manualCheckinAction(query: string, specificMemberId?: stri
     const result = await processCheckIn(
       supabase, 
       { type: 'member_id', value: targetMemberId },
-      { staffId: staff?.auth_user_id, checkinType: 'manual' }
+      { staff: staff, checkinType: 'manual' }
     )
 
     if (result.type !== 'success') {
