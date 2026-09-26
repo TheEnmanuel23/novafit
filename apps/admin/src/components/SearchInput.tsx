@@ -10,6 +10,14 @@ export function SearchInput({ placeholder }: { placeholder?: string }) {
   const [isPending, startTransition] = useTransition()
   const [query, setQuery] = useState(searchParams.get('q') || '')
 
+  // Sync local state with URL if it changes from outside (e.g. when filters are reset)
+  useEffect(() => {
+    const q = searchParams.get('q') || ''
+    if (q !== query) {
+      setQuery(q)
+    }
+  }, [searchParams])
+
   useEffect(() => {
     const currentQ = searchParams.get('q') || ''
     if (query === currentQ) return

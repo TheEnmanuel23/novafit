@@ -3,6 +3,7 @@
 import { createServerClient, createServiceClient } from '@novafit/supabase/src/server'
 import { getMembers } from '@novafit/supabase/src/queries/members'
 import { processCheckIn } from '@novafit/supabase/src/queries/checkin'
+import { getCurrentStaff } from '@novafit/supabase/src/queries/staff'
 
 export async function manualCheckinAction(query: string, specificMemberId?: string) {
   const supabase = createServiceClient()
@@ -49,8 +50,16 @@ export async function manualCheckinAction(query: string, specificMemberId?: stri
       return { type: 'error', message: 'Miembro no encontrado en la base de datos.' }
     }
     
+    // Try to get staff ID if logged in
+    const authClient = await createServerClient()
+    const staff = await getCurrentStaff(authClient)
+    
     // Process checkin
-    const result = await processCheckIn(supabase, { type: 'member_id', value: targetMemberId })
+    const result = await processCheckIn(
+      supabase, 
+      { type: 'member_id', value: targetMemberId },
+      { staffId: staff?.auth_user_id, checkinType: 'manual' }
+    )
 
     if (result.type !== 'success') {
       return {

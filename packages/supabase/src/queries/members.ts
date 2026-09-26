@@ -45,7 +45,9 @@ export async function getMembers(
       `
       *,
       member_plans (
-        id, plan_id, visits_purchased, visits_used, expiration_date, status, created_at, updated_at,
+        id, plan_id, visits_purchased, visits_used, expiration_date, status, created_at, updated_at, starts_at,
+        creator:staff!member_plans_created_by_fkey(name),
+        updater:staff!member_plans_updated_by_fkey(name),
         plan:plans (*)
       )
     `,
@@ -85,7 +87,9 @@ export async function getMemberByUsername(
       `
       *,
       member_plans (
-        id, plan_id, visits_purchased, visits_used, expiration_date, status, created_at, updated_at,
+        id, plan_id, visits_purchased, visits_used, expiration_date, status, created_at, updated_at, starts_at,
+        creator:staff!member_plans_created_by_fkey(name),
+        updater:staff!member_plans_updated_by_fkey(name),
         plan:plans (*)
       )
     `
@@ -116,7 +120,9 @@ export async function getMemberByQrCode(
       `
       *,
       member_plans (
-        id, plan_id, visits_purchased, visits_used, expiration_date, status, created_at, updated_at,
+        id, plan_id, visits_purchased, visits_used, expiration_date, status, created_at, updated_at, starts_at,
+        creator:staff!member_plans_created_by_fkey(name),
+        updater:staff!member_plans_updated_by_fkey(name),
         plan:plans (*)
       )
     `

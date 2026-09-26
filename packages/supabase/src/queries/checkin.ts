@@ -42,6 +42,15 @@ export async function getAttendances(
       scanned_at,
       balance_before,
       balance_after,
+      checkin_type,
+      created_by,
+      updated_by,
+      registered_by,
+      member_plan:member_plans (
+        plan:plans (
+          description
+        )
+      ),
       members!inner (
         member_id,
         name,
@@ -138,7 +147,8 @@ export async function getAttendances(
  */
 export async function processCheckIn(
   supabase: SupabaseClient,
-  lookup: { type: 'member_id' | 'username'; value: string }
+  lookup: { type: 'member_id' | 'username'; value: string },
+  options?: { staffId?: string; checkinType?: string }
 ): Promise<CheckInResult> {
   // 1. Fetch member with active plan
   const memberQuery = supabase
@@ -226,7 +236,11 @@ export async function processCheckIn(
     member_plan_id: activePlan.id,
     balance_before: balanceBefore,
     balance_after: balanceAfter,
-    registered_by: null, // kiosk mode — no staff auth
+    registered_by: options?.staffId || null,
+    created_by: options?.staffId || null,
+    updated_by: options?.staffId || null,
+    checkin_type: options?.checkinType || 'manual',
+    scanned_at: getAppDate().toISOString(),
   })
 
   return {

@@ -93,21 +93,46 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Plan</p>
+                <p className="text-sm text-muted-foreground mb-1">Plan</p>
                 <p className="font-medium">{member.active_plan.plan?.description}</p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Visitas Restantes</p>
-                <p className="font-medium text-accent">{member.active_plan.visits_remaining} / {member.active_plan.visits_purchased}</p>
+              <div className="row-span-2">
+                <p className="text-sm text-muted-foreground mb-2">Estado de Visitas</p>
+                <div className="flex flex-col gap-2 p-3 bg-black/10 rounded border border-white/5">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Compradas (Total)</span>
+                    <span className="font-medium">{member.active_plan.visits_purchased}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Usadas</span>
+                    <span className="font-medium">{(member.active_plan as any).visits_used}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm border-t border-white/5 pt-1 mt-1">
+                    <span className="text-muted-foreground">Disponibles / Restantes</span>
+                    <span className="font-medium text-accent">{member.active_plan.visits_remaining}</span>
+                  </div>
+                </div>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Fecha de Inicio</p>
-                <p className="font-medium">{(member.active_plan as any).starts_at ? new Date((member.active_plan as any).starts_at).toLocaleDateString() : 'N/A'}</p>
+                <p className="text-sm text-muted-foreground mb-1">Fechas</p>
+                <div className="text-sm flex flex-col gap-1">
+                  <p><span className="text-muted-foreground w-16 inline-block">Inicio:</span> <span className="font-medium">{(member.active_plan as any).starts_at ? new Date((member.active_plan as any).starts_at).toLocaleDateString() : 'N/A'}</span></p>
+                  <p><span className="text-muted-foreground w-16 inline-block">Expira:</span> <span className="font-medium">{new Date(member.active_plan.expiration_date).toLocaleDateString()}</span></p>
+                </div>
               </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row sm:gap-6 gap-2 mt-2 pt-4 border-t border-white/5 text-[10px] text-muted-foreground">
               <div>
-                <p className="text-sm text-muted-foreground">Fecha de Expiración</p>
-                <p className="font-medium">{new Date(member.active_plan.expiration_date).toLocaleDateString()}</p>
+                <span className="uppercase tracking-wider block mb-0.5">Registro</span>
+                <span className="text-white/80">{(member.active_plan as any).creator?.name || 'Sistema'}</span> • {new Date((member.active_plan as any).created_at).toLocaleString()}
               </div>
+              {(member.active_plan as any).updated_at && (member.active_plan as any).updated_at !== (member.active_plan as any).created_at && (
+                <div>
+                  <span className="uppercase tracking-wider block mb-0.5">Última actualización</span>
+                  <span className="text-white/80">{(member.active_plan as any).updater?.name || 'Sistema'}</span> • {new Date((member.active_plan as any).updated_at).toLocaleString()}
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -146,11 +171,31 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-4 mt-2">
+                  <div className="flex flex-wrap gap-6 mt-2">
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Visitas</p>
-                      <p className="text-xs font-medium">{mp.visits_used} / {mp.visits_purchased}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Disponibles / Restantes</p>
+                      <p className="text-xs font-medium text-accent">{mp.visits_purchased - mp.visits_used} <span className="text-muted-foreground font-normal">visitas</span></p>
                     </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Usadas</p>
+                      <p className="text-xs font-medium">{mp.visits_used} <span className="text-muted-foreground font-normal">visitas</span></p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Compradas</p>
+                      <p className="text-xs font-medium">{mp.visits_purchased} <span className="text-muted-foreground font-normal">visitas</span></p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:gap-6 gap-2 mt-2 pt-3 border-t border-white/5 text-[10px] text-muted-foreground">
+                    <div>
+                      <span className="uppercase tracking-wider block mb-0.5">Registro</span>
+                      <span className="text-white/80">{mp.creator?.name || 'Sistema'}</span> • {new Date(mp.created_at).toLocaleString()}
+                    </div>
+                    {mp.updated_at && mp.updated_at !== mp.created_at && (
+                      <div>
+                        <span className="uppercase tracking-wider block mb-0.5">Última actualización</span>
+                        <span className="text-white/80">{mp.updater?.name || 'Sistema'}</span> • {new Date(mp.updated_at).toLocaleString()}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

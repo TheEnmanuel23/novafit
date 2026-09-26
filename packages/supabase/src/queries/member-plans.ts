@@ -31,7 +31,7 @@ export async function getMemberPlanHistory(
 ): Promise<any[]> {
   const { data, error } = await supabase
     .from('member_plans')
-    .select('*, plan:plans(*)')
+    .select('*, plan:plans(*), creator:staff!member_plans_created_by_fkey(name), updater:staff!member_plans_updated_by_fkey(name)')
     .eq('member_id', memberId)
     .order('created_at', { ascending: false })
 

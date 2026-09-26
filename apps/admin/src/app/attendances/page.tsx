@@ -81,7 +81,9 @@ export default async function AttendancesPage({ searchParams }: Props) {
                 <th className="p-4 font-medium"><SortHeader label="Fecha" field="scanned_at" sort_by={sort_by} order={order} params={resolvedSearchParams} /></th>
                 <th className="p-4 font-medium"><SortHeader label="Nombre" field="name" sort_by={sort_by} order={order} params={resolvedSearchParams} /></th>
                 <th className="p-4 font-medium hidden md:table-cell"><SortHeader label="ID Usuario" field="username" sort_by={sort_by} order={order} params={resolvedSearchParams} /></th>
+                <th className="p-4 font-medium hidden lg:table-cell">Plan</th>
                 <th className="p-4 font-medium hidden sm:table-cell"><SortHeader label="Estado" field="status" sort_by={sort_by} order={order} params={resolvedSearchParams} /></th>
+                <th className="p-4 font-medium hidden lg:table-cell">Método</th>
                 <th className="p-4 font-medium text-right">Balance</th>
               </tr>
             </thead>
@@ -102,8 +104,14 @@ export default async function AttendancesPage({ searchParams }: Props) {
                   <td className="p-4 text-sm text-muted-foreground hidden md:table-cell">
                     {attendance.members.username}
                   </td>
+                  <td className="p-4 text-sm hidden lg:table-cell">
+                    <span className="text-muted-foreground">{attendance.member_plan?.plan?.description || 'N/A'}</span>
+                  </td>
                   <td className="p-4 hidden sm:table-cell">
                     <StatusBadge status={attendance.members.status} />
+                  </td>
+                  <td className="p-4 hidden lg:table-cell">
+                    <CheckinTypeBadge type={attendance.checkin_type || 'manual'} />
                   </td>
                   <td className="p-4 text-right">
                     <span className="font-bold text-sm bg-black/20 px-2 py-1 rounded border border-white/5 inline-block min-w-[3rem] text-center">
@@ -166,4 +174,28 @@ function StatusBadge({ status }: { status: any }) {
   if (status === 'low_balance') return <span className="badge badge-warning text-[10px]">Por expirar</span>
   if (status === 'expired') return <span className="badge badge-expired text-[10px]">Expirado</span>
   return <span className="badge badge-no-plan text-[10px]">Sin Plan</span>
+}
+
+function CheckinTypeBadge({ type }: { type: string }) {
+  if (type === 'qr') {
+    return (
+      <span className="badge badge-active text-[10px] flex items-center gap-1 w-max">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>
+        QR
+      </span>
+    )
+  }
+  if (type === 'manual') {
+    return (
+      <span className="badge badge-warning text-[10px] flex items-center gap-1 w-max">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+        Manual
+      </span>
+    )
+  }
+  return (
+    <span className="badge badge-no-plan text-[10px] flex items-center gap-1 w-max capitalize">
+      {type}
+    </span>
+  )
 }

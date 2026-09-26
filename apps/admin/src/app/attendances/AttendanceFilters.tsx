@@ -41,6 +41,15 @@ export function AttendanceFilters() {
     return () => clearTimeout(timeout)
   }, [startDate, endDate, status, pathname, router, searchParams])
 
+  const handleReset = () => {
+    setStartDate(todayStr)
+    setEndDate(todayStr)
+    setStatus('')
+    startTransition(() => {
+      router.replace(pathname, { scroll: false })
+    })
+  }
+
   return (
     <div className="flex gap-2 flex-wrap text-sm relative">
       <div className="flex-1 min-w-[120px]">
@@ -74,6 +83,14 @@ export function AttendanceFilters() {
           <option value="expired">Expirado</option>
           <option value="no_plan">Sin Plan</option>
         </select>
+      </div>
+      <div className="flex items-end">
+        <button 
+          onClick={handleReset}
+          className="btn h-10 px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-colors border border-white/10 text-xs font-medium"
+        >
+          Limpiar
+        </button>
       </div>
       {isPending && (
         <div className="absolute right-0 top-0 -mt-2 -mr-2">
