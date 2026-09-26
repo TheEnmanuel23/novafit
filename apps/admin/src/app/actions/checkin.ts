@@ -13,23 +13,25 @@ export async function manualCheckinAction(query: string, specificMemberId?: stri
 
     // If no specific member selected, we search
     if (!targetMemberId) {
-      const { members } = await getMembers(supabase, { search: query, limit: 10 })
+      let { members } = await getMembers(supabase, { search: query, limit: 50 })
       
+      const exactQuery = query.trim().toLowerCase()
+      members = members.filter(m => {
+        const name = m.name.toLowerCase()
+        const username = m.username.toLowerCase()
+        const phone = (m.phone || '').toLowerCase()
+        return name === exactQuery || username === exactQuery || phone === exactQuery
+      })
+
       if (members.length === 0) {
-        return { type: 'error', message: 'No se encontró ningún miembro con esa información.' }
+        return { type: 'error', message: 'No se encontró ningún miembro con ese dato exacto.' }
       }
 
-      // If multiple members, return them to the UI so the user can select
+      // If multiple members have the EXACT same name/phone, return them to the UI so the user can select
       if (members.length > 1) {
-        // Check if there is an EXACT match for username or phone
-        const exactMatch = members.find(m => m.username === query.toUpperCase() || m.phone === query)
-        if (exactMatch) {
-          targetMemberId = exactMatch.member_id
-        } else {
-          return { 
-            type: 'needs_selection', 
-            members: members.map(m => ({ id: m.member_id, name: m.name, username: m.username, phone: (m as any).phone, status: m.status })) 
-          }
+        return { 
+          type: 'needs_selection', 
+          members: members.map(m => ({ id: m.member_id, name: m.name, username: m.username, phone: (m as any).phone, status: m.status })) 
         }
       } else {
         targetMemberId = members[0].member_id
@@ -89,9 +91,17 @@ export async function searchMembersAction(query: string) {
   if (!query || query.length < 2) return []
 
   try {
-    const { members } = await getMembers(supabase, { search: query, limit: 10 })
+    let { members } = await getMembers(supabase, { search: query, limit: 50 })
     const { getAppDate } = await import('@novafit/supabase/src/utils/date')
     const today = getAppDate()
+    
+    const exactQuery = query.trim().toLowerCase()
+    members = members.filter(m => {
+      const name = m.name.toLowerCase()
+      const username = m.username.toLowerCase()
+      const phone = (m.phone || '').toLowerCase()
+      return name === exactQuery || username === exactQuery || phone === exactQuery
+    })
 
     return members
       .filter(m => m.status === 'active' || m.status === 'low_balance')
