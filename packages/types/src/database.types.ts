@@ -155,13 +155,13 @@ isOneToOne: false
                   ]
                 },"plans": {
                   Row: {
-                    "active": boolean,"created_at": string,"created_by": string | null,"description": string,"expiration_days": number,"id": string,"max_balance": number,"price": number,"updated_by": string | null,"visits_included": number
+                    "active": boolean,"created_at": string,"created_by": string | null,"description": string,"expiration_days": number,"id": string,"key": string,"max_balance": number,"price": number,"updated_by": string | null,"visits_included": number
                   }
                   Insert: {
-                    "active"?: boolean,"created_at"?: string,"created_by"?: string | null,"description": string,"expiration_days": number,"id"?: string,"max_balance": number,"price": number,"updated_by"?: string | null,"visits_included": number
+                    "active"?: boolean,"created_at"?: string,"created_by"?: string | null,"description": string,"expiration_days": number,"id"?: string,"key"?: string,"max_balance": number,"price": number,"updated_by"?: string | null,"visits_included": number
                   }
                   Update: {
-                    "active"?: boolean,"created_at"?: string,"created_by"?: string | null,"description"?: string,"expiration_days"?: number,"id"?: string,"max_balance"?: number,"price"?: number,"updated_by"?: string | null,"visits_included"?: number
+                    "active"?: boolean,"created_at"?: string,"created_by"?: string | null,"description"?: string,"expiration_days"?: number,"id"?: string,"key"?: string,"max_balance"?: number,"price"?: number,"updated_by"?: string | null,"visits_included"?: number
                   }
                   Relationships: [
                     {

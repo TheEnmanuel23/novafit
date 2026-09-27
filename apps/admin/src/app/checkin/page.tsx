@@ -177,7 +177,7 @@ export default function CheckinPage() {
                 {notFound && (
                   <div className="bg-error/10 border border-error/20 rounded-lg p-3 text-center animate-in fade-in zoom-in duration-200">
                     <p className="text-error text-sm font-medium">
-                      No se encontró ningún miembro con esa información.
+                      No se encontró ningún miembro activo con esa información.
                     </p>
                   </div>
                 )}

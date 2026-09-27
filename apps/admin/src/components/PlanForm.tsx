@@ -39,6 +39,19 @@ export function PlanForm({ initialData }: PlanFormProps) {
         />
       </div>
 
+      <div className="input-group">
+        <label className="input-label" htmlFor="key">Clave Única (Opcional)</label>
+        <input 
+          id="key"
+          name="key"
+          type="text" 
+          defaultValue={initialData?.key || ''}
+          className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl" 
+          placeholder="Ej. day, month, biweek..."
+        />
+        <p className="text-xs text-muted-foreground mt-1">Identificador interno para lógicas especiales (ej. "day" para pase diario).</p>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="input-group">
           <label className="input-label" htmlFor="visits_included">Visitas Incluidas</label>

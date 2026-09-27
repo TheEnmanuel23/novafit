@@ -2,6 +2,7 @@
 
 export interface Plan {
   id: string;
+  key: string;
   description: string;
   visits_included: number;
   price: number;

@@ -9,6 +9,7 @@ import { EditMemberModal } from '@/components/EditMemberModal'
 import { DeactivateMemberButton } from '@/components/DeactivateMemberButton'
 import { AssignPlanModal } from '@/components/AssignPlanModal'
 import { EditPlanModal } from '@/components/EditPlanModal'
+import { ShareMemberAppModal } from '@/components/ShareMemberAppModal'
 
 export default async function MemberDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -54,6 +55,7 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
           <p className="text-muted-foreground text-xs">{member.username}</p>
         </div>
         <div className="flex items-center gap-2 ml-auto">
+          <ShareMemberAppModal member={member as any} />
           <EditMemberModal member={member} />
           <DeactivateMemberButton memberId={member.member_id} />
         </div>

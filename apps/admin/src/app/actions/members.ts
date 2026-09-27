@@ -43,9 +43,8 @@ export async function registerMember(prevState: any, formData: FormData) {
     }
     
     const expirationDate = new Date(startsAt)
-    // Add calendar days (including Sundays)
-    // If a plan is for 1 day, it expires on the same day.
-    expirationDate.setDate(expirationDate.getDate() + Math.max(0, customDays - 1))
+    // Add calendar days
+    expirationDate.setDate(expirationDate.getDate() + customDays)
     expirationDate.setHours(23, 59, 59, 999)
 
     // 2. Generate Username and QR code
@@ -90,6 +89,12 @@ export async function registerMember(prevState: any, formData: FormData) {
       })
 
     if (txError) throw new Error(`Error registrando pago: ${txError.message}`)
+
+    const registerVisit = formData.get('register_visit') === 'on'
+    if (registerVisit) {
+      const { processCheckIn } = await import('@novafit/supabase/src/queries/checkin')
+      await processCheckIn(supabase, { type: 'member_id', value: member.member_id }, { staff, checkinType: 'manual' })
+    }
 
   } catch (error: any) {
     return { error: error.message || 'Error inesperado al registrar.' }
@@ -191,6 +196,12 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
       customVisits: isNaN(customVisits) ? undefined : customVisits,
       customDays: isNaN(customDays) ? undefined : customDays
     })
+
+    const registerVisit = formData.get('register_visit') === 'on'
+    if (registerVisit) {
+      const { processCheckIn } = await import('@novafit/supabase/src/queries/checkin')
+      await processCheckIn(supabase, { type: 'member_id', value: memberId }, { staff, checkinType: 'manual' })
+    }
 
   } catch (error: any) {
     return { error: error.message || 'Error inesperado al asignar el plan.' }

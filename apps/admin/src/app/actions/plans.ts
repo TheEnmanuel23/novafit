@@ -23,6 +23,7 @@ export async function createPlan(prevState: any, formData: FormData) {
     const price = parseInt(formData.get('price') as string, 10)
     const max_balance = parseInt(formData.get('max_balance') as string, 10)
     const expiration_days = parseInt(formData.get('expiration_days') as string, 10)
+    const key = (formData.get('key') as string) || 'custom'
     const active = formData.get('active') === 'on'
 
     if (!description || isNaN(visits_included) || isNaN(price) || isNaN(max_balance) || isNaN(expiration_days)) {
@@ -35,6 +36,7 @@ export async function createPlan(prevState: any, formData: FormData) {
       price,
       max_balance,
       expiration_days,
+      key,
       active
     })
 
@@ -62,6 +64,7 @@ export async function updatePlan(id: string, prevState: any, formData: FormData)
     const price = parseInt(formData.get('price') as string, 10)
     const max_balance = parseInt(formData.get('max_balance') as string, 10)
     const expiration_days = parseInt(formData.get('expiration_days') as string, 10)
+    const key = (formData.get('key') as string) || 'custom'
     const active = formData.get('active') === 'on'
 
     if (!description || isNaN(visits_included) || isNaN(price) || isNaN(max_balance) || isNaN(expiration_days)) {
@@ -74,6 +77,7 @@ export async function updatePlan(id: string, prevState: any, formData: FormData)
       price,
       max_balance,
       expiration_days,
+      key,
       active
     }).eq('id', id)
 

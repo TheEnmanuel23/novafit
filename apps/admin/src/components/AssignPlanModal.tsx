@@ -9,6 +9,8 @@ export function AssignPlanModal({ memberId, plans }: { memberId: string, plans: 
   const [state, formAction, pending] = useActionState(assignPlanAction, null)
   
   const [selectedPlanId, setSelectedPlanId] = useState<string>('')
+  const [isDiaPlan, setIsDiaPlan] = useState<boolean>(false)
+  const [diaQuantity, setDiaQuantity] = useState<number>(1)
   const [customPrice, setCustomPrice] = useState<number>(0)
   const [customVisits, setCustomVisits] = useState<number>(0)
   const [customDays, setCustomDays] = useState<number>(0)
@@ -24,9 +26,29 @@ export function AssignPlanModal({ memberId, plans }: { memberId: string, plans: 
     setSelectedPlanId(planId)
     const plan = plans.find(p => p.id === planId)
     if (plan) {
-      setCustomPrice(plan.price)
-      setCustomVisits(plan.visits_included)
-      setCustomDays(plan.expiration_days)
+      const isDia = plan.key === 'day'
+      setIsDiaPlan(isDia)
+      if (isDia) {
+        setDiaQuantity(1)
+        setCustomPrice(plan.price)
+        setCustomVisits(1)
+        setCustomDays(2)
+      } else {
+        setCustomPrice(plan.price)
+        setCustomVisits(plan.visits_included)
+        setCustomDays(plan.expiration_days)
+      }
+    }
+  }
+
+  const handleDiaQuantityChange = (val: number) => {
+    const qty = val > 0 ? val : 1;
+    setDiaQuantity(qty);
+    const plan = plans.find(p => p.id === selectedPlanId);
+    if (plan) {
+       setCustomVisits(qty);
+       setCustomDays(qty * 2);
+       setCustomPrice(plan.price * qty);
     }
   }
 
@@ -100,48 +122,97 @@ export function AssignPlanModal({ memberId, plans }: { memberId: string, plans: 
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  {isDiaPlan ? (
                     <div className="input-group">
-                      <label className="input-label text-xs" htmlFor="custom_visits">Visitas a Asignar</label>
+                      <label className="input-label text-xs" htmlFor="dia_quantity">Cantidad de Días (Día Plan)</label>
                       <input 
-                        id="custom_visits"
-                        name="custom_visits"
+                        id="dia_quantity"
                         type="number" 
                         min="1"
-                        value={customVisits}
-                        onChange={(e) => setCustomVisits(parseInt(e.target.value) || 0)}
+                        value={diaQuantity}
+                        onChange={(e) => handleDiaQuantityChange(parseInt(e.target.value) || 1)}
                         className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
                         required 
                       />
+                      <div className="mt-2 p-3 bg-black/30 rounded-lg text-xs flex flex-col gap-1">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Visitas:</span>
+                          <span className="font-bold text-white">{customVisits}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Vigencia:</span>
+                          <span className="font-bold text-white">{customDays} días calendario</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Precio:</span>
+                          <span className="font-bold text-accent">C$ {customPrice}</span>
+                        </div>
+                      </div>
+                      <input type="hidden" name="custom_visits" value={customVisits} />
+                      <input type="hidden" name="custom_days" value={customDays} />
+                      <input type="hidden" name="custom_price" value={customPrice} />
                     </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="input-group">
+                          <label className="input-label text-xs" htmlFor="custom_visits">Visitas a Asignar</label>
+                          <input 
+                            id="custom_visits"
+                            name="custom_visits"
+                            type="number" 
+                            min="1"
+                            value={customVisits}
+                            onChange={(e) => setCustomVisits(parseInt(e.target.value) || 0)}
+                            className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
+                            required 
+                          />
+                        </div>
 
-                    <div className="input-group">
-                      <label className="input-label text-xs" htmlFor="custom_days">Días de Vigencia</label>
-                      <input 
-                        id="custom_days"
-                        name="custom_days"
-                        type="number" 
-                        min="1"
-                        value={customDays}
-                        onChange={(e) => setCustomDays(parseInt(e.target.value) || 0)}
-                        className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
-                        required 
-                      />
-                    </div>
-                  </div>
+                        <div className="input-group">
+                          <label className="input-label text-xs" htmlFor="custom_days">Días de Vigencia</label>
+                          <input 
+                            id="custom_days"
+                            name="custom_days"
+                            type="number" 
+                            min="1"
+                            value={customDays}
+                            onChange={(e) => setCustomDays(parseInt(e.target.value) || 0)}
+                            className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
+                            required 
+                          />
+                        </div>
+                      </div>
 
-                  <div className="input-group">
-                    <label className="input-label text-xs" htmlFor="custom_price">Precio a Cobrar (C$)</label>
+                      <div className="input-group">
+                        <label className="input-label text-xs" htmlFor="custom_price">Precio a Cobrar (C$)</label>
+                        <input 
+                          id="custom_price"
+                          name="custom_price"
+                          type="number" 
+                          min="0"
+                          value={customPrice}
+                          onChange={(e) => setCustomPrice(parseInt(e.target.value) || 0)}
+                          className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
+                          required 
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex items-center gap-3 mt-4 bg-black/20 p-3 rounded-xl border border-white/5">
                     <input 
-                      id="custom_price"
-                      name="custom_price"
-                      type="number" 
-                      min="0"
-                      value={customPrice}
-                      onChange={(e) => setCustomPrice(parseInt(e.target.value) || 0)}
-                      className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
-                      required 
+                      type="checkbox" 
+                      id="register_visit" 
+                      name="register_visit" 
+                      className="w-5 h-5 rounded border-white/20 bg-black/40 accent-accent"
                     />
+                    <label htmlFor="register_visit" className="text-sm font-medium cursor-pointer flex-1">
+                      Registrar visita automáticamente
+                      <span className="block text-xs text-muted-foreground font-normal">
+                        Descuenta una visita hoy (ej. si el cliente ya está en el gimnasio).
+                      </span>
+                    </label>
                   </div>
                 </div>
               )}
