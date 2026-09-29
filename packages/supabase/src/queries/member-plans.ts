@@ -6,12 +6,13 @@ export async function getActiveMemberPlan(
   supabase: SupabaseClient,
   memberId: string
 ): Promise<(MemberPlan & { visits_remaining: number; plan: any }) | null> {
+  const appDate = await getAppDate();
   const { data, error } = await supabase
     .from('member_plans')
     .select('*, plan:plans(*)')
     .eq('member_id', memberId)
     .eq('status', 'active')
-    .gt('expiration_date', getAppDate().toISOString())
+    .gt('expiration_date', appDate.toISOString())
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -69,13 +70,15 @@ export async function processRecharge(
 
   if (planError || !plan) throw new Error('Plan not found')
 
+  const appDate = await getAppDate();
+
   // Get current active plan
   const { data: currentPlan } = await supabase
     .from('member_plans')
     .select('*, plan:plans(*)')
     .eq('member_id', input.memberId)
     .eq('status', 'active')
-    .gt('expiration_date', getAppDate().toISOString())
+    .gt('expiration_date', appDate.toISOString())
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -94,7 +97,7 @@ export async function processRecharge(
 
   let newBalance = 0;
   let newVisitsUsed = 0;
-  let newExpiration = new Date(input.startsAt || getAppDate());
+  let newExpiration = new Date(input.startsAt || appDate);
   let finalPlanId = input.planId;
   let maxBalanceCap = plan.max_balance;
 
@@ -135,7 +138,7 @@ export async function processRecharge(
   if (currentPlan) {
     await supabase
       .from('member_plans')
-      .update({ status: 'expired', updated_at: getAppDate().toISOString() })
+      .update({ status: 'expired', updated_at: appDate.toISOString() })
       .eq('id', currentPlan.id)
   }
 
@@ -147,7 +150,7 @@ export async function processRecharge(
       plan_id: finalPlanId,
       visits_purchased: newBalance,
       visits_used: newVisitsUsed,
-      starts_at: (input.startsAt || getAppDate()).toISOString(),
+      starts_at: (input.startsAt || appDate).toISOString(),
       expiration_date: newExpiration.toISOString(),
       status: 'active',
     })
@@ -186,12 +189,14 @@ export async function previewRecharge(
   const { data: plan } = await supabase.from('plans').select('*').eq('id', planId).single()
   if (!plan) throw new Error('Plan not found')
 
+  const appDate = await getAppDate();
+
   const { data: currentPlan } = await supabase
     .from('member_plans')
     .select('*, plan:plans(*)')
     .eq('member_id', memberId)
     .eq('status', 'active')
-    .gt('expiration_date', getAppDate().toISOString())
+    .gt('expiration_date', appDate.toISOString())
     .maybeSingle()
 
   const rollover = currentPlan ? currentPlan.visits_purchased - currentPlan.visits_used : 0
@@ -201,7 +206,7 @@ export async function previewRecharge(
   const isCurrentDay = currentPlan && currentPlan.plan ? (currentPlan.plan.key === 'day') : false;
 
   let newBalance = 0;
-  let newExpiration = getAppDate();
+  let newExpiration = new Date(appDate);
   let maxBalanceCap = plan.max_balance;
 
   if (!currentPlan) {

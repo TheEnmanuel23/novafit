@@ -8,6 +8,8 @@ import { getMemberPlanHistory } from '@novafit/supabase/src/queries/member-plans
 import { EditMemberModal } from '@/components/EditMemberModal'
 import { DeactivateMemberButton } from '@/components/DeactivateMemberButton'
 import { AssignPlanModal } from '@/components/AssignPlanModal'
+import { isPlanActive, isPlanExpired } from '@novafit/supabase/src/utils/member'
+import { getAppDate } from '@novafit/supabase/src/utils/date'
 import { EditPlanModal } from '@/components/EditPlanModal'
 import { ShareMemberAppModal } from '@/components/ShareMemberAppModal'
 
@@ -43,6 +45,7 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
 
   const plans = await getActivePlans(supabase)
   const planHistory = await getMemberPlanHistory(supabase, member.member_id)
+  const appDate = await getAppDate()
 
   return (
     <div className="app-container">
@@ -162,13 +165,13 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                        mp.status === 'active' ? 'bg-accent/20 text-accent border border-accent/20' : 
-                        mp.status === 'expired' ? 'bg-error/20 text-error border border-error/20' : 
+                        isPlanExpired(mp, appDate) ? 'bg-error/20 text-error border border-error/20' : 
+                        isPlanActive(mp, appDate) ? 'bg-accent/20 text-accent border border-accent/20' : 
                         'bg-white/10 text-white/70'
                       }`}>
-                        {mp.status}
+                        {isPlanExpired(mp, appDate) ? 'expired' : isPlanActive(mp, appDate) ? 'active' : mp.status}
                       </span>
-                      {mp.status !== 'expired' && (
+                      {!isPlanExpired(mp, appDate) && (
                          <EditPlanModal memberPlan={mp} memberId={member.member_id} />
                       )}
                     </div>

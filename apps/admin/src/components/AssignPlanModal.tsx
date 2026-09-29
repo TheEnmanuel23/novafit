@@ -116,7 +116,19 @@ export function AssignPlanModal({ memberId, plans }: { memberId: string, plans: 
                       id="starts_at"
                       name="starts_at"
                       type="date" 
-                      defaultValue={new Date().toISOString().split('T')[0]}
+                      defaultValue={
+                        typeof window !== 'undefined'
+                          ? (() => {
+                              const match = document.cookie.match(/(?:^|; )x-simulated-date=([^;]*)/)
+                              if (match && match[1]) {
+                                const val = decodeURIComponent(match[1])
+                                if (val.length === 10 && val.includes('-')) return val
+                              }
+                              const d = new Date()
+                              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                            })()
+                          : new Date().toISOString().split('T')[0]
+                      }
                       className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
                       required 
                     />

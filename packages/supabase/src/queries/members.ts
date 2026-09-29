@@ -95,8 +95,9 @@ export async function getMembers(
   const { data, error, count } = await query
   if (error) throw new Error(`Failed to fetch members: ${error.message}`)
 
+  const appDate = await getAppDate();
   let members = (data ?? []).map((m: any) => {
-    const { status, active_plan } = computeMemberState(m.member_plans as any[]);
+    const { status, active_plan } = computeMemberState(m.member_plans as any[], appDate);
 
     return {
       ...m,
@@ -169,7 +170,8 @@ export async function getMemberByUsername(
   if (error) throw new Error(`Failed to fetch member: ${error.message}`)
   if (!data) return null
 
-  const { status, active_plan } = computeMemberState(data.member_plans as any[]);
+  const appDate = await getAppDate();
+  const { status, active_plan } = computeMemberState(data.member_plans as any[], appDate);
 
   return {
     ...data,
@@ -202,7 +204,8 @@ export async function getMemberByQrCode(
   if (error) throw new Error(`Failed to fetch member by QR: ${error.message}`)
   if (!data) return null
 
-  const { status, active_plan } = computeMemberState(data.member_plans as any[]);
+  const appDate = await getAppDate();
+  const { status, active_plan } = computeMemberState(data.member_plans as any[], appDate);
 
   return {
     ...data,
@@ -235,7 +238,8 @@ export async function getMemberById(
   if (error) throw new Error(`Failed to fetch member: ${error.message}`)
   if (!data) return null
 
-  const { status, active_plan } = computeMemberState(data.member_plans as any[]);
+  const appDate = await getAppDate();
+  const { status, active_plan } = computeMemberState(data.member_plans as any[], appDate);
 
   return {
     ...data,
@@ -270,9 +274,10 @@ export async function updateMemberUsername(
   memberId: string,
   username: string
 ): Promise<void> {
+  const appDate = await getAppDate();
   const { error } = await supabase
     .from('members')
-    .update({ username: username.toUpperCase(), updated_at: getAppDate().toISOString() })
+    .update({ username: username.toUpperCase(), updated_at: appDate.toISOString() })
     .eq('member_id', memberId)
 
   if (error) throw new Error(`Failed to update username: ${error.message}`)
@@ -286,11 +291,12 @@ export async function updateMemberDetails(
   },
   staffId: string
 ): Promise<void> {
+  const appDate = await getAppDate();
   const { error } = await supabase
     .from('members')
     .update({ name: input.name, phone: input.phone || null,
       updated_by: staffId,
-      updated_at: getAppDate().toISOString(),
+      updated_at: appDate.toISOString(),
     })
     .eq('member_id', memberId)
 
@@ -302,12 +308,13 @@ export async function softDeleteMember(
   memberId: string,
   staffId: string
 ): Promise<void> {
+  const appDate = await getAppDate();
   const { error } = await supabase
     .from('members')
     .update({
       deleted: true,
       updated_by: staffId,
-      updated_at: getAppDate().toISOString(),
+      updated_at: appDate.toISOString(),
     })
     .eq('member_id', memberId)
 

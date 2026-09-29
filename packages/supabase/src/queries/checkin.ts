@@ -2,9 +2,10 @@ import { getAppDate } from '@novafit/supabase/src/utils/date';
 import { computeMemberState } from '@novafit/supabase/src/utils/member';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CheckInResult, MemberWithStatus } from '@novafit/types'
+import { isBefore, isEqual, isAfter } from 'date-fns'
 
 export async function getTodayVisitsCount(supabase: SupabaseClient): Promise<number> {
-  const today = getAppDate();
+  const today = await getAppDate();
   const startOfDay = new Date(today);
   startOfDay.setHours(0, 0, 0, 0);
   const endOfDay = new Date(today);
@@ -108,9 +109,10 @@ export async function getAttendances(
      console.log('No attendances found with options:', options);
   }
 
+  const appDate = await getAppDate();
   // Compute status for each member
   let result = data.map((row: any) => {
-    const { status } = computeMemberState(row.members?.member_plans as any[]);
+    const { status } = computeMemberState(row.members?.member_plans as any[], appDate);
 
     return {
       ...row,
@@ -179,18 +181,17 @@ export async function processCheckIn(
 
   const member = memberData as any
 
-  const todayStr = getAppDate().toISOString().split('T')[0];
+  const appDate = await getAppDate();
 
   // 2. Find active plan
   const activePlan = (member.member_plans as any[]).find(
     (mp: any) => {
       if (mp.status !== 'active') return false;
-      const expStr = mp.expiration_date.split('T')[0];
-      if (expStr < todayStr) return false;
-      if (mp.starts_at) {
-        const startStr = mp.starts_at.split('T')[0];
-        if (startStr > todayStr) return false;
+      if (mp.expiration_date) {
+        const expDate = new Date(mp.expiration_date);
+        if (isBefore(expDate, appDate) || isEqual(expDate, appDate)) return false;
       }
+      if (mp.starts_at && isAfter(new Date(mp.starts_at), appDate)) return false;
       return true;
     }
   )
@@ -231,7 +232,7 @@ export async function processCheckIn(
     .update({
       visits_used: activePlan.visits_used + 1,
       status: balanceAfter <= 0 ? 'expired' : activePlan.status,
-      updated_at: getAppDate().toISOString(),
+      updated_at: appDate.toISOString(),
     })
     .eq('id', activePlan.id)
 
@@ -249,7 +250,7 @@ export async function processCheckIn(
     created_by: options?.staff?.id || null,
     updated_by: options?.staff?.id || null,
     checkin_type: options?.checkinType || 'manual',
-    scanned_at: getAppDate().toISOString(),
+    scanned_at: appDate.toISOString(),
   })
 
   if (insertError) {

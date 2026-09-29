@@ -248,6 +248,8 @@ export async function updatePlanAction(prevState: any, formData: FormData) {
       expiresAtISO = expDate.toISOString()
     }
     
+    const appDate = await getAppDate();
+    
     const { error } = await supabase
       .from('member_plans')
       .update({
@@ -256,7 +258,7 @@ export async function updatePlanAction(prevState: any, formData: FormData) {
         starts_at: startsAtISO,
         expiration_date: expiresAtISO,
         status: status === 'active' || status === 'expired' ? status : undefined,
-        updated_at: getAppDate().toISOString()
+        updated_at: appDate.toISOString()
       })
       .eq('id', planId)
       
