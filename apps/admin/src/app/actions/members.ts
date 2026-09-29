@@ -93,7 +93,7 @@ export async function registerMember(prevState: any, formData: FormData) {
     const registerVisit = formData.get('register_visit') === 'on'
     if (registerVisit) {
       const { processCheckIn } = await import('@novafit/supabase/src/queries/checkin')
-      await processCheckIn(supabase, { type: 'member_id', value: member.member_id }, { staff, checkinType: 'manual' })
+      await processCheckIn(supabase, { type: 'member_id', value: member.member_id }, { staff, checkinType: 'auto_assignment' })
     }
 
   } catch (error: any) {
@@ -200,7 +200,7 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
     const registerVisit = formData.get('register_visit') === 'on'
     if (registerVisit) {
       const { processCheckIn } = await import('@novafit/supabase/src/queries/checkin')
-      await processCheckIn(supabase, { type: 'member_id', value: memberId }, { staff, checkinType: 'manual' })
+      await processCheckIn(supabase, { type: 'member_id', value: memberId }, { staff, checkinType: 'auto_assignment' })
     }
 
   } catch (error: any) {

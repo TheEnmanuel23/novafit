@@ -179,12 +179,20 @@ export async function processCheckIn(
 
   const member = memberData as any
 
+  const todayStr = getAppDate().toISOString().split('T')[0];
+
   // 2. Find active plan
   const activePlan = (member.member_plans as any[]).find(
-    (mp: any) =>
-      mp.status === 'active' && 
-      new Date(mp.expiration_date) > getAppDate() &&
-      (!mp.starts_at || new Date(mp.starts_at) <= getAppDate())
+    (mp: any) => {
+      if (mp.status !== 'active') return false;
+      const expStr = mp.expiration_date.split('T')[0];
+      if (expStr < todayStr) return false;
+      if (mp.starts_at) {
+        const startStr = mp.starts_at.split('T')[0];
+        if (startStr > todayStr) return false;
+      }
+      return true;
+    }
   )
 
   if (!activePlan) {

@@ -3,7 +3,12 @@
 import { useEffect, useState } from 'react'
 
 export function DevDateTools() {
-  const [dateStr, setDateStr] = useState(() => new Date().toISOString().split('T')[0])
+  const getLocalDateStr = () => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  const [dateStr, setDateStr] = useState(getLocalDateStr)
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
@@ -28,7 +33,7 @@ export function DevDateTools() {
   }
 
   const handleReset = () => {
-    setDateStr(new Date().toISOString().split('T')[0])
+    setDateStr(getLocalDateStr())
     document.cookie = `x-simulated-date=; path=/; max-age=0`
     window.location.reload()
   }
