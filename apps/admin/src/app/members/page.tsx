@@ -126,7 +126,7 @@ export default async function MembersPage({ searchParams }: Props) {
 
                   {member.active_plan && (
                     <div className="text-sm font-medium mt-1">
-                      {member.active_plan.visits_remaining} / {member.active_plan.visits_purchased} <span className="text-muted-foreground text-xs font-normal">visitas disponibles</span>
+                      {member.active_plan.visits_remaining} / {member.active_plan.visits_purchased} <span className="text-muted-foreground text-xs font-normal">días disponibles</span>
                     </div>
                   )}
                 </div>

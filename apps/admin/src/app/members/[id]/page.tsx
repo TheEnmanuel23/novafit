@@ -179,15 +179,15 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
                   <div className="flex flex-wrap gap-6 mt-2">
                     <div>
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Compradas</p>
-                      <p className="text-xs font-medium">{mp.visits_purchased} <span className="text-muted-foreground font-normal">visitas</span></p>
+                      <p className="text-xs font-medium">{mp.visits_purchased} <span className="text-muted-foreground font-normal">días</span></p>
                     </div>
                     <div>
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Usadas</p>
-                      <p className="text-xs font-medium">{mp.visits_used} <span className="text-muted-foreground font-normal">visitas</span></p>
+                      <p className="text-xs font-medium">{mp.visits_used} <span className="text-muted-foreground font-normal">días</span></p>
                     </div>
                     <div>
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Disponibles / Restantes</p>
-                      <p className="text-xs font-medium text-accent">{mp.visits_purchased - mp.visits_used} <span className="text-muted-foreground font-normal">visitas</span></p>
+                      <p className="text-xs font-medium text-accent">{mp.visits_purchased - mp.visits_used} <span className="text-muted-foreground font-normal">días</span></p>
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row sm:gap-6 gap-2 mt-2 pt-3 border-t border-white/5 text-[10px] text-muted-foreground">

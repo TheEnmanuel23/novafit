@@ -211,7 +211,7 @@ export default function CheckinPage() {
                         </span>
                         {m.active_plan && (
                           <span className="text-[10px] font-medium text-muted-foreground mt-1">
-                            {m.active_plan.visits_remaining} visitas restantes
+                            {m.active_plan.visits_remaining} días restantes
                           </span>
                         )}
                       </div>
