@@ -34,6 +34,7 @@ export function StatusDateFilters({
   const [endDate, setEndDate] = useState(initialEnd ?? '')
   const [status, setStatus] = useState(initialStatus)
   const [query, setQuery] = useState(searchParams.get('q') || '')
+  const [selectedRange, setSelectedRange] = useState('custom')
 
   // Sync local state if URL changes from outside (e.g. back/forward buttons)
   useEffect(() => {
@@ -42,8 +43,9 @@ export function StatusDateFilters({
   }, [searchParams])
 
   useEffect(() => {
-    const currentStart = searchParams.get('startDate') || ''
-    const currentEnd = searchParams.get('endDate') || ''
+    // If param is null, it means it's not in the URL, but the component initializes with defaultStart/defaultEnd
+    const currentStart = searchParams.get('startDate') !== null ? searchParams.get('startDate') : defaultStart
+    const currentEnd = searchParams.get('endDate') !== null ? searchParams.get('endDate') : defaultEnd
     const currentStatus = searchParams.get('status') || ''
     const currentQ = searchParams.get('q') || ''
 
@@ -53,11 +55,9 @@ export function StatusDateFilters({
       startTransition(() => {
         const params = new URLSearchParams(searchParams.toString())
         
-        if (startDate) params.set('startDate', startDate)
-        else params.delete('startDate')
-        
-        if (endDate) params.set('endDate', endDate)
-        else params.delete('endDate')
+        // We set explicitly to support empty strings for clearing the date
+        if (startDate !== null) params.set('startDate', startDate)
+        if (endDate !== null) params.set('endDate', endDate)
         
         if (status) params.set('status', status)
         else params.delete('status')
@@ -70,25 +70,75 @@ export function StatusDateFilters({
     }, 300)
 
     return () => clearTimeout(timeout)
-  }, [startDate, endDate, status, query, pathname, router, searchParams])
+  }, [startDate, endDate, status, query, pathname, router, searchParams, defaultStart, defaultEnd])
 
   const handleReset = () => {
     setStartDate(defaultStart)
     setEndDate(defaultEnd)
     setStatus('')
     setQuery('')
+    setSelectedRange('custom')
     startTransition(() => {
       const params = new URLSearchParams(searchParams.toString())
       if (defaultStart) params.set('startDate', defaultStart)
-      else params.delete('startDate')
+      else params.set('startDate', '')
       
       if (defaultEnd) params.set('endDate', defaultEnd)
-      else params.delete('endDate')
+      else params.set('endDate', '')
 
       params.delete('status')
       params.delete('q')
       router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     })
+  }
+
+  const setDateRange = (type: string) => {
+    setSelectedRange(type);
+    const now = new Date()
+    const format = (d: Date) => {
+      const year = d.getFullYear()
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+
+    let start, end;
+    
+    switch(type) {
+      case 'today':
+        start = end = now;
+        break;
+      case 'this_week':
+        start = new Date(now);
+        start.setDate(now.getDate() - now.getDay());
+        end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        break;
+      case 'last_two_weeks':
+        end = new Date(now);
+        start = new Date(now);
+        start.setDate(now.getDate() - 14);
+        break;
+      case 'this_month':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        break;
+      case 'last_month':
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        end = new Date(now.getFullYear(), now.getMonth(), 0);
+        break;
+      case 'clear':
+        setStartDate('');
+        setEndDate('');
+        return;
+      case 'custom':
+        return;
+    }
+    
+    if (start && end) {
+      setStartDate(format(start));
+      setEndDate(format(end));
+    }
   }
 
   return (
@@ -103,14 +153,34 @@ export function StatusDateFilters({
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
+
       <div className="flex gap-2 flex-wrap text-sm">
+        <div className="flex-1 min-w-[130px]">
+          <label className="text-xs text-muted-foreground ml-1">Rango de fechas</label>
+          <select 
+            className="input h-10 w-full appearance-none bg-surface/50"
+            value={selectedRange}
+            onChange={(e) => setDateRange(e.target.value)}
+          >
+            <option value="custom">Personalizado</option>
+            <option value="today">Hoy</option>
+            <option value="this_week">Esta semana</option>
+            <option value="last_two_weeks">Últimas 2 semanas</option>
+            <option value="this_month">Este mes</option>
+            <option value="last_month">Mes pasado</option>
+            <option value="clear">Sin límite (limpiar)</option>
+          </select>
+        </div>
         <div className="flex-1 min-w-[120px]">
           <label className="text-xs text-muted-foreground ml-1">{dateLabelStart}</label>
           <input 
             type="date" 
             className="input h-10 w-full"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => {
+              setStartDate(e.target.value)
+              setSelectedRange('custom')
+            }}
           />
         </div>
         <div className="flex-1 min-w-[120px]">
@@ -119,7 +189,10 @@ export function StatusDateFilters({
             type="date" 
             className="input h-10 w-full"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={(e) => {
+              setEndDate(e.target.value)
+              setSelectedRange('custom')
+            }}
           />
         </div>
         <div className="flex-1 min-w-[120px]">
@@ -141,7 +214,7 @@ export function StatusDateFilters({
             onClick={handleReset}
             className="btn h-10 px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-colors border border-white/10 text-xs font-medium"
           >
-            Limpiar
+            Valores por defecto
           </button>
         </div>
       </div>
