@@ -1,6 +1,7 @@
 import { getAppDate } from '@novafit/supabase/src/utils/date';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MemberPlan } from '@novafit/types'
+import { endOfDay } from 'date-fns'
 
 export async function getActiveMemberPlan(
   supabase: SupabaseClient,
@@ -132,7 +133,7 @@ export async function processRecharge(
   }
 
   const balanceAfter = newBalance - newVisitsUsed;
-  newExpiration.setHours(23, 59, 59, 999)
+  newExpiration = endOfDay(newExpiration);
 
   // Mark old plan as expired
   if (currentPlan) {
@@ -232,7 +233,7 @@ export async function previewRecharge(
   }
 
   const balanceAfter = newBalance;
-  newExpiration.setHours(23, 59, 59, 999)
+  newExpiration = endOfDay(newExpiration);
 
   return {
     balanceBefore,

@@ -2,6 +2,7 @@ import { getAppDate } from '@novafit/supabase/src/utils/date';
 import { computeMemberState } from '@novafit/supabase/src/utils/member';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Member, MemberWithStatus } from '@novafit/types'
+import { parseISO, startOfDay, endOfDay } from 'date-fns'
 
 /** Generate a short unique username: ABCD-1234 (no ambiguous chars) */
 export function generateUsername(): string {
@@ -70,14 +71,12 @@ export async function getMembers(
   }
 
   if (startDate) {
-    const start = new Date(startDate)
-    start.setHours(0, 0, 0, 0)
+    const start = startOfDay(parseISO(startDate))
     query = query.gte('created_at', start.toISOString())
   }
   
   if (endDate) {
-    const end = new Date(endDate)
-    end.setHours(23, 59, 59, 999)
+    const end = endOfDay(parseISO(endDate))
     query = query.lte('created_at', end.toISOString())
   }
 

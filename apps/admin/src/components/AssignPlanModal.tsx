@@ -4,7 +4,7 @@ import { useState, useActionState, useEffect } from 'react'
 import type { Plan } from '@novafit/types'
 import { assignPlanAction } from '@/app/actions/members'
 
-export function AssignPlanModal({ memberId, plans }: { memberId: string, plans: Plan[] }) {
+export function AssignPlanModal({ memberId, plans, currentRollover = 0 }: { memberId: string, plans: Plan[], currentRollover?: number }) {
   const [isOpen, setIsOpen] = useState(false)
   const [state, formAction, pending] = useActionState(assignPlanAction, null)
   
@@ -14,6 +14,40 @@ export function AssignPlanModal({ memberId, plans }: { memberId: string, plans: 
   const [customPrice, setCustomPrice] = useState<number>(0)
   const [customVisits, setCustomVisits] = useState<number>(0)
   const [customDays, setCustomDays] = useState<number>(0)
+  
+  const [startsAt, setStartsAt] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const match = document.cookie.match(/(?:^|; )x-simulated-date=([^;]*)/)
+      if (match && match[1]) {
+        const val = decodeURIComponent(match[1])
+        if (val.length === 10 && val.includes('-')) return val
+      }
+      const d = new Date()
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+    return new Date().toISOString().split('T')[0]
+  })
+
+  // Calculate preview
+  let projectedBalance = 0;
+  let projectedExpirationStr = '';
+  
+  if (selectedPlanId) {
+    const plan = plans.find(p => p.id === selectedPlanId);
+    if (plan) {
+      projectedBalance = currentRollover + customVisits;
+      if (plan.max_balance && projectedBalance > plan.max_balance) {
+        projectedBalance = plan.max_balance;
+      }
+      
+      const [y, m, d] = startsAt.split('-').map(Number);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        const expDate = new Date(y, m - 1, d);
+        expDate.setDate(expDate.getDate() + customDays);
+        projectedExpirationStr = expDate.toLocaleDateString('es-NI', { year: 'numeric', month: 'long', day: 'numeric' });
+      }
+    }
+  }
 
   useEffect(() => {
     if (state?.success) {
@@ -116,19 +150,8 @@ export function AssignPlanModal({ memberId, plans }: { memberId: string, plans: 
                       id="starts_at"
                       name="starts_at"
                       type="date" 
-                      defaultValue={
-                        typeof window !== 'undefined'
-                          ? (() => {
-                              const match = document.cookie.match(/(?:^|; )x-simulated-date=([^;]*)/)
-                              if (match && match[1]) {
-                                const val = decodeURIComponent(match[1])
-                                if (val.length === 10 && val.includes('-')) return val
-                              }
-                              const d = new Date()
-                              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-                            })()
-                          : new Date().toISOString().split('T')[0]
-                      }
+                      value={startsAt}
+                      onChange={(e) => setStartsAt(e.target.value)}
                       className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
                       required 
                     />
@@ -211,6 +234,26 @@ export function AssignPlanModal({ memberId, plans }: { memberId: string, plans: 
                       </div>
                     </>
                   )}
+
+                  <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 flex flex-col gap-2 mt-2">
+                    <p className="text-xs text-accent font-bold uppercase tracking-wider mb-1">Previsualización</p>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Visitas Trasladadas (Rollover):</span>
+                      <span className="font-medium">{currentRollover}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Visitas Nuevas:</span>
+                      <span className="font-medium">{customVisits}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm border-t border-accent/10 pt-2 mt-1">
+                      <span className="text-accent/80 font-medium">Balance Total (con max.):</span>
+                      <span className="font-bold text-accent">{projectedBalance}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm mt-1">
+                      <span className="text-accent/80 font-medium">Nueva Fecha Expiración:</span>
+                      <span className="font-bold text-accent">{projectedExpirationStr || 'N/A'}</span>
+                    </div>
+                  </div>
 
                   <div className="flex items-center gap-3 mt-4 bg-black/20 p-3 rounded-xl border border-white/5">
                     <input 

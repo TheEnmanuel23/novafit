@@ -2,20 +2,18 @@ import { getAppDate } from '@novafit/supabase/src/utils/date';
 import { computeMemberState } from '@novafit/supabase/src/utils/member';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CheckInResult, MemberWithStatus } from '@novafit/types'
-import { isBefore, isEqual, isAfter } from 'date-fns'
+import { isBefore, isEqual, isAfter, startOfDay, endOfDay } from 'date-fns'
 
 export async function getTodayVisitsCount(supabase: SupabaseClient): Promise<number> {
   const today = await getAppDate();
-  const startOfDay = new Date(today);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(today);
-  endOfDay.setHours(23, 59, 59, 999);
+  const start = startOfDay(today);
+  const end = endOfDay(today);
 
   const { count, error } = await supabase
     .from('attendances')
     .select('*', { count: 'exact', head: true })
-    .gte('scanned_at', startOfDay.toISOString())
-    .lte('scanned_at', endOfDay.toISOString());
+    .gte('scanned_at', start.toISOString())
+    .lte('scanned_at', end.toISOString());
 
   if (error) {
     console.error('Error fetching today visits count:', error);

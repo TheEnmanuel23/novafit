@@ -93,7 +93,7 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
               <h2 className="text-lg font-semibold">Plan Activo</h2>
               <div className="flex gap-2">
                 <EditPlanModal memberPlan={member.active_plan} memberId={member.member_id} />
-                <AssignPlanModal memberId={member.member_id} plans={plans} />
+                <AssignPlanModal memberId={member.member_id} plans={plans} currentRollover={member.active_plan.visits_remaining} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -144,7 +144,7 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
           <div className="glass p-8 rounded-xl flex flex-col items-center justify-center gap-4 text-center">
             <h2 className="text-xl font-bold text-muted-foreground">Sin Plan Activo</h2>
             <p className="text-sm text-muted-foreground max-w-sm mb-2">Este miembro no tiene un plan activo. Asigna uno nuevo para continuar.</p>
-            <AssignPlanModal memberId={member.member_id} plans={plans} />
+            <AssignPlanModal memberId={member.member_id} plans={plans} currentRollover={0} />
           </div>
         )}
 
@@ -160,7 +160,7 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
                     <div>
                       <p className="font-semibold text-sm">{mp.plan?.description}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {mp.starts_at ? new Date(mp.starts_at).toLocaleDateString() : 'N/A'} - {mp.expiration_date ? new Date(mp.expiration_date).toLocaleDateString() : 'N/A'}
+                        Inicio: {mp.starts_at ? new Date(mp.starts_at).toLocaleDateString() : 'N/A'} • Expira: {mp.expiration_date ? new Date(mp.expiration_date).toLocaleDateString() : 'N/A'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
