@@ -59,7 +59,8 @@ export async function getAttendances(
           status,
           expiration_date,
           visits_purchased,
-          visits_used
+          visits_used,
+          updated_at
         )
       )
     `)
@@ -157,7 +158,7 @@ export async function processCheckIn(
       `
       *,
       member_plans (
-        id, plan_id, visits_purchased, visits_used, expiration_date, status,
+        id, plan_id, visits_purchased, visits_used, expiration_date, status, starts_at, updated_at,
         plan:plans (*)
       )
     `
@@ -181,24 +182,58 @@ export async function processCheckIn(
 
   const appDate = await getAppDate();
 
-  // 2. Find active plan
-  const activePlan = (member.member_plans as any[]).find(
-    (mp: any) => {
-      if (mp.status !== 'active') return false;
-      if (mp.expiration_date) {
-        const expDate = new Date(mp.expiration_date);
-        if (isBefore(expDate, appDate) || isEqual(expDate, appDate)) return false;
-      }
-      if (mp.starts_at && isAfter(new Date(mp.starts_at), appDate)) return false;
-      return true;
+  // 1.5. Check for today's check-ins FIRST
+  const start = startOfDay(appDate).toISOString();
+  const end = endOfDay(appDate).toISOString();
+  
+  const { data: todaysAttendances } = await supabase
+    .from('attendances')
+    .select('balance_before, balance_after, member_plan_id')
+    .eq('member_id', member.member_id)
+    .gte('scanned_at', start)
+    .lte('scanned_at', end)
+    .order('scanned_at', { ascending: false })
+    .limit(1);
+
+  const hasCheckedInToday = todaysAttendances && todaysAttendances.length > 0;
+
+  if (hasCheckedInToday) {
+    const lastCheckin = todaysAttendances[0];
+    
+    // Find the plan details to return expiration date if possible
+    const planUsed = (member.member_plans as any[]).find(mp => mp.id === lastCheckin.member_plan_id);
+
+    // Record the re-entry
+    await supabase.from('attendances').insert({
+      member_id: member.member_id,
+      member_plan_id: lastCheckin.member_plan_id,
+      balance_before: lastCheckin.balance_after, 
+      balance_after: lastCheckin.balance_after, // No deduction
+      registered_by: options?.staff?.id || null,
+      created_by: options?.staff?.id || null,
+      updated_by: options?.staff?.id || null,
+      checkin_type: options?.checkinType || 'manual',
+      scanned_at: appDate.toISOString(),
+    });
+
+    return {
+      type: 'success',
+      member,
+      balance_before: lastCheckin.balance_after,
+      balance_after: lastCheckin.balance_after,
+      expiration_date: planUsed?.expiration_date,
+      message: `¡Bienvenido, ${member.name}!`,
     }
-  )
+  }
+
+  // 2. Find active plan (using member state logic which considers same-day exhaustion)
+  const { active_plan: activePlan } = computeMemberState(member.member_plans, appDate);
 
   if (!activePlan) {
     // Check if there's an expired plan
-    const hasExpired = (member.member_plans as any[]).some(
-      (mp: any) => mp.status === 'expired'
-    )
+    const { status } = computeMemberState(member.member_plans, appDate);
+    const hasExpired = status === 'expired';
+    
     return {
       type: hasExpired ? 'expired' : 'no_plan',
       member,
@@ -212,6 +247,9 @@ export async function processCheckIn(
 
   // 3. Check remaining visits
   if (balanceBefore <= 0) {
+    // This shouldn't happen because activePlan should only be returned if it has balance OR if it was exhausted today and they re-entered.
+    // If they exhausted it today, it would have been caught by the `hasCheckedInToday` block.
+    // So if it reaches here, it means they ran out of visits.
     return {
       type: 'no_visits',
       member,

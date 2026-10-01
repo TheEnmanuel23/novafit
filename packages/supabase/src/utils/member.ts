@@ -1,15 +1,28 @@
 import type { MemberWithStatus, MemberPlanWithDetails, MemberPlanStatus } from '@novafit/types';
-import { isAfter, isBefore, isEqual } from 'date-fns';
+import { isAfter, isBefore, isEqual, startOfDay } from 'date-fns';
 
 /**
  * Determines if a given plan is currently active based on its status and expiration date.
+ * If a plan ran out of visits TODAY, it is still considered active for the rest of the day to allow re-entries.
  */
 export function isPlanActive(plan: Partial<MemberPlanWithDetails>, appDate: Date): boolean {
-  if (plan.status !== 'active') return false;
   if (!plan.expiration_date) return false;
   
+  const isUpdatedToday = plan.updated_at && isEqual(startOfDay(new Date(plan.updated_at)), startOfDay(appDate));
   const remaining = (plan.visits_purchased || 0) - (plan.visits_used || 0);
-  if (remaining <= 0) return false;
+
+  if (plan.status !== 'active') {
+    // If it was marked expired TODAY because it ran out of visits, it stays active for re-entries today
+    if (plan.status === 'expired' && isUpdatedToday && remaining <= 0) {
+      // Continue checks
+    } else {
+      return false;
+    }
+  }
+  
+  if (remaining <= 0 && !isUpdatedToday) {
+    return false;
+  }
   
   return isAfter(new Date(plan.expiration_date), appDate);
 }
@@ -18,10 +31,18 @@ export function isPlanActive(plan: Partial<MemberPlanWithDetails>, appDate: Date
  * Determines if a given plan is expired based on its status, expiration date, or empty balance.
  */
 export function isPlanExpired(plan: Partial<MemberPlanWithDetails>, appDate: Date): boolean {
-  if (plan.status === 'expired') return true;
-  
+  const isUpdatedToday = plan.updated_at && isEqual(startOfDay(new Date(plan.updated_at)), startOfDay(appDate));
   const remaining = (plan.visits_purchased || 0) - (plan.visits_used || 0);
-  if (remaining <= 0) return true;
+
+  if (plan.status === 'expired') {
+    if (isUpdatedToday && remaining <= 0) return false; // Still active for today's re-entries
+    return true;
+  }
+  
+  if (remaining <= 0) {
+    if (isUpdatedToday) return false; // Still active for today's re-entries
+    return true;
+  }
   
   if (!plan.expiration_date) return false;
   const expDate = new Date(plan.expiration_date);
@@ -40,8 +61,18 @@ export function computeMemberState(memberPlans: Partial<MemberPlanWithDetails>[]
 
   if (activePlan) {
     const remaining = (activePlan.visits_purchased || 0) - (activePlan.visits_used || 0);
+    // If it's a day plan that was exhausted today, remaining will be <= 0.
+    // We can show 'active' if remaining <= 0 (meaning it's the exhaustion day), or 'low_balance'.
+    // We'll return 'active' if remaining <= 0 so it doesn't look bad to the user, or 'low_balance' if remaining > 0 and <= 3.
+    let status: MemberWithStatus['status'] = 'active';
+    if (remaining <= 0) {
+       status = 'active'; // Still fully active for the day
+    } else if (remaining <= 3) {
+       status = 'low_balance';
+    }
+
     return {
-      status: remaining <= 3 ? 'low_balance' : 'active',
+      status,
       active_plan: {
         ...activePlan,
         visits_remaining: remaining,
