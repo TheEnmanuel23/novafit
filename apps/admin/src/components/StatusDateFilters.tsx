@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useTransition } from 'react'
+import { getClientAppDate } from '@novafit/supabase/src/utils/date-client'
 
 type StatusDateFiltersProps = {
   dateLabelStart?: string
@@ -94,7 +95,7 @@ export function StatusDateFilters({
 
   const setDateRange = (type: string) => {
     setSelectedRange(type);
-    const now = new Date()
+    const now = getClientAppDate();
     const format = (d: Date) => {
       const year = d.getFullYear()
       const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -107,6 +108,11 @@ export function StatusDateFilters({
     switch(type) {
       case 'today':
         start = end = now;
+        break;
+      case 'yesterday':
+        start = new Date(now);
+        start.setDate(now.getDate() - 1);
+        end = new Date(start);
         break;
       case 'this_week':
         start = new Date(now);
@@ -126,6 +132,10 @@ export function StatusDateFilters({
       case 'last_month':
         start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         end = new Date(now.getFullYear(), now.getMonth(), 0);
+        break;
+      case 'last_two_months':
+        start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         break;
       case 'clear':
         setStartDate('');
@@ -164,10 +174,12 @@ export function StatusDateFilters({
           >
             <option value="custom">Personalizado</option>
             <option value="today">Hoy</option>
+            <option value="yesterday">Ayer</option>
             <option value="this_week">Esta semana</option>
             <option value="last_two_weeks">Últimas 2 semanas</option>
             <option value="this_month">Este mes</option>
             <option value="last_month">Mes pasado</option>
+            <option value="last_two_months">Últimos 2 meses</option>
             <option value="clear">Sin límite (limpiar)</option>
           </select>
         </div>

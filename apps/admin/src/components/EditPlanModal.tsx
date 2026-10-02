@@ -74,7 +74,7 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="input-group">
-                  <label className="input-label text-xs" htmlFor="visits_purchased">Visitas Compradas</label>
+                  <label className="input-label text-xs" htmlFor="visits_purchased">Días Comprados</label>
                   <input 
                     id="visits_purchased"
                     name="visits_purchased"
@@ -86,7 +86,7 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
                   />
                 </div>
                 <div className="input-group">
-                  <label className="input-label text-xs" htmlFor="visits_used">Visitas Usadas</label>
+                  <label className="input-label text-xs" htmlFor="visits_used">Días Usados</label>
                   <input 
                     id="visits_used"
                     name="visits_used"

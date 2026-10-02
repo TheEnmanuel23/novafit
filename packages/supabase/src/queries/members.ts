@@ -49,13 +49,16 @@ export async function getMembers(
   const { search, startDate, endDate, page = 1, limit = 50, sort_by = 'created_at', order = 'desc' } = opts
   const offset = (page - 1) * limit
 
+  const hasPlanDateFilter = !!(startDate || endDate);
+  const memberPlansRelation = hasPlanDateFilter ? 'member_plans!inner' : 'member_plans';
+
   let query = supabase
     .from('members')
     .select(
       `
       *,
       creator:staff!members_created_by_fkey(name),
-      member_plans (
+      ${memberPlansRelation} (
         id, plan_id, visits_purchased, visits_used, expiration_date, status, created_at, updated_at, starts_at,
         creator:staff!member_plans_created_by_fkey(name),
         updater:staff!member_plans_updated_by_fkey(name),
@@ -72,12 +75,12 @@ export async function getMembers(
 
   if (startDate) {
     const start = startOfDay(parseISO(startDate))
-    query = query.gte('created_at', start.toISOString())
+    query = query.gte('member_plans.starts_at', start.toISOString())
   }
   
   if (endDate) {
     const end = endOfDay(parseISO(endDate))
-    query = query.lte('created_at', end.toISOString())
+    query = query.lte('member_plans.starts_at', end.toISOString())
   }
 
   // Database sorting for direct columns

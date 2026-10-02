@@ -11,6 +11,9 @@ export function isPlanActive(plan: Partial<MemberPlanWithDetails>, appDate: Date
   const isUpdatedToday = plan.updated_at && isEqual(startOfDay(new Date(plan.updated_at)), startOfDay(appDate));
   const remaining = (plan.visits_purchased || 0) - (plan.visits_used || 0);
 
+  const expDate = startOfDay(new Date(plan.expiration_date));
+  const today = startOfDay(appDate);
+
   if (plan.status !== 'active') {
     // If it was marked expired TODAY because it ran out of visits, it stays active for re-entries today
     if (plan.status === 'expired' && isUpdatedToday && remaining <= 0) {
@@ -24,15 +27,20 @@ export function isPlanActive(plan: Partial<MemberPlanWithDetails>, appDate: Date
     return false;
   }
   
-  return isAfter(new Date(plan.expiration_date), appDate);
+  return isAfter(expDate, today) || isEqual(expDate, today);
 }
 
 /**
  * Determines if a given plan is expired based on its status, expiration date, or empty balance.
  */
 export function isPlanExpired(plan: Partial<MemberPlanWithDetails>, appDate: Date): boolean {
+  if (!plan.expiration_date) return false;
+
   const isUpdatedToday = plan.updated_at && isEqual(startOfDay(new Date(plan.updated_at)), startOfDay(appDate));
   const remaining = (plan.visits_purchased || 0) - (plan.visits_used || 0);
+  
+  const expDate = startOfDay(new Date(plan.expiration_date));
+  const today = startOfDay(appDate);
 
   if (plan.status === 'expired') {
     if (isUpdatedToday && remaining <= 0) return false; // Still active for today's re-entries
@@ -44,9 +52,7 @@ export function isPlanExpired(plan: Partial<MemberPlanWithDetails>, appDate: Dat
     return true;
   }
   
-  if (!plan.expiration_date) return false;
-  const expDate = new Date(plan.expiration_date);
-  return isBefore(expDate, appDate) || isEqual(expDate, appDate);
+  return isBefore(expDate, today);
 }
 
 /**

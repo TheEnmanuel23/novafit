@@ -105,7 +105,7 @@ export async function processRecharge(
   if (!currentPlan) {
     // Scenario A: Fresh start
     newBalance = visitsIncluded;
-    newExpiration.setDate(newExpiration.getDate() + expirationDays);
+    newExpiration.setDate(newExpiration.getDate() + Math.max(0, expirationDays - 1));
   } else {
     // We have a current active plan
     if (isNewDía) {
@@ -118,7 +118,7 @@ export async function processRecharge(
       newBalance = newRemaining + newVisitsUsed;
       
       if (isCurrentDay) {
-        newExpiration.setDate(newExpiration.getDate() + expirationDays);
+        newExpiration.setDate(newExpiration.getDate() + Math.max(0, expirationDays - 1));
       } else {
         finalPlanId = currentPlan.plan_id;
         newExpiration = new Date(currentPlan.expiration_date);
@@ -128,7 +128,7 @@ export async function processRecharge(
       if (maxBalanceCap) {
         newBalance = Math.min(newBalance, maxBalanceCap);
       }
-      newExpiration.setDate(newExpiration.getDate() + expirationDays);
+      newExpiration.setDate(newExpiration.getDate() + Math.max(0, expirationDays - 1));
     }
   }
 

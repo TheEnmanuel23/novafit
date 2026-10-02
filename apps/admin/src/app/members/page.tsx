@@ -10,30 +10,14 @@ type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
-function getCurrentMonthDates() {
-  const now = new Date()
-  const start = new Date(now.getFullYear(), now.getMonth(), 1)
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  
-  // Format as YYYY-MM-DD in local time
-  const format = (d: Date) => {
-    const year = d.getFullYear()
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
-  }
-  
-  return { start: format(start), end: format(end) }
-}
 
 export default async function MembersPage({ searchParams }: Props) {
   const resolvedSearchParams = await searchParams
   const search = typeof resolvedSearchParams.q === 'string' ? resolvedSearchParams.q : undefined
   const status = typeof resolvedSearchParams.status === 'string' ? resolvedSearchParams.status : undefined
   
-  const { start: defaultStart, end: defaultEnd } = getCurrentMonthDates()
-  const startDate = typeof resolvedSearchParams.startDate === 'string' ? resolvedSearchParams.startDate : defaultStart
-  const endDate = typeof resolvedSearchParams.endDate === 'string' ? resolvedSearchParams.endDate : defaultEnd
+  const startDate = typeof resolvedSearchParams.startDate === 'string' ? resolvedSearchParams.startDate : ''
+  const endDate = typeof resolvedSearchParams.endDate === 'string' ? resolvedSearchParams.endDate : ''
   const sort_by = typeof resolvedSearchParams.sort_by === 'string' ? resolvedSearchParams.sort_by : 'created_at'
   const order = typeof resolvedSearchParams.order === 'string' && resolvedSearchParams.order === 'asc' ? 'asc' : 'desc'
 
@@ -75,10 +59,10 @@ export default async function MembersPage({ searchParams }: Props) {
       <main className="page-content mt-6">
         <div className="glass p-4 mb-6">
           <StatusDateFilters 
-            dateLabelStart="Registrado Desde" 
-            dateLabelEnd="Registrado Hasta" 
-            defaultStart={defaultStart}
-            defaultEnd={defaultEnd}
+            dateLabelStart="Inicio de Plan Desde" 
+            dateLabelEnd="Inicio de Plan Hasta" 
+            defaultStart=""
+            defaultEnd=""
             searchPlaceholder="Buscar por nombre, ID o teléfono..."
             totalResults={total}
           />
