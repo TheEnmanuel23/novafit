@@ -3,9 +3,25 @@
 import { createServerClient, createServiceClient } from '@novafit/supabase/src/server'
 import { getMembers } from '@novafit/supabase/src/queries/members'
 import { processCheckIn } from '@novafit/supabase/src/queries/checkin'
-import { getCurrentStaff } from '@novafit/supabase/src/queries/staff'
+import { getCurrentStaff, hasRole, isGlobalAdmin } from '@novafit/supabase/src/queries/staff'
 
 export async function manualCheckinAction(query: string, specificMemberId?: string) {
+  // Server actions are callable directly via POST, so authorize here before
+  // touching the service role client (which bypasses RLS).
+  const authClient = await createServerClient()
+  const staff = await getCurrentStaff(authClient)
+  if (!staff) {
+    return { type: 'error', message: 'Sesión no válida. Inicia sesión nuevamente.' }
+  }
+  const canManualCheckin =
+    (await isGlobalAdmin(staff)) ||
+    (await hasRole(staff, 'process_checkin')) ||
+    (await hasRole(staff, 'checkin_manual')) ||
+    (await hasRole(staff, 'manage_members'))
+  if (!canManualCheckin) {
+    return { type: 'error', message: 'No tienes permisos para registrar visitas manualmente.' }
+  }
+
   const supabase = createServiceClient()
 
   try {
@@ -43,18 +59,12 @@ export async function manualCheckinAction(query: string, specificMemberId?: stri
     }
 
     // We need the member's name for the success message
-    const { members } = await getMembers(supabase, { search: '', limit: 100 }) // This is inefficient, but we just need the name. Wait, let's just use the query if it was found, or fetch by ID.
-    // Actually, getMemberById is better.
     const { getMemberById } = await import('@novafit/supabase/src/queries/members')
     const member = await getMemberById(supabase, targetMemberId)
 
     if (!member) {
       return { type: 'error', message: 'Miembro no encontrado en la base de datos.' }
     }
-    
-    // Try to get staff ID if logged in
-    const authClient = await createServerClient()
-    const staff = await getCurrentStaff(authClient)
     
     // Process checkin
     const result = await processCheckIn(
