@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { getCurrentStaff, hasRole } from '@novafit/supabase'
+import { getCurrentStaff, hasRole, isGlobalAdmin } from '@novafit/supabase'
 
 export async function BottomNav({ currentPath }: { currentPath: string }) {
   const supabase = await createClient()
@@ -8,8 +8,23 @@ export async function BottomNav({ currentPath }: { currentPath: string }) {
 
   if (!staff) return null
 
-  const canManageMembers = await hasRole(staff, 'manage_members')
-  const canManageStaff = await hasRole(staff, 'manage_staff')
+  const isGlobal = await isGlobalAdmin(staff)
+  const canManageMembers = (await hasRole(staff, 'manage_members')) || isGlobal
+  const canManageStaff = (await hasRole(staff, 'manage_staff')) || isGlobal
+  const canManageSettings = (await hasRole(staff, 'manage_settings')) || isGlobal
+  const isKioskOnly = !isGlobal && !canManageMembers && !canManageStaff && !canManageSettings
+
+  // Kiosk-only users get a stripped-down nav with just the checkin link
+  if (isKioskOnly) {
+    return (
+      <nav className="bottom-nav">
+        <Link href="/checkin" className={`bottom-nav-item ${currentPath.startsWith('/checkin') ? 'active' : ''}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="5" height="5" x="7" y="7"/><rect width="5" height="5" x="12" y="12"/></svg>
+          Kiosco
+        </Link>
+      </nav>
+    )
+  }
 
   return (
     <nav className="bottom-nav">

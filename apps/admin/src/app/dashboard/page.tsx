@@ -4,6 +4,7 @@ import { getCurrentStaff, hasRole, isGlobalAdmin } from '@novafit/supabase'
 import { BottomNav } from '@/components/BottomNav'
 import { UserDropdown } from '@/components/UserDropdown'
 import { getBusinessSettings } from '@/app/actions/settings'
+import { redirect } from 'next/navigation'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -13,10 +14,19 @@ export default async function DashboardPage() {
   const isGlobal = staff ? await isGlobalAdmin(staff) : false
   const canManageMembers = staff ? (await hasRole(staff, 'manage_members')) || isGlobal : false
   const canManageSettings = staff ? (await hasRole(staff, 'manage_settings')) || isGlobal : false
+  const canManageStaff = staff ? (await hasRole(staff, 'manage_staff')) || isGlobal : false
+
+  // Staff with no admin roles are kiosk-only — send them straight to /checkin
+  const isKioskOnly = staff && !isGlobal && !canManageMembers && !canManageSettings && !canManageStaff
+  if (isKioskOnly) {
+    redirect('/checkin')
+  }
+
   const settings = await getBusinessSettings()
   
   const { getTodayVisitsCount } = await import('@novafit/supabase/src/queries/checkin')
   const visitsToday = await getTodayVisitsCount(supabaseAdmin)
+
 
   return (
     <div className="app-container">
