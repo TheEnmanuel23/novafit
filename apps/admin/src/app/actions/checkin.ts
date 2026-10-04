@@ -113,12 +113,14 @@ export async function manualCheckinAction(query: string, specificMemberId?: stri
 export async function searchMembersAction(query: string) {
   if (!query || query.length < 2) return []
 
-  const { staff } = await authorizeManualCheckin()
-  if (!staff) return []
-
-  const supabase = createServiceClient()
+  const { staff, error: authError } = await authorizeManualCheckin()
+  if (!staff) {
+    console.warn('[searchMembersAction] unauthorized:', authError)
+    return []
+  }
 
   try {
+    const supabase = createServiceClient()
     let { members } = await getMembers(supabase, { search: query, limit: 50 })
     const { getAppDate } = await import('@novafit/supabase/src/utils/date')
     const today = getAppDate()
