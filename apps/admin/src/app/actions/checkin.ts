@@ -5,13 +5,19 @@ import { getMembers } from '@novafit/supabase/src/queries/members'
 import { processCheckIn } from '@novafit/supabase/src/queries/checkin'
 import { getCurrentStaff, hasRole, isGlobalAdmin } from '@novafit/supabase/src/queries/staff'
 
-export async function manualCheckinAction(query: string, specificMemberId?: string) {
-  // Server actions are callable directly via POST, so authorize here before
-  // touching the service role client (which bypasses RLS).
+/**
+ * Server actions are callable directly via POST, so authorize here before
+ * touching the service role client (which bypasses RLS).
+ *
+ * Kiosk-style staff may only hold `checkin_manual`, which the `members` /
+ * `member_plans` RLS policies don't grant SELECT for, so both searching and
+ * checking in must go through the service client once authorized.
+ */
+async function authorizeManualCheckin() {
   const authClient = await createServerClient()
   const staff = await getCurrentStaff(authClient)
   if (!staff) {
-    return { type: 'error', message: 'Sesión no válida. Inicia sesión nuevamente.' }
+    return { staff: null, error: 'Sesión no válida. Inicia sesión nuevamente.' } as const
   }
   const canManualCheckin =
     (await isGlobalAdmin(staff)) ||
@@ -19,7 +25,15 @@ export async function manualCheckinAction(query: string, specificMemberId?: stri
     (await hasRole(staff, 'checkin_manual')) ||
     (await hasRole(staff, 'manage_members'))
   if (!canManualCheckin) {
-    return { type: 'error', message: 'No tienes permisos para registrar visitas manualmente.' }
+    return { staff: null, error: 'No tienes permisos para registrar visitas manualmente.' } as const
+  }
+  return { staff, error: null } as const
+}
+
+export async function manualCheckinAction(query: string, specificMemberId?: string) {
+  const { staff, error: authError } = await authorizeManualCheckin()
+  if (!staff) {
+    return { type: 'error', message: authError }
   }
 
   const supabase = createServiceClient()
@@ -97,8 +111,12 @@ export async function manualCheckinAction(query: string, specificMemberId?: stri
 }
 
 export async function searchMembersAction(query: string) {
-  const supabase = await createServerClient()
   if (!query || query.length < 2) return []
+
+  const { staff } = await authorizeManualCheckin()
+  if (!staff) return []
+
+  const supabase = createServiceClient()
 
   try {
     let { members } = await getMembers(supabase, { search: query, limit: 50 })
@@ -131,6 +149,7 @@ export async function searchMembersAction(query: string) {
         } : null
       }))
   } catch (error) {
+    console.error('[searchMembersAction] failed:', error)
     return []
   }
 }
