@@ -13,6 +13,7 @@ export function AssignPlanModal({ memberId, plans, currentRollover = 0 }: { memb
   const [diaQuantity, setDiaQuantity] = useState<number>(1)
   const [customPrice, setCustomPrice] = useState<number>(0)
   const [customVisits, setCustomVisits] = useState<number>(0)
+  const [customVisitsUsed, setCustomVisitsUsed] = useState<number>(0)
   const [customDays, setCustomDays] = useState<number>(0)
   
   const [startsAt, setStartsAt] = useState<string>(() => {
@@ -35,7 +36,7 @@ export function AssignPlanModal({ memberId, plans, currentRollover = 0 }: { memb
   if (selectedPlanId) {
     const plan = plans.find(p => p.id === selectedPlanId);
     if (plan) {
-      projectedBalance = currentRollover + customVisits;
+      projectedBalance = currentRollover + customVisits - customVisitsUsed;
       if (plan.max_balance && projectedBalance > plan.max_balance) {
         projectedBalance = plan.max_balance;
       }
@@ -66,10 +67,12 @@ export function AssignPlanModal({ memberId, plans, currentRollover = 0 }: { memb
         setDiaQuantity(1)
         setCustomPrice(plan.price)
         setCustomVisits(1)
+        setCustomVisitsUsed(0)
         setCustomDays(2)
       } else {
         setCustomPrice(plan.price)
         setCustomVisits(plan.visits_included)
+        setCustomVisitsUsed(0)
         setCustomDays(plan.expiration_days)
       }
     }
@@ -81,6 +84,7 @@ export function AssignPlanModal({ memberId, plans, currentRollover = 0 }: { memb
     const plan = plans.find(p => p.id === selectedPlanId);
     if (plan) {
        setCustomVisits(qty);
+       setCustomVisitsUsed(0);
        setCustomDays(qty * 2);
        setCustomPrice(plan.price * qty);
     }
@@ -184,6 +188,7 @@ export function AssignPlanModal({ memberId, plans, currentRollover = 0 }: { memb
                         </div>
                       </div>
                       <input type="hidden" name="custom_visits" value={customVisits} />
+                      <input type="hidden" name="custom_visits_used" value={customVisitsUsed} />
                       <input type="hidden" name="custom_days" value={customDays} />
                       <input type="hidden" name="custom_price" value={customPrice} />
                     </div>
@@ -219,18 +224,34 @@ export function AssignPlanModal({ memberId, plans, currentRollover = 0 }: { memb
                         </div>
                       </div>
 
-                      <div className="input-group">
-                        <label className="input-label text-xs" htmlFor="custom_price">Precio a Cobrar (C$)</label>
-                        <input 
-                          id="custom_price"
-                          name="custom_price"
-                          type="number" 
-                          min="0"
-                          value={customPrice}
-                          onChange={(e) => setCustomPrice(parseInt(e.target.value) || 0)}
-                          className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
-                          required 
-                        />
+                      <div className="grid grid-cols-2 gap-3 mt-2">
+                        <div className="input-group">
+                          <label className="input-label text-xs" htmlFor="custom_price">Precio a Cobrar (C$)</label>
+                          <input 
+                            id="custom_price"
+                            name="custom_price"
+                            type="number" 
+                            min="0"
+                            value={customPrice}
+                            onChange={(e) => setCustomPrice(parseInt(e.target.value) || 0)}
+                            className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
+                            required 
+                          />
+                        </div>
+
+                        <div className="input-group">
+                          <label className="input-label text-xs" htmlFor="custom_visits_used">Visitas ya usadas</label>
+                          <input 
+                            id="custom_visits_used"
+                            name="custom_visits_used"
+                            type="number" 
+                            min="0"
+                            max={customVisits}
+                            value={customVisitsUsed}
+                            onChange={(e) => setCustomVisitsUsed(parseInt(e.target.value) || 0)}
+                            className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
+                          />
+                        </div>
                       </div>
                     </>
                   )}
@@ -245,6 +266,12 @@ export function AssignPlanModal({ memberId, plans, currentRollover = 0 }: { memb
                       <span className="text-muted-foreground">Visitas Nuevas:</span>
                       <span className="font-medium">{customVisits}</span>
                     </div>
+                    {customVisitsUsed > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Visitas Ya Usadas:</span>
+                        <span className="font-medium text-error">-{customVisitsUsed}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center text-sm border-t border-accent/10 pt-2 mt-1">
                       <span className="text-accent/80 font-medium">Balance Total (con max.):</span>
                       <span className="font-bold text-accent">{projectedBalance}</span>

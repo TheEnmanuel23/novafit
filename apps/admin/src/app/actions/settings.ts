@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 export async function getBusinessSettings() {
+  console.info(`[SettingsAction:getBusinessSettings] Fetching business settings`)
   const supabase = await createServerClient()
   const { data, error } = await supabase
     .from('business_settings')
@@ -13,13 +14,14 @@ export async function getBusinessSettings() {
     .single()
 
   if (error && error.code !== 'PGRST116') {
-    console.error('Error fetching business settings:', error)
+    console.error('[SettingsAction:getBusinessSettings] Error fetching business settings:', error)
   }
 
   return data || { name: 'NovaFit', phone: '', address: '', logo_url: '' }
 }
 
 export async function updateBusinessSettings(prevState: any, formData: FormData) {
+  console.info(`[SettingsAction:updateBusinessSettings] Attempting to update business settings`)
   const name = formData.get('name') as string
   const phone = formData.get('phone') as string
   const address = formData.get('address') as string
@@ -37,6 +39,7 @@ export async function updateBusinessSettings(prevState: any, formData: FormData)
       .upload(fileName, logo, { upsert: true })
 
     if (uploadError) {
+      console.error(`[SettingsAction:updateBusinessSettings] Error uploading logo:`, uploadError)
       return { error: 'Error al subir el logo: ' + uploadError.message }
     }
     
@@ -59,10 +62,12 @@ export async function updateBusinessSettings(prevState: any, formData: FormData)
     })
 
   if (error) {
+    console.error(`[SettingsAction:updateBusinessSettings] Error saving settings:`, error)
     return { error: 'Error al guardar la configuración: ' + error.message }
   }
 
   revalidatePath('/', 'layout')
   
+  console.info(`[SettingsAction:updateBusinessSettings] Successfully updated business settings`)
   return { success: true }
 }

@@ -4,11 +4,13 @@ import { createServiceClient, createServerClient } from '@novafit/supabase/src/s
 import { redirect } from 'next/navigation'
 
 export async function signUpGlobalAdmin(formData: FormData) {
+  console.info(`[SignupAction:signUpGlobalAdmin] Attempting to sign up global admin`)
   const name = formData.get('name') as string
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
   if (!name || !email || !password) {
+    console.warn(`[SignupAction:signUpGlobalAdmin] Missing fields`)
     return { error: 'Por favor, complete todos los campos.' }
   }
 
@@ -22,6 +24,7 @@ export async function signUpGlobalAdmin(formData: FormData) {
     .single()
 
   if (profileError || !globalAdminProfile) {
+    console.error(`[SignupAction:signUpGlobalAdmin] Could not find Global Admin profile:`, profileError)
     return { error: 'No se pudo encontrar el perfil de Global Admin en la base de datos.' }
   }
 
@@ -31,10 +34,12 @@ export async function signUpGlobalAdmin(formData: FormData) {
     .eq('profile_id', globalAdminProfile.id)
 
   if (countError) {
+    console.error(`[SignupAction:signUpGlobalAdmin] Error checking existing admins:`, countError)
     return { error: 'Error al verificar administradores existentes.' }
   }
 
   if (existingAdmins && existingAdmins.length > 0) {
+    console.warn(`[SignupAction:signUpGlobalAdmin] Global Admin already exists`)
     return { error: 'Ya existe un Global Admin. No se pueden crear más por esta vía.' }
   }
 
@@ -46,7 +51,7 @@ export async function signUpGlobalAdmin(formData: FormData) {
   })
 
   if (authError || !authUser.user) {
-    console.error('Auth Error:', authError)
+    console.error('[SignupAction:signUpGlobalAdmin] Auth Error:', authError)
     return { error: 'Error al crear la cuenta de autenticación.' }
   }
 
@@ -61,7 +66,7 @@ export async function signUpGlobalAdmin(formData: FormData) {
     })
 
   if (staffError) {
-    console.error('Staff Insert Error:', staffError)
+    console.error('[SignupAction:signUpGlobalAdmin] Staff Insert Error:', staffError)
     // Rollback the auth user creation if staff insertion fails
     await supabaseAdmin.auth.admin.deleteUser(authUser.user.id)
     return { error: 'Error al crear el perfil de empleado.' }
@@ -74,5 +79,6 @@ export async function signUpGlobalAdmin(formData: FormData) {
     password,
   })
 
+  console.info(`[SignupAction:signUpGlobalAdmin] Global Admin created and signed in successfully`)
   redirect('/dashboard')
 }
