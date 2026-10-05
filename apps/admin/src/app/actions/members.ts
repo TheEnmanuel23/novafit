@@ -8,11 +8,13 @@ import { getCurrentStaff, hasRole } from '@novafit/supabase'
 import { generateUniqueUsername, createMember, updateMemberDetails, softDeleteMember } from '@novafit/supabase/src/queries/members'
 
 export async function registerMember(prevState: any, formData: FormData) {
+  console.info(`[MembersAction:registerMember] Starting registration`)
   const supabase = await createServerClient()
   
   try {
     const staff = await getCurrentStaff(supabase)
     if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      console.warn(`[MembersAction:registerMember] Unauthorized access attempt`)
       throw new Error('No tienes permisos para registrar miembros.')
     }
     
@@ -93,11 +95,14 @@ export async function registerMember(prevState: any, formData: FormData) {
 
     const registerVisit = formData.get('register_visit') === 'on'
     if (registerVisit) {
+      console.info(`[MembersAction:registerMember] Auto-registering visit for ${member.member_id}`)
       const { processCheckIn } = await import('@novafit/supabase/src/queries/checkin')
       await processCheckIn(supabase, { type: 'member_id', value: member.member_id }, { staff, checkinType: 'auto_assignment' })
     }
 
+    console.info(`[MembersAction:registerMember] Successfully registered member: ${member.member_id}`)
   } catch (error: any) {
+    console.error(`[MembersAction:registerMember] Error:`, error)
     return { error: error.message || 'Error inesperado al registrar.' }
   }
 
@@ -106,11 +111,14 @@ export async function registerMember(prevState: any, formData: FormData) {
 }
 
 export async function updateMemberAction(prevState: any, formData: FormData) {
+  const memberId = formData.get('member_id') as string
+  console.info(`[MembersAction:updateMemberAction] Attempting to update member: ${memberId}`)
   const supabase = await createServerClient()
   
   try {
     const staff = await getCurrentStaff(supabase)
     if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      console.warn(`[MembersAction:updateMemberAction] Unauthorized access attempt`)
       throw new Error('No tienes permisos para editar miembros.')
     }
     
@@ -128,8 +136,10 @@ export async function updateMemberAction(prevState: any, formData: FormData) {
       { name, phone},
       staff.id
     )
+    console.info(`[MembersAction:updateMemberAction] Successfully updated member: ${memberId}`)
 
   } catch (error: any) {
+    console.error(`[MembersAction:updateMemberAction] Error:`, error)
     return { error: error.message || 'Error inesperado al actualizar el miembro.' }
   }
 
@@ -142,17 +152,21 @@ export async function updateMemberAction(prevState: any, formData: FormData) {
 }
 
 export async function deactivateMemberAction(memberId: string) {
+  console.info(`[MembersAction:deactivateMemberAction] Deactivating member: ${memberId}`)
   const supabase = await createServerClient()
   
   try {
     const staff = await getCurrentStaff(supabase)
     if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      console.warn(`[MembersAction:deactivateMemberAction] Unauthorized access attempt`)
       throw new Error('No tienes permisos para desactivar miembros.')
     }
     
     await softDeleteMember(supabase, memberId, staff.id)
+    console.info(`[MembersAction:deactivateMemberAction] Successfully deactivated member: ${memberId}`)
 
   } catch (error: any) {
+    console.error(`[MembersAction:deactivateMemberAction] Error:`, error)
     throw new Error(error.message || 'Error inesperado al desactivar el miembro.')
   }
 
@@ -161,11 +175,15 @@ export async function deactivateMemberAction(memberId: string) {
 }
 
 export async function assignPlanAction(prevState: any, formData: FormData) {
+  const memberId = formData.get('member_id') as string
+  const planId = formData.get('plan_id') as string
+  console.info(`[MembersAction:assignPlanAction] Assigning plan ${planId} to member ${memberId}`)
   const supabase = await createServerClient()
   
   try {
     const staff = await getCurrentStaff(supabase)
     if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      console.warn(`[MembersAction:assignPlanAction] Unauthorized access attempt`)
       throw new Error('No tienes permisos para asignar planes.')
     }
     
@@ -202,11 +220,14 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
 
     const registerVisit = formData.get('register_visit') === 'on'
     if (registerVisit) {
+      console.info(`[MembersAction:assignPlanAction] Auto-registering visit for ${memberId}`)
       const { processCheckIn } = await import('@novafit/supabase/src/queries/checkin')
       await processCheckIn(supabase, { type: 'member_id', value: memberId }, { staff, checkinType: 'auto_assignment' })
     }
+    console.info(`[MembersAction:assignPlanAction] Successfully assigned plan`)
 
   } catch (error: any) {
+    console.error(`[MembersAction:assignPlanAction] Error:`, error)
     return { error: error.message || 'Error inesperado al asignar el plan.' }
   }
 
@@ -217,11 +238,14 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
 }
 
 export async function updatePlanAction(prevState: any, formData: FormData) {
+  const planId = formData.get('plan_id') as string
+  console.info(`[MembersAction:updatePlanAction] Updating plan ${planId}`)
   const supabase = await createServerClient()
   
   try {
     const staff = await getCurrentStaff(supabase)
     if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      console.warn(`[MembersAction:updatePlanAction] Unauthorized access attempt`)
       throw new Error('No tienes permisos para editar planes.')
     }
     
@@ -266,8 +290,10 @@ export async function updatePlanAction(prevState: any, formData: FormData) {
       .eq('id', planId)
       
     if (error) throw new Error(error.message)
+    console.info(`[MembersAction:updatePlanAction] Successfully updated plan ${planId}`)
 
   } catch (error: any) {
+    console.error(`[MembersAction:updatePlanAction] Error:`, error)
     return { error: error.message || 'Error inesperado al editar el plan.' }
   }
 
