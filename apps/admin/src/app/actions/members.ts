@@ -122,7 +122,6 @@ export async function updateMemberAction(prevState: any, formData: FormData) {
       throw new Error('No tienes permisos para editar miembros.')
     }
     
-    const memberId = formData.get('member_id') as string
     const name = formData.get('name') as string
     const phone = formData.get('phone') as string
     
@@ -145,7 +144,6 @@ export async function updateMemberAction(prevState: any, formData: FormData) {
 
   // The caller can use the success state or we just let it finish.
   // Revalidate the member's detail page
-  const memberId = formData.get('member_id') as string
   revalidatePath(`/members/${memberId}`)
   revalidatePath('/members')
   return { success: true }
@@ -187,7 +185,6 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
       throw new Error('No tienes permisos para asignar planes.')
     }
     
-    const memberId = formData.get('member_id') as string
     const planId = formData.get('plan_id') as string
     const customPrice = parseInt(formData.get('custom_price') as string, 10)
     const customVisits = parseInt(formData.get('custom_visits') as string, 10)
@@ -231,7 +228,6 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
     return { error: error.message || 'Error inesperado al asignar el plan.' }
   }
 
-  const memberId = formData.get('member_id') as string
   revalidatePath(`/members/${memberId}`)
   revalidatePath('/members')
   return { success: true }
@@ -239,7 +235,8 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
 
 export async function updatePlanAction(prevState: any, formData: FormData) {
   const planId = formData.get('plan_id') as string
-  console.info(`[MembersAction:updatePlanAction] Updating plan ${planId}`)
+  const memberId = formData.get('member_id') as string
+  console.info(`[MembersAction:updatePlanAction] Updating plan ${planId} for member ${memberId}`)
   const supabase = await createServerClient()
   
   try {
@@ -250,7 +247,6 @@ export async function updatePlanAction(prevState: any, formData: FormData) {
     }
     
     const planId = formData.get('plan_id') as string
-    const memberId = formData.get('member_id') as string
     const visitsPurchased = parseInt(formData.get('visits_purchased') as string, 10)
     const visitsUsed = parseInt(formData.get('visits_used') as string, 10)
     const startsAtStr = formData.get('starts_at') as string
@@ -297,7 +293,6 @@ export async function updatePlanAction(prevState: any, formData: FormData) {
     return { error: error.message || 'Error inesperado al editar el plan.' }
   }
 
-  const memberId2 = formData.get('member_id') as string
-  revalidatePath(`/members/${memberId2}`)
+  revalidatePath(`/members/${memberId}`)
   return { success: true }
 }
