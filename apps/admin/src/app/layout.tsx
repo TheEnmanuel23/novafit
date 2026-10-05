@@ -4,8 +4,11 @@ import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
+const envName = process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.NODE_ENV || 'development'
+const titlePrefix = envName === 'production' ? '' : `[${envName.toUpperCase()}] `
+
 export const metadata: Metadata = {
-  title: 'NovaFit — Panel Administrativo',
+  title: `${titlePrefix}NovaFit — Panel Administrativo`,
   description: 'Sistema de gestión de visitas para NovaFit Gym',
   manifest: '/manifest.json',
 }
