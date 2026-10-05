@@ -17,6 +17,7 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
   const [diaQuantity, setDiaQuantity] = useState<number>(1)
   const [customPrice, setCustomPrice] = useState<number>(0)
   const [customVisits, setCustomVisits] = useState<number>(0)
+  const [customVisitsUsed, setCustomVisitsUsed] = useState<number>(0)
   const [customDays, setCustomDays] = useState<number>(0)
   const [startsAt, setStartsAt] = useState<string>(
     typeof window !== 'undefined' 
@@ -42,10 +43,12 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
         setDiaQuantity(1)
         setCustomPrice(plan.price)
         setCustomVisits(1)
+        setCustomVisitsUsed(0)
         setCustomDays(2)
       } else {
         setCustomPrice(plan.price)
         setCustomVisits(plan.visits_included)
+        setCustomVisitsUsed(0)
         setCustomDays(plan.expiration_days)
       }
     }
@@ -57,6 +60,7 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
     const plan = plans.find(p => p.id === selectedPlanId);
     if (plan) {
        setCustomVisits(qty);
+       setCustomVisitsUsed(0);
        setCustomDays(qty * 2);
        setCustomPrice(plan.price * qty);
     }
@@ -170,6 +174,7 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
                   </div>
                 </div>
                 <input type="hidden" name="custom_visits" value={customVisits} />
+                <input type="hidden" name="custom_visits_used" value={customVisitsUsed} />
                 <input type="hidden" name="custom_days" value={customDays} />
                 <input type="hidden" name="custom_price" value={customPrice} />
               </div>
@@ -205,18 +210,34 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
                   </div>
                 </div>
                 
-                <div className="input-group">
-                  <label className="input-label text-xs" htmlFor="custom_price">Precio Cobrado (C$)</label>
-                  <input 
-                    id="custom_price"
-                    name="custom_price"
-                    type="number" 
-                    min="0"
-                    value={customPrice}
-                    onChange={(e) => setCustomPrice(parseInt(e.target.value) || 0)}
-                    className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
-                    required 
-                  />
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  <div className="input-group">
+                    <label className="input-label text-xs" htmlFor="custom_price">Precio Cobrado (C$)</label>
+                    <input 
+                      id="custom_price"
+                      name="custom_price"
+                      type="number" 
+                      min="0"
+                      value={customPrice}
+                      onChange={(e) => setCustomPrice(parseInt(e.target.value) || 0)}
+                      className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
+                      required 
+                    />
+                  </div>
+                  
+                  <div className="input-group">
+                    <label className="input-label text-xs" htmlFor="custom_visits_used">Visitas ya usadas</label>
+                    <input 
+                      id="custom_visits_used"
+                      name="custom_visits_used"
+                      type="number" 
+                      min="0"
+                      max={customVisits}
+                      value={customVisitsUsed}
+                      onChange={(e) => setCustomVisitsUsed(parseInt(e.target.value) || 0)}
+                      className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
+                    />
+                  </div>
                 </div>
               </>
             )}

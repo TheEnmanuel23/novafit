@@ -23,6 +23,7 @@ export async function registerMember(prevState: any, formData: FormData) {
     // Custom overrides
     const startsAtStr = formData.get('starts_at') as string
     const customVisits = parseInt(formData.get('custom_visits') as string, 10)
+    const customVisitsUsed = parseInt(formData.get('custom_visits_used') as string, 10) || 0
     const customDays = parseInt(formData.get('custom_days') as string, 10)
     const customPrice = parseInt(formData.get('custom_price') as string, 10)
     
@@ -66,7 +67,7 @@ export async function registerMember(prevState: any, formData: FormData) {
         starts_at: startsAt.toISOString(),
         expiration_date: expirationDate.toISOString(),
         visits_purchased: customVisits,
-        visits_used: 0,
+        visits_used: customVisitsUsed,
         status: 'active'
       })
       .select()
@@ -83,7 +84,7 @@ export async function registerMember(prevState: any, formData: FormData) {
         plan_id: planId,
         visits_added: customVisits,
         balance_before: 0,
-        balance_after: customVisits,
+        balance_after: customVisits - customVisitsUsed,
         amount_paid: customPrice,
         registered_by: staff.id
       })
@@ -172,6 +173,7 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
     const planId = formData.get('plan_id') as string
     const customPrice = parseInt(formData.get('custom_price') as string, 10)
     const customVisits = parseInt(formData.get('custom_visits') as string, 10)
+    const customVisitsUsed = parseInt(formData.get('custom_visits_used') as string, 10) || 0
     const customDays = parseInt(formData.get('custom_days') as string, 10)
     const startsAtStr = formData.get('starts_at') as string
     
@@ -194,6 +196,7 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
       registeredBy: staff.id,
       startsAt,
       customVisits: isNaN(customVisits) ? undefined : customVisits,
+      customVisitsUsed,
       customDays: isNaN(customDays) ? undefined : customDays
     })
 

@@ -59,6 +59,7 @@ export async function processRecharge(
     registeredBy: string | null
     startsAt?: Date
     customVisits?: number
+    customVisitsUsed?: number
     customDays?: number
   }
 ): Promise<{ newPlan: MemberPlan; balanceBefore: number; balanceAfter: number }> {
@@ -97,7 +98,7 @@ export async function processRecharge(
   const isCurrentDay = currentPlan && currentPlan.plan ? (currentPlan.plan.key === 'day') : false;
 
   let newBalance = 0;
-  let newVisitsUsed = 0;
+  let newVisitsUsed = input.customVisitsUsed || 0;
   let newExpiration = new Date(input.startsAt || appDate);
   let finalPlanId = input.planId;
   let maxBalanceCap = plan.max_balance;
@@ -114,7 +115,7 @@ export async function processRecharge(
       if (activeCap) {
         newRemaining = Math.min(newRemaining, activeCap);
       }
-      newVisitsUsed = currentPlan.visits_used;
+      newVisitsUsed = input.customVisitsUsed !== undefined ? input.customVisitsUsed : currentPlan.visits_used;
       newBalance = newRemaining + newVisitsUsed;
       
       if (isCurrentDay) {

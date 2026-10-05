@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useActionState, useEffect } from 'react'
+import { parseISO, addDays, format } from 'date-fns'
 import type { MemberPlan } from '@novafit/types'
 import { updatePlanAction } from '@/app/actions/members'
 
@@ -14,8 +15,25 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
     }
   }, [state])
 
-  const defaultStart = (memberPlan as any).starts_at ? new Date((memberPlan as any).starts_at).toISOString().split('T')[0] : ''
-  const defaultEnd = memberPlan.expiration_date ? new Date(memberPlan.expiration_date).toISOString().split('T')[0] : ''
+  const defaultStart = (memberPlan as any).starts_at ? format(parseISO((memberPlan as any).starts_at), 'yyyy-MM-dd') : ''
+  const defaultEnd = memberPlan.expiration_date ? format(parseISO(memberPlan.expiration_date), 'yyyy-MM-dd') : ''
+
+  const [startsAt, setStartsAt] = useState(defaultStart)
+  const [expiresAt, setExpiresAt] = useState(defaultEnd)
+
+  const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newStart = e.target.value
+    setStartsAt(newStart)
+    
+    if (newStart) {
+      // Always use the plan's exact default duration. This avoids weird rollover durations (like 66 days)
+      const durationDays = (memberPlan as any).plan?.expiration_days || 0
+      
+      const newStartDate = parseISO(newStart)
+      const newEndDate = addDays(newStartDate, durationDays - 1)
+      setExpiresAt(format(newEndDate, 'yyyy-MM-dd'))
+    }
+  }
 
   return (
     <>
@@ -54,7 +72,8 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
                     id="starts_at"
                     name="starts_at"
                     type="date" 
-                    defaultValue={defaultStart}
+                    value={startsAt}
+                    onChange={handleStartChange}
                     className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
                     required 
                   />
@@ -65,7 +84,8 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
                     id="expiration_date"
                     name="expiration_date"
                     type="date" 
-                    defaultValue={defaultEnd}
+                    value={expiresAt}
+                    onChange={(e) => setExpiresAt(e.target.value)}
                     className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
                     required 
                   />
