@@ -20,7 +20,7 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
 
   let initialDuration = (memberPlan as any).plan?.expiration_days
   if (defaultStart && defaultEnd) {
-    initialDuration = differenceInDays(parseISO(defaultEnd), parseISO(defaultStart)) + 1
+    initialDuration = differenceInDays(parseISO(defaultEnd), parseISO(defaultStart))
   }
 
   const [startsAt, setStartsAt] = useState(defaultStart)
@@ -31,7 +31,7 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
     const newStart = e.target.value
     setStartsAt(newStart)
     if (newStart && durationDays > 0) {
-      const newEndDate = addDays(parseISO(newStart), durationDays - 1)
+      const newEndDate = addDays(parseISO(newStart), durationDays)
       setExpiresAt(format(newEndDate, 'yyyy-MM-dd'))
     }
   }
@@ -40,7 +40,7 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
     const newDuration = parseInt(e.target.value, 10) || 0
     setDurationDays(newDuration)
     if (startsAt && newDuration > 0) {
-      const newEndDate = addDays(parseISO(startsAt), newDuration - 1)
+      const newEndDate = addDays(parseISO(startsAt), newDuration)
       setExpiresAt(format(newEndDate, 'yyyy-MM-dd'))
     }
   }
@@ -49,7 +49,7 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
     const newEnd = e.target.value
     setExpiresAt(newEnd)
     if (startsAt && newEnd) {
-      setDurationDays(differenceInDays(parseISO(newEnd), parseISO(startsAt)) + 1)
+      setDurationDays(differenceInDays(parseISO(newEnd), parseISO(startsAt)))
     }
   }
 

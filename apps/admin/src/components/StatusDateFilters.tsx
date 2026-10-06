@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useTransition, useRef } from 'react'
 import { getClientAppDate } from '@novafit/supabase/src/utils/date-client'
 
 type StatusDateFiltersProps = {
@@ -37,11 +37,37 @@ export function StatusDateFilters({
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [selectedRange, setSelectedRange] = useState('custom')
 
+  const lastPushed = useRef({
+    q: searchParams.get('q') || '',
+    status: initialStatus,
+    startDate: initialStart,
+    endDate: initialEnd
+  })
+
   // Sync local state if URL changes from outside (e.g. back/forward buttons)
   useEffect(() => {
     const q = searchParams.get('q') || ''
-    if (q !== query) setQuery(q)
-  }, [searchParams])
+    const currentStatus = searchParams.get('status') || ''
+    const currentStart = searchParams.get('startDate') !== null ? searchParams.get('startDate') : defaultStart
+    const currentEnd = searchParams.get('endDate') !== null ? searchParams.get('endDate') : defaultEnd
+
+    if (q !== lastPushed.current.q) {
+      setQuery(q)
+      lastPushed.current.q = q
+    }
+    if (currentStatus !== lastPushed.current.status) {
+      setStatus(currentStatus)
+      lastPushed.current.status = currentStatus
+    }
+    if (currentStart !== lastPushed.current.startDate) {
+      setStartDate(currentStart as string)
+      lastPushed.current.startDate = currentStart
+    }
+    if (currentEnd !== lastPushed.current.endDate) {
+      setEndDate(currentEnd as string)
+      lastPushed.current.endDate = currentEnd
+    }
+  }, [searchParams, defaultStart, defaultEnd])
 
   useEffect(() => {
     // If param is null, it means it's not in the URL, but the component initializes with defaultStart/defaultEnd
@@ -56,9 +82,19 @@ export function StatusDateFilters({
       startTransition(() => {
         const params = new URLSearchParams(searchParams.toString())
         
+        lastPushed.current = {
+          q: query,
+          status: status,
+          startDate: startDate !== null ? startDate : defaultStart,
+          endDate: endDate !== null ? endDate : defaultEnd
+        }
+
         // We set explicitly to support empty strings for clearing the date
-        if (startDate !== null) params.set('startDate', startDate)
-        if (endDate !== null) params.set('endDate', endDate)
+        if (startDate !== null && startDate !== '') params.set('startDate', startDate)
+        else if (startDate === '') params.set('startDate', '')
+        
+        if (endDate !== null && endDate !== '') params.set('endDate', endDate)
+        else if (endDate === '') params.set('endDate', '')
         
         if (status) params.set('status', status)
         else params.delete('status')
@@ -74,8 +110,8 @@ export function StatusDateFilters({
   }, [startDate, endDate, status, query, pathname, router, searchParams, defaultStart, defaultEnd])
 
   const handleReset = () => {
-    setStartDate(defaultStart)
-    setEndDate(defaultEnd)
+    setStartDate(defaultStart as string)
+    setEndDate(defaultEnd as string)
     setStatus('')
     setQuery('')
     setSelectedRange('custom')
@@ -89,6 +125,14 @@ export function StatusDateFilters({
 
       params.delete('status')
       params.delete('q')
+
+      lastPushed.current = {
+        q: '',
+        status: '',
+        startDate: defaultStart,
+        endDate: defaultEnd
+      }
+
       router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     })
   }
