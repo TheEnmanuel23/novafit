@@ -22,7 +22,7 @@ export const viewport: Viewport = {
 
 import { DevDateTools } from '@/components/DevDateTools'
 
-const isProduction = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production'
+const isProduction = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production'
 
 export default function RootLayout({
   children,
