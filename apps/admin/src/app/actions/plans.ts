@@ -8,11 +8,13 @@ import { getCurrentStaff, hasRole } from '@novafit/supabase'
 async function checkPermission(supabase: any) {
   const staff = await getCurrentStaff(supabase)
   if (!staff || !(await hasRole(staff, 'manage_members'))) {
+    console.warn(`[PlansAction:checkPermission] Unauthorized access attempt`)
     throw new Error('Unauthorized')
   }
 }
 
 export async function createPlan(prevState: any, formData: FormData) {
+  console.info(`[PlansAction:createPlan] Attempting to create plan`)
   const supabase = await createServerClient()
   
   try {
@@ -41,10 +43,13 @@ export async function createPlan(prevState: any, formData: FormData) {
     })
 
     if (error) {
+      console.error(`[PlansAction:createPlan] Error inserting plan:`, error)
       return { error: 'Error al crear el plan: ' + error.message }
     }
+    console.info(`[PlansAction:createPlan] Successfully created plan: ${description}`)
 
   } catch (error: any) {
+    console.error(`[PlansAction:createPlan] Unexpected error:`, error)
     return { error: error.message || 'Error inesperado.' }
   }
 
@@ -54,6 +59,7 @@ export async function createPlan(prevState: any, formData: FormData) {
 }
 
 export async function updatePlan(id: string, prevState: any, formData: FormData) {
+  console.info(`[PlansAction:updatePlan] Attempting to update plan: ${id}`)
   const supabase = await createServerClient()
   
   try {
@@ -82,10 +88,13 @@ export async function updatePlan(id: string, prevState: any, formData: FormData)
     }).eq('id', id)
 
     if (error) {
+      console.error(`[PlansAction:updatePlan] Error updating plan:`, error)
       return { error: 'Error al actualizar el plan: ' + error.message }
     }
+    console.info(`[PlansAction:updatePlan] Successfully updated plan: ${id}`)
 
   } catch (error: any) {
+    console.error(`[PlansAction:updatePlan] Unexpected error:`, error)
     return { error: error.message || 'Error inesperado.' }
   }
 
@@ -95,6 +104,7 @@ export async function updatePlan(id: string, prevState: any, formData: FormData)
 }
 
 export async function togglePlanStatus(id: string, active: boolean) {
+  console.info(`[PlansAction:togglePlanStatus] Toggling status for plan: ${id} to ${active}`)
   const supabase = await createServerClient()
   
   try {
@@ -106,10 +116,13 @@ export async function togglePlanStatus(id: string, active: boolean) {
       .eq('id', id)
 
     if (error) {
+      console.error(`[PlansAction:togglePlanStatus] Error toggling status:`, error)
       return { error: 'Error al cambiar estado: ' + error.message }
     }
+    console.info(`[PlansAction:togglePlanStatus] Successfully toggled status`)
 
   } catch (error: any) {
+    console.error(`[PlansAction:togglePlanStatus] Unexpected error:`, error)
     return { error: error.message || 'Error inesperado.' }
   }
 

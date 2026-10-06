@@ -8,11 +8,13 @@ import { getCurrentStaff, hasRole } from '@novafit/supabase'
 import { generateUniqueUsername, createMember, updateMemberDetails, softDeleteMember } from '@novafit/supabase/src/queries/members'
 
 export async function registerMember(prevState: any, formData: FormData) {
+  console.info(`[MembersAction:registerMember] Starting registration`)
   const supabase = await createServerClient()
   
   try {
     const staff = await getCurrentStaff(supabase)
     if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      console.warn(`[MembersAction:registerMember] Unauthorized access attempt`)
       throw new Error('No tienes permisos para registrar miembros.')
     }
     
@@ -23,6 +25,7 @@ export async function registerMember(prevState: any, formData: FormData) {
     // Custom overrides
     const startsAtStr = formData.get('starts_at') as string
     const customVisits = parseInt(formData.get('custom_visits') as string, 10)
+    const customVisitsUsed = parseInt(formData.get('custom_visits_used') as string, 10) || 0
     const customDays = parseInt(formData.get('custom_days') as string, 10)
     const customPrice = parseInt(formData.get('custom_price') as string, 10)
     
@@ -66,7 +69,7 @@ export async function registerMember(prevState: any, formData: FormData) {
         starts_at: startsAt.toISOString(),
         expiration_date: expirationDate.toISOString(),
         visits_purchased: customVisits,
-        visits_used: 0,
+        visits_used: customVisitsUsed,
         status: 'active'
       })
       .select()
@@ -83,7 +86,7 @@ export async function registerMember(prevState: any, formData: FormData) {
         plan_id: planId,
         visits_added: customVisits,
         balance_before: 0,
-        balance_after: customVisits,
+        balance_after: customVisits - customVisitsUsed,
         amount_paid: customPrice,
         registered_by: staff.id
       })
@@ -92,11 +95,14 @@ export async function registerMember(prevState: any, formData: FormData) {
 
     const registerVisit = formData.get('register_visit') === 'on'
     if (registerVisit) {
+      console.info(`[MembersAction:registerMember] Auto-registering visit for ${member.member_id}`)
       const { processCheckIn } = await import('@novafit/supabase/src/queries/checkin')
       await processCheckIn(supabase, { type: 'member_id', value: member.member_id }, { staff, checkinType: 'auto_assignment' })
     }
 
+    console.info(`[MembersAction:registerMember] Successfully registered member: ${member.member_id}`)
   } catch (error: any) {
+    console.error(`[MembersAction:registerMember] Error:`, error)
     return { error: error.message || 'Error inesperado al registrar.' }
   }
 
@@ -105,15 +111,17 @@ export async function registerMember(prevState: any, formData: FormData) {
 }
 
 export async function updateMemberAction(prevState: any, formData: FormData) {
+  const memberId = formData.get('member_id') as string
+  console.info(`[MembersAction:updateMemberAction] Attempting to update member: ${memberId}`)
   const supabase = await createServerClient()
   
   try {
     const staff = await getCurrentStaff(supabase)
     if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      console.warn(`[MembersAction:updateMemberAction] Unauthorized access attempt`)
       throw new Error('No tienes permisos para editar miembros.')
     }
     
-    const memberId = formData.get('member_id') as string
     const name = formData.get('name') as string
     const phone = formData.get('phone') as string
     
@@ -127,31 +135,36 @@ export async function updateMemberAction(prevState: any, formData: FormData) {
       { name, phone},
       staff.id
     )
+    console.info(`[MembersAction:updateMemberAction] Successfully updated member: ${memberId}`)
 
   } catch (error: any) {
+    console.error(`[MembersAction:updateMemberAction] Error:`, error)
     return { error: error.message || 'Error inesperado al actualizar el miembro.' }
   }
 
   // The caller can use the success state or we just let it finish.
   // Revalidate the member's detail page
-  const memberId = formData.get('member_id') as string
   revalidatePath(`/members/${memberId}`)
   revalidatePath('/members')
   return { success: true }
 }
 
 export async function deactivateMemberAction(memberId: string) {
+  console.info(`[MembersAction:deactivateMemberAction] Deactivating member: ${memberId}`)
   const supabase = await createServerClient()
   
   try {
     const staff = await getCurrentStaff(supabase)
     if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      console.warn(`[MembersAction:deactivateMemberAction] Unauthorized access attempt`)
       throw new Error('No tienes permisos para desactivar miembros.')
     }
     
     await softDeleteMember(supabase, memberId, staff.id)
+    console.info(`[MembersAction:deactivateMemberAction] Successfully deactivated member: ${memberId}`)
 
   } catch (error: any) {
+    console.error(`[MembersAction:deactivateMemberAction] Error:`, error)
     throw new Error(error.message || 'Error inesperado al desactivar el miembro.')
   }
 
@@ -160,18 +173,22 @@ export async function deactivateMemberAction(memberId: string) {
 }
 
 export async function assignPlanAction(prevState: any, formData: FormData) {
+  const memberId = formData.get('member_id') as string
+  const planId = formData.get('plan_id') as string
+  console.info(`[MembersAction:assignPlanAction] Assigning plan ${planId} to member ${memberId}`)
   const supabase = await createServerClient()
   
   try {
     const staff = await getCurrentStaff(supabase)
     if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      console.warn(`[MembersAction:assignPlanAction] Unauthorized access attempt`)
       throw new Error('No tienes permisos para asignar planes.')
     }
     
-    const memberId = formData.get('member_id') as string
     const planId = formData.get('plan_id') as string
     const customPrice = parseInt(formData.get('custom_price') as string, 10)
     const customVisits = parseInt(formData.get('custom_visits') as string, 10)
+    const customVisitsUsed = parseInt(formData.get('custom_visits_used') as string, 10) || 0
     const customDays = parseInt(formData.get('custom_days') as string, 10)
     const startsAtStr = formData.get('starts_at') as string
     
@@ -194,36 +211,42 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
       registeredBy: staff.id,
       startsAt,
       customVisits: isNaN(customVisits) ? undefined : customVisits,
+      customVisitsUsed,
       customDays: isNaN(customDays) ? undefined : customDays
     })
 
     const registerVisit = formData.get('register_visit') === 'on'
     if (registerVisit) {
+      console.info(`[MembersAction:assignPlanAction] Auto-registering visit for ${memberId}`)
       const { processCheckIn } = await import('@novafit/supabase/src/queries/checkin')
       await processCheckIn(supabase, { type: 'member_id', value: memberId }, { staff, checkinType: 'auto_assignment' })
     }
+    console.info(`[MembersAction:assignPlanAction] Successfully assigned plan`)
 
   } catch (error: any) {
+    console.error(`[MembersAction:assignPlanAction] Error:`, error)
     return { error: error.message || 'Error inesperado al asignar el plan.' }
   }
 
-  const memberId = formData.get('member_id') as string
   revalidatePath(`/members/${memberId}`)
   revalidatePath('/members')
   return { success: true }
 }
 
 export async function updatePlanAction(prevState: any, formData: FormData) {
+  const planId = formData.get('plan_id') as string
+  const memberId = formData.get('member_id') as string
+  console.info(`[MembersAction:updatePlanAction] Updating plan ${planId} for member ${memberId}`)
   const supabase = await createServerClient()
   
   try {
     const staff = await getCurrentStaff(supabase)
     if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      console.warn(`[MembersAction:updatePlanAction] Unauthorized access attempt`)
       throw new Error('No tienes permisos para editar planes.')
     }
     
     const planId = formData.get('plan_id') as string
-    const memberId = formData.get('member_id') as string
     const visitsPurchased = parseInt(formData.get('visits_purchased') as string, 10)
     const visitsUsed = parseInt(formData.get('visits_used') as string, 10)
     const startsAtStr = formData.get('starts_at') as string
@@ -263,12 +286,13 @@ export async function updatePlanAction(prevState: any, formData: FormData) {
       .eq('id', planId)
       
     if (error) throw new Error(error.message)
+    console.info(`[MembersAction:updatePlanAction] Successfully updated plan ${planId}`)
 
   } catch (error: any) {
+    console.error(`[MembersAction:updatePlanAction] Error:`, error)
     return { error: error.message || 'Error inesperado al editar el plan.' }
   }
 
-  const memberId2 = formData.get('member_id') as string
-  revalidatePath(`/members/${memberId2}`)
+  revalidatePath(`/members/${memberId}`)
   return { success: true }
 }

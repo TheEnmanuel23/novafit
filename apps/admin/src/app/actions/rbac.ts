@@ -4,11 +4,13 @@ import { createServerClient } from '@novafit/supabase/src/server'
 import { revalidatePath } from 'next/cache'
 
 export async function saveProfile(prevState: any, formData: FormData) {
+  console.info(`[RbacAction:saveProfile] Attempting to save profile`)
   const supabase = await createServerClient()
   
   // Verify Global Admin
   const { data: isGlobalAdmin } = await supabase.rpc('is_global_admin')
   if (!isGlobalAdmin) {
+    console.warn(`[RbacAction:saveProfile] Unauthorized access attempt: Not a Global Admin`)
     return { error: 'Acceso denegado.' }
   }
 
@@ -17,7 +19,10 @@ export async function saveProfile(prevState: any, formData: FormData) {
   const description = formData.get('description') as string
   const roleIds = formData.getAll('roles') as string[]
 
-  if (!name) return { error: 'El nombre es requerido.' }
+  if (!name) {
+    console.warn(`[RbacAction:saveProfile] Missing profile name`)
+    return { error: 'El nombre es requerido.' }
+  }
 
   try {
     let profileId = id
@@ -52,9 +57,10 @@ export async function saveProfile(prevState: any, formData: FormData) {
     }
 
     revalidatePath('/staff/profiles')
+    console.info(`[RbacAction:saveProfile] Successfully saved profile: ${profileId}`)
     return { success: true }
   } catch (error: any) {
-    console.error('Error saving profile:', error)
+    console.error('[RbacAction:saveProfile] Error saving profile:', error)
     return { error: error.message || 'Error al guardar el perfil.' }
   }
 }

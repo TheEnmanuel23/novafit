@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useActionState, useEffect } from 'react'
+import { parseISO, addDays, differenceInDays, format } from 'date-fns'
 import type { MemberPlan } from '@novafit/types'
 import { updatePlanAction } from '@/app/actions/members'
 
@@ -14,8 +15,43 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
     }
   }, [state])
 
-  const defaultStart = (memberPlan as any).starts_at ? new Date((memberPlan as any).starts_at).toISOString().split('T')[0] : ''
-  const defaultEnd = memberPlan.expiration_date ? new Date(memberPlan.expiration_date).toISOString().split('T')[0] : ''
+  const defaultStart = (memberPlan as any).starts_at ? format(parseISO((memberPlan as any).starts_at), 'yyyy-MM-dd') : ''
+  const defaultEnd = memberPlan.expiration_date ? format(parseISO(memberPlan.expiration_date), 'yyyy-MM-dd') : ''
+
+  let initialDuration = (memberPlan as any).plan?.expiration_days
+  if (defaultStart && defaultEnd) {
+    initialDuration = differenceInDays(parseISO(defaultEnd), parseISO(defaultStart))
+  }
+
+  const [startsAt, setStartsAt] = useState(defaultStart)
+  const [expiresAt, setExpiresAt] = useState(defaultEnd)
+  const [durationDays, setDurationDays] = useState(initialDuration)
+
+  const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newStart = e.target.value
+    setStartsAt(newStart)
+    if (newStart && durationDays > 0) {
+      const newEndDate = addDays(parseISO(newStart), durationDays)
+      setExpiresAt(format(newEndDate, 'yyyy-MM-dd'))
+    }
+  }
+
+  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDuration = parseInt(e.target.value, 10) || 0
+    setDurationDays(newDuration)
+    if (startsAt && newDuration > 0) {
+      const newEndDate = addDays(parseISO(startsAt), newDuration)
+      setExpiresAt(format(newEndDate, 'yyyy-MM-dd'))
+    }
+  }
+
+  const handleEndChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEnd = e.target.value
+    setExpiresAt(newEnd)
+    if (startsAt && newEnd) {
+      setDurationDays(differenceInDays(parseISO(newEnd), parseISO(startsAt)))
+    }
+  }
 
   return (
     <>
@@ -54,7 +90,8 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
                     id="starts_at"
                     name="starts_at"
                     type="date" 
-                    defaultValue={defaultStart}
+                    value={startsAt}
+                    onChange={handleStartChange}
                     className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
                     required 
                   />
@@ -65,14 +102,26 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
                     id="expiration_date"
                     name="expiration_date"
                     type="date" 
-                    defaultValue={defaultEnd}
+                    value={expiresAt}
+                    onChange={handleEndChange}
                     className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
                     required 
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="input-group">
+                  <label className="input-label text-xs" htmlFor="duration_days" title="Días de vigencia del plan">Vigencia (Días)</label>
+                  <input 
+                    id="duration_days"
+                    type="number" 
+                    min="1"
+                    value={durationDays}
+                    onChange={handleDurationChange}
+                    className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
+                  />
+                </div>
                 <div className="input-group">
                   <label className="input-label text-xs" htmlFor="visits_purchased">Días Comprados</label>
                   <input 

@@ -6,9 +6,11 @@ import { revalidatePath } from 'next/cache'
 export async function createStaffAccount(prevState: any, formData: FormData) {
   const name = formData.get('name') as string
   const username = formData.get('username') as string
+  console.info(`[StaffAction:createStaffAccount] Attempting to create staff account for ${username}`)
   const profile_id = formData.get('profile_id') as string
 
   if (!name || !username || !profile_id) {
+    console.warn(`[StaffAction:createStaffAccount] Missing fields`)
     return { error: 'Por favor, complete todos los campos requeridos.' }
   }
 
@@ -22,6 +24,7 @@ export async function createStaffAccount(prevState: any, formData: FormData) {
   const { data: isGlobalAdmin, error: rpcError } = await supabase.rpc('is_global_admin')
   
   if (rpcError || !isGlobalAdmin) {
+    console.warn(`[StaffAction:createStaffAccount] Unauthorized access attempt: Not a Global Admin`)
     return { error: 'No tienes permisos suficientes para realizar esta acción.' }
   }
 
@@ -42,7 +45,7 @@ export async function createStaffAccount(prevState: any, formData: FormData) {
   })
 
   if (authError || !authUser.user) {
-    console.error('Auth Error:', authError)
+    console.error('[StaffAction:createStaffAccount] Auth Error:', authError)
     // Attempt to parse standard Supabase errors
     if (authError?.message?.includes('already registered')) {
       return { error: 'El nombre de usuario ya está registrado.' }
@@ -60,12 +63,14 @@ export async function createStaffAccount(prevState: any, formData: FormData) {
     })
 
   if (staffError) {
-    console.error('Staff Insert Error:', staffError)
+    console.error('[StaffAction:createStaffAccount] Staff Insert Error:', staffError)
     await supabaseAdmin.auth.admin.deleteUser(authUser.user.id)
     return { error: 'Error al crear el perfil de empleado.' }
   }
 
   revalidatePath('/dashboard/staff')
+
+  console.info(`[StaffAction:createStaffAccount] Successfully created staff account for ${cleanUsername}`)
 
   return { 
     success: true, 
@@ -77,13 +82,20 @@ export async function createStaffAccount(prevState: any, formData: FormData) {
 export async function updateStaffProfile(prevState: any, formData: FormData) {
   const staffId = formData.get('staff_id') as string
   const profileId = formData.get('profile_id') as string
+  console.info(`[StaffAction:updateStaffProfile] Attempting to update staff ${staffId} to profile ${profileId}`)
 
-  if (!staffId || !profileId) return { error: 'Faltan datos requeridos.' }
+  if (!staffId || !profileId) {
+    console.warn(`[StaffAction:updateStaffProfile] Missing fields`)
+    return { error: 'Faltan datos requeridos.' }
+  }
 
   const supabase = await createServerClient()
   const { data: isGlobalAdmin } = await supabase.rpc('is_global_admin')
   
-  if (!isGlobalAdmin) return { error: 'Acceso denegado.' }
+  if (!isGlobalAdmin) {
+    console.warn(`[StaffAction:updateStaffProfile] Unauthorized access attempt: Not a Global Admin`)
+    return { error: 'Acceso denegado.' }
+  }
 
   const supabaseAdmin = createServiceClient()
 
@@ -95,6 +107,7 @@ export async function updateStaffProfile(prevState: any, formData: FormData) {
     .single()
 
   if ((targetStaff?.profile as any)?.name === 'Global Admin') {
+    console.warn(`[StaffAction:updateStaffProfile] Attempted to modify Global Admin`)
     return { error: 'No se puede modificar el nivel de acceso de un administrador global.' }
   }
 
@@ -103,17 +116,25 @@ export async function updateStaffProfile(prevState: any, formData: FormData) {
     .update({ profile_id: profileId })
     .eq('id', staffId)
 
-  if (error) return { error: 'Error al actualizar el staff.' }
+  if (error) {
+    console.error(`[StaffAction:updateStaffProfile] Error updating staff profile:`, error)
+    return { error: 'Error al actualizar el staff.' }
+  }
 
   revalidatePath(`/staff/${staffId}`)
+  console.info(`[StaffAction:updateStaffProfile] Successfully updated staff profile`)
   return { success: true }
 }
 
 export async function resetStaffPassword(staffId: string) {
+  console.info(`[StaffAction:resetStaffPassword] Attempting to reset password for staff ${staffId}`)
   const supabase = await createServerClient()
   const { data: isGlobalAdmin } = await supabase.rpc('is_global_admin')
   
-  if (!isGlobalAdmin) return { error: 'Acceso denegado.' }
+  if (!isGlobalAdmin) {
+    console.warn(`[StaffAction:resetStaffPassword] Unauthorized access attempt: Not a Global Admin`)
+    return { error: 'Acceso denegado.' }
+  }
 
   const supabaseAdmin = createServiceClient()
 
@@ -124,6 +145,7 @@ export async function resetStaffPassword(staffId: string) {
     .single()
 
   if (fetchError || !targetStaff) {
+    console.warn(`[StaffAction:resetStaffPassword] Staff not found: ${staffId}`)
     return { error: 'No se encontró al empleado.' }
   }
 
@@ -139,9 +161,10 @@ export async function resetStaffPassword(staffId: string) {
   )
 
   if (updateError) {
-    console.error('Password Reset Error:', updateError)
+    console.error('[StaffAction:resetStaffPassword] Password Reset Error:', updateError)
     return { error: 'Error al restablecer la contraseña en autenticación.' }
   }
 
+  console.info(`[StaffAction:resetStaffPassword] Password reset successful for staff ${staffId}`)
   return { success: true, newPassword }
 }
