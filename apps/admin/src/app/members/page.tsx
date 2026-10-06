@@ -95,6 +95,9 @@ export default async function MembersPage({ searchParams }: Props) {
                     {displayPlan?.starts_at && (
                       <div className="text-[10px] text-muted-foreground">
                         <span className="font-medium text-white/70">Inicio de plan:</span> {formatDate(displayPlan.starts_at)}
+                        {displayPlan.expiration_date && (
+                          <> <span className="font-medium text-white/70 ml-2">• Expira:</span> {formatDate(displayPlan.expiration_date)}</>
+                        )}
                       </div>
                     )}
                   </div>

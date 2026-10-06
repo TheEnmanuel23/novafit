@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useActionState, useEffect } from 'react'
+import { parseISO, addDays, format } from 'date-fns'
+import { es } from 'date-fns/locale'
 import type { Plan } from '@novafit/types'
 import { assignPlanAction } from '@/app/actions/members'
 
@@ -41,11 +43,13 @@ export function AssignPlanModal({ memberId, plans, currentRollover = 0 }: { memb
         projectedBalance = plan.max_balance;
       }
       
-      const [y, m, d] = startsAt.split('-').map(Number);
-      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
-        const expDate = new Date(y, m - 1, d);
-        expDate.setDate(expDate.getDate() + customDays);
-        projectedExpirationStr = expDate.toLocaleDateString('es-NI', { year: 'numeric', month: 'long', day: 'numeric' });
+      try {
+        if (startsAt) {
+          const expDate = addDays(parseISO(startsAt), customDays);
+          projectedExpirationStr = format(expDate, "d 'de' MMMM 'de' yyyy", { locale: es });
+        }
+      } catch (e) {
+        // ignore invalid dates
       }
     }
   }

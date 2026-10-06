@@ -1,6 +1,8 @@
 'use client'
 
 import { useActionState, useState } from 'react'
+import { parseISO, addDays, format } from 'date-fns'
+import { es } from 'date-fns/locale'
 import type { Plan } from '@novafit/types'
 import { registerMember } from '@/app/actions/members'
 
@@ -33,6 +35,29 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
         })()
       : new Date().toISOString().split('T')[0]
   )
+  // Calculate preview
+  let projectedBalance = 0;
+  let projectedExpirationStr = '';
+  
+  if (selectedPlanId) {
+    const plan = plans.find(p => p.id === selectedPlanId);
+    if (plan) {
+      projectedBalance = customVisits - customVisitsUsed;
+      if (plan.max_balance && projectedBalance > plan.max_balance) {
+        projectedBalance = plan.max_balance;
+      }
+      
+      try {
+        if (startsAt) {
+          const expDate = addDays(parseISO(startsAt), customDays);
+          projectedExpirationStr = format(expDate, "d 'de' MMMM 'de' yyyy", { locale: es });
+        }
+      } catch (e) {
+        // ignore invalid dates
+      }
+    }
+  }
+
   const handlePlanSelect = (planId: string) => {
     setSelectedPlanId(planId)
     const plan = plans.find(p => p.id === planId)
@@ -241,6 +266,28 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
                 </div>
               </>
             )}
+
+            <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 flex flex-col gap-2 mt-2">
+              <p className="text-xs text-accent font-bold uppercase tracking-wider mb-1">Previsualización</p>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Visitas Nuevas:</span>
+                <span className="font-medium">{customVisits}</span>
+              </div>
+              {customVisitsUsed > 0 && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Visitas Ya Usadas:</span>
+                  <span className="font-medium text-error">-{customVisitsUsed}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center text-sm border-t border-accent/10 pt-2 mt-1">
+                <span className="text-accent/80 font-medium">Balance Total (con max.):</span>
+                <span className="font-bold text-accent">{projectedBalance}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm mt-1">
+                <span className="text-accent/80 font-medium">Nueva Fecha Expiración:</span>
+                <span className="font-bold text-accent">{projectedExpirationStr || 'N/A'}</span>
+              </div>
+            </div>
 
             <div className="flex items-center gap-3 mt-4 bg-black/20 p-3 rounded-xl border border-white/5">
               <input 
