@@ -63,3 +63,14 @@ export function formatDateOnly(dateString: string | Date | null | undefined): st
     timeZone: 'UTC'
   })
 }
+
+/**
+ * Returns a date formatted as YYYY-MM-DD for a specific timezone.
+ * We use 'en-CA' because it natively formats dates in YYYY-MM-DD format,
+ * which is required for safe lexicographical comparisons (e.g. '2026-10-06' < '2026-10-07').
+ * If we used 'es-NI', it would return '6/10/2026' which breaks string comparisons.
+ */
+export function toTimezoneYYYYMMDD(dateInput: string | Date, timeZone: string = 'America/Managua'): string {
+  return new Date(dateInput).toLocaleDateString('en-CA', { timeZone });
+}
+
