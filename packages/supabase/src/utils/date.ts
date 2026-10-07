@@ -36,3 +36,30 @@ export async function getAppDate(): Promise<Date> {
   }
   return new Date()
 }
+
+/**
+ * Formats a timestamp into a readable date and time string in the Managua timezone.
+ * Example: "5 oct 2026, 06:14"
+ */
+export function formatDateTime(dateString: string | Date | null | undefined): string {
+  if (!dateString) return 'N/A'
+  return new Date(dateString).toLocaleString('es-NI', {
+    timeZone: 'America/Managua',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+/**
+ * Formats a date-only string (like plan start/expiration dates) into a UTC date string to prevent timezone shifts.
+ * Example: "5/10/2026"
+ */
+export function formatDateOnly(dateString: string | Date | null | undefined): string {
+  if (!dateString) return 'N/A'
+  return new Date(dateString).toLocaleDateString('es-NI', {
+    timeZone: 'UTC'
+  })
+}
