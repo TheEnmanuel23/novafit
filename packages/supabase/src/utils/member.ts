@@ -1,5 +1,5 @@
 import type { MemberWithStatus, MemberPlanWithDetails, MemberPlanStatus } from '@novafit/types';
-import { isAfter, isBefore, isEqual, startOfDay } from 'date-fns';
+import { toTimezoneYYYYMMDD } from './date';
 
 /**
  * Determines if a given plan is currently active based on its status and expiration date.
@@ -8,11 +8,15 @@ import { isAfter, isBefore, isEqual, startOfDay } from 'date-fns';
 export function isPlanActive(plan: Partial<MemberPlanWithDetails>, appDate: Date): boolean {
   if (!plan.expiration_date) return false;
   
-  const isUpdatedToday = plan.updated_at && isEqual(startOfDay(new Date(plan.updated_at)), startOfDay(appDate));
+  const appDateStr = toTimezoneYYYYMMDD(appDate);
+  const isUpdatedToday = plan.updated_at && 
+    toTimezoneYYYYMMDD(plan.updated_at) === appDateStr;
+  
   const remaining = (plan.visits_purchased || 0) - (plan.visits_used || 0);
 
-  const expDate = startOfDay(new Date(plan.expiration_date));
-  const today = startOfDay(appDate);
+  // For expiration_date (which is UTC midnight), we compare strings lexicographically (YYYY-MM-DD)
+  const expDateStr = toTimezoneYYYYMMDD(plan.expiration_date, 'UTC');
+
 
   if (plan.status !== 'active') {
     // If it was marked expired TODAY because it ran out of visits, it stays active for re-entries today
@@ -27,7 +31,7 @@ export function isPlanActive(plan: Partial<MemberPlanWithDetails>, appDate: Date
     return false;
   }
   
-  return isAfter(expDate, today) || isEqual(expDate, today);
+  return expDateStr >= appDateStr;
 }
 
 /**
@@ -36,11 +40,13 @@ export function isPlanActive(plan: Partial<MemberPlanWithDetails>, appDate: Date
 export function isPlanExpired(plan: Partial<MemberPlanWithDetails>, appDate: Date): boolean {
   if (!plan.expiration_date) return false;
 
-  const isUpdatedToday = plan.updated_at && isEqual(startOfDay(new Date(plan.updated_at)), startOfDay(appDate));
+  const appDateStr = toTimezoneYYYYMMDD(appDate);
+  const isUpdatedToday = plan.updated_at && 
+    toTimezoneYYYYMMDD(plan.updated_at) === appDateStr;
+  
   const remaining = (plan.visits_purchased || 0) - (plan.visits_used || 0);
   
-  const expDate = startOfDay(new Date(plan.expiration_date));
-  const today = startOfDay(appDate);
+  const expDateStr = toTimezoneYYYYMMDD(plan.expiration_date, 'UTC');
 
   if (plan.status === 'expired') {
     if (isUpdatedToday && remaining <= 0) return false; // Still active for today's re-entries
@@ -52,7 +58,7 @@ export function isPlanExpired(plan: Partial<MemberPlanWithDetails>, appDate: Dat
     return true;
   }
   
-  return isBefore(expDate, today);
+  return expDateStr < appDateStr;
 }
 
 /**
