@@ -1,6 +1,6 @@
 'use server'
 
-import { createServerClient } from '@novafit/supabase/src/server'
+import { createServerClient, createServiceClient } from '@novafit/supabase/src/server'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 
@@ -22,7 +22,7 @@ export async function signIn(formData: FormData) {
 
   const supabase = await createServerClient()
   
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
@@ -30,6 +30,18 @@ export async function signIn(formData: FormData) {
   if (error) {
     console.error(`[AuthAction:signIn] Sign in failed:`, error)
     return { error: 'Credenciales inválidas' }
+  }
+
+  if (data?.user) {
+    try {
+      const adminClient = createServiceClient()
+      await Promise.all([
+        adminClient.from('staff').update({ is_online: true }).eq('auth_user_id', data.user.id),
+        adminClient.from('user_sessions').insert({ auth_user_id: data.user.id, user_type: 'staff', action: 'login' })
+      ])
+    } catch (err) {
+      console.error(`[AuthAction:signIn] Failed to log session/status:`, err)
+    }
   }
 
   // Redirect to dashboard on success
@@ -40,6 +52,20 @@ export async function signIn(formData: FormData) {
 export async function signOut() {
   console.info(`[AuthAction:signOut] Attempting sign out`)
   const supabase = await createServerClient()
+  
+  try {
+    const { data } = await supabase.auth.getUser()
+    if (data?.user) {
+      const adminClient = createServiceClient()
+      await Promise.all([
+        adminClient.from('staff').update({ is_online: false }).eq('auth_user_id', data.user.id),
+        adminClient.from('user_sessions').insert({ auth_user_id: data.user.id, user_type: 'staff', action: 'logout' })
+      ])
+    }
+  } catch (err) {
+    console.error(`[AuthAction:signOut] Failed to log session/status:`, err)
+  }
+
   await supabase.auth.signOut()
   console.info(`[AuthAction:signOut] Sign out successful`)
   

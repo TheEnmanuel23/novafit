@@ -65,7 +65,7 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
 
           <div className="flex flex-col gap-1 mt-2">
             <span className="text-xs text-muted-foreground uppercase font-semibold">Fecha de Registro</span>
-            <span className="font-medium">{new Date(staff.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+            <span className="font-medium">{new Date(staff.created_at).toLocaleDateString('es-ES', { timeZone: 'America/Managua', year: 'numeric', month: 'long', day: 'numeric' })}</span>
           </div>
         </section>
 
