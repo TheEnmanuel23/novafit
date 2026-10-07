@@ -18,8 +18,8 @@ export async function registerMember(prevState: any, formData: FormData) {
       throw new Error('No tienes permisos para registrar miembros.')
     }
     
-    const name = formData.get('name') as string
-    const phone = formData.get('phone') as string
+    const name = (formData.get('name') as string)?.trim()
+    const phone = (formData.get('phone') as string)?.trim()
     const planId = formData.get('plan_id') as string
     
     // Custom overrides
@@ -121,8 +121,8 @@ export async function updateMemberAction(prevState: any, formData: FormData) {
       throw new Error('No tienes permisos para editar miembros.')
     }
     
-    const name = formData.get('name') as string
-    const phone = formData.get('phone') as string
+    const name = (formData.get('name') as string)?.trim()
+    const phone = (formData.get('phone') as string)?.trim()
     
     if (!memberId || !name) {
       return { error: 'ID y Nombre son requeridos.' }
