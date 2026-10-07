@@ -14,7 +14,7 @@ export default async function AttendancesPage({ searchParams }: Props) {
   const resolvedSearchParams = await searchParams
   const search = typeof resolvedSearchParams.q === 'string' ? resolvedSearchParams.q : undefined
   
-  const { getAppDate } = await import('@novafit/supabase/src/utils/date')
+  const { getAppDate, formatDateTime } = await import('@novafit/supabase/src/utils/date')
   const appDate = await getAppDate()
   const todayStr = appDate.toISOString().split('T')[0] // YYYY-MM-DD
   const startDate = typeof resolvedSearchParams.startDate === 'string' ? resolvedSearchParams.startDate : todayStr
@@ -40,17 +40,6 @@ export default async function AttendancesPage({ searchParams }: Props) {
     order
   })
 
-  // Format date helper
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('es-NI', {
-      timeZone: 'America/Managua',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
 
   return (
     <div className="app-container">
@@ -97,7 +86,7 @@ export default async function AttendancesPage({ searchParams }: Props) {
               {attendances.map((attendance: any) => (
                 <tr key={attendance.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                   <td className="p-4 whitespace-nowrap text-sm">
-                    {formatDate(attendance.scanned_at)}
+                    {formatDateTime(attendance.scanned_at)}
                   </td>
                   <td className="p-4">
                     <Link href={`/members/${attendance.members.member_id}`} className="font-semibold group-hover:text-accent transition-colors block">

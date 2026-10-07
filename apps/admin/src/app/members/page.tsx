@@ -5,6 +5,7 @@ import { getMembers, getCurrentStaff, hasRole } from '@novafit/supabase'
 import { BottomNav } from '@/components/BottomNav'
 import { StatusDateFilters } from '@/components/StatusDateFilters'
 import { MemberSortDropdown } from './MemberSortDropdown'
+import { formatDateTime, formatDateOnly } from '@novafit/supabase/src/utils/date'
 
 type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -30,17 +31,6 @@ export default async function MembersPage({ searchParams }: Props) {
   }
 
   const { members, total } = await getMembers(supabase, { limit: 50, search, status, startDate, endDate, sort_by, order })
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('es-NI', {
-      timeZone: 'America/Managua',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
 
   return (
     <div className="app-container">
@@ -91,13 +81,13 @@ export default async function MembersPage({ searchParams }: Props) {
                   
                   <div className="flex flex-col gap-1 mt-3">
                     <div className="text-[10px] text-muted-foreground">
-                      <span className="font-medium text-white/70">Registrado el:</span> {formatDate(member.created_at)} por {member.creator?.name || 'Sistema'}
+                      <span className="font-medium text-white/70">Registrado el:</span> {formatDateTime(member.created_at)} por {member.creator?.name || 'Sistema'}
                     </div>
                     {displayPlan?.starts_at && (
                       <div className="text-[10px] text-muted-foreground">
-                        <span className="font-medium text-white/70">Inicio de plan:</span> {formatDate(displayPlan.starts_at)}
+                        <span className="font-medium text-white/70">Inicio de plan:</span> {formatDateOnly(displayPlan.starts_at)}
                         {displayPlan.expiration_date && (
-                          <> <span className="font-medium text-white/70 ml-2">• Expira:</span> {formatDate(displayPlan.expiration_date)}</>
+                          <> <span className="font-medium text-white/70 ml-2">• Expira:</span> {formatDateOnly(displayPlan.expiration_date)}</>
                         )}
                       </div>
                     )}
