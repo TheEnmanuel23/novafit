@@ -114,6 +114,7 @@ export interface Staff {
   email: string;
   profile_id: string;
   deleted: boolean;
+  is_online: boolean;
   created_at: string;
   updated_at: string;
 }

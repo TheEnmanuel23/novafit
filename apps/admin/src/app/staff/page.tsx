@@ -50,7 +50,12 @@ export default async function StaffPage() {
           {staffList.map((staff) => (
             <Link key={staff.id} href={`/staff/${staff.id}`} className="glass p-4 flex justify-between items-center hover-lift group">
               <div>
-                <div className="font-semibold group-hover:text-accent transition-colors">{staff.name}</div>
+                <div className="font-semibold group-hover:text-accent transition-colors flex items-center gap-2">
+                  {staff.name}
+                  {staff.is_online && (
+                    <span className="flex h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" title="Online" />
+                  )}
+                </div>
                 <div className="text-sm text-muted-foreground mt-0.5">{staff.username}</div>
               </div>
               <div className="text-right">

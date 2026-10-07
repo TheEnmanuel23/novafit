@@ -33,6 +33,7 @@ export default async function MembersPage({ searchParams }: Props) {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('es-NI', {
+      timeZone: 'America/Managua',
       year: 'numeric',
       month: 'short',
       day: 'numeric',

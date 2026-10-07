@@ -121,8 +121,8 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Fechas</p>
                 <div className="text-sm flex flex-col gap-1">
-                  <p><span className="text-muted-foreground w-16 inline-block">Inicio:</span> <span className="font-medium">{(member.active_plan as any).starts_at ? new Date((member.active_plan as any).starts_at).toLocaleDateString('es-NI') : 'N/A'}</span></p>
-                  <p><span className="text-muted-foreground w-16 inline-block">Expira:</span> <span className="font-medium">{new Date(member.active_plan.expiration_date).toLocaleDateString('es-NI')}</span></p>
+                  <p><span className="text-muted-foreground w-16 inline-block">Inicio:</span> <span className="font-medium">{(member.active_plan as any).starts_at ? new Date((member.active_plan as any).starts_at).toLocaleDateString('es-NI', { timeZone: 'America/Managua' }) : 'N/A'}</span></p>
+                  <p><span className="text-muted-foreground w-16 inline-block">Expira:</span> <span className="font-medium">{new Date(member.active_plan.expiration_date).toLocaleDateString('es-NI', { timeZone: 'America/Managua' })}</span></p>
                 </div>
               </div>
             </div>
@@ -130,12 +130,12 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
             <div className="flex flex-col sm:flex-row sm:gap-6 gap-2 mt-2 pt-4 border-t border-white/5 text-[10px] text-muted-foreground">
               <div>
                 <span className="uppercase tracking-wider block mb-0.5">Registro</span>
-                <span className="text-white/80">{(member.active_plan as any).creator?.name || 'Sistema'}</span> • {new Date((member.active_plan as any).created_at).toLocaleString('es-NI')}
+                <span className="text-white/80">{(member.active_plan as any).creator?.name || 'Sistema'}</span> • {new Date((member.active_plan as any).created_at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}
               </div>
               {(member.active_plan as any).updated_at && (member.active_plan as any).updated_at !== (member.active_plan as any).created_at && (
                 <div>
                   <span className="uppercase tracking-wider block mb-0.5">Última actualización</span>
-                  <span className="text-white/80">{(member.active_plan as any).updater?.name || 'Sistema'}</span> • {new Date((member.active_plan as any).updated_at).toLocaleString('es-NI')}
+                  <span className="text-white/80">{(member.active_plan as any).updater?.name || 'Sistema'}</span> • {new Date((member.active_plan as any).updated_at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}
                 </div>
               )}
             </div>
@@ -160,7 +160,7 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
                     <div>
                       <p className="font-semibold text-sm">{mp.plan?.description}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Inicio: {mp.starts_at ? new Date(mp.starts_at).toLocaleDateString('es-NI') : 'N/A'} • Expira: {mp.expiration_date ? new Date(mp.expiration_date).toLocaleDateString('es-NI') : 'N/A'}
+                        Inicio: {mp.starts_at ? new Date(mp.starts_at).toLocaleDateString('es-NI', { timeZone: 'America/Managua' }) : 'N/A'} • Expira: {mp.expiration_date ? new Date(mp.expiration_date).toLocaleDateString('es-NI', { timeZone: 'America/Managua' }) : 'N/A'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -193,12 +193,12 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
                   <div className="flex flex-col sm:flex-row sm:gap-6 gap-2 mt-2 pt-3 border-t border-white/5 text-[10px] text-muted-foreground">
                     <div>
                       <span className="uppercase tracking-wider block mb-0.5">Registro</span>
-                      <span className="text-white/80">{mp.creator?.name || 'Sistema'}</span> • {new Date(mp.created_at).toLocaleString('es-NI')}
+                      <span className="text-white/80">{mp.creator?.name || 'Sistema'}</span> • {new Date(mp.created_at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}
                     </div>
                     {mp.updated_at && mp.updated_at !== mp.created_at && (
                       <div>
                         <span className="uppercase tracking-wider block mb-0.5">Última actualización</span>
-                        <span className="text-white/80">{mp.updater?.name || 'Sistema'}</span> • {new Date(mp.updated_at).toLocaleString('es-NI')}
+                        <span className="text-white/80">{mp.updater?.name || 'Sistema'}</span> • {new Date(mp.updated_at).toLocaleString('es-NI', { timeZone: 'America/Managua' })}
                       </div>
                     )}
                   </div>
@@ -213,7 +213,7 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Fecha de Registro</p>
-              <p className="font-medium">{new Date(member.created_at).toLocaleDateString('es-NI')}</p>
+              <p className="font-medium">{new Date(member.created_at).toLocaleDateString('es-NI', { timeZone: 'America/Managua' })}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Creado por</p>
@@ -221,7 +221,7 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Última Actualización</p>
-              <p className="font-medium">{new Date(member.updated_at).toLocaleDateString('es-NI')}</p>
+              <p className="font-medium">{new Date(member.updated_at).toLocaleDateString('es-NI', { timeZone: 'America/Managua' })}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Actualizado por</p>
