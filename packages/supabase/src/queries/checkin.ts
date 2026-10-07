@@ -30,6 +30,7 @@ export async function getAttendances(
     endDate?: string;
     search?: string;
     status?: string;
+    plan_id?: string;
     sort_by?: string;
     order?: 'asc' | 'desc';
   }
@@ -46,7 +47,9 @@ export async function getAttendances(
       updated_by,
       registered_by,
       member_plan:member_plans (
+        plan_id,
         plan:plans (
+          id,
           description
         )
       ),
@@ -125,6 +128,11 @@ export async function getAttendances(
   // Filter locally by status if requested
   if (options?.status) {
     result = result.filter(r => r.members.status === options.status);
+  }
+
+  // Filter locally by plan if requested
+  if (options?.plan_id) {
+    result = result.filter(r => r.member_plan?.plan_id === options.plan_id);
   }
 
   // Fallback JS sort if PostgREST foreign sort failed or if sorting by status

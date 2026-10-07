@@ -11,6 +11,7 @@ type StatusDateFiltersProps = {
   defaultEnd?: string
   searchPlaceholder?: string
   totalResults?: number
+  plans?: { id: string, description: string }[]
 }
 
 export function StatusDateFilters({ 
@@ -19,7 +20,8 @@ export function StatusDateFilters({
   defaultStart = '',
   defaultEnd = '',
   searchPlaceholder = 'Buscar...',
-  totalResults
+  totalResults,
+  plans
 }: StatusDateFiltersProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -30,16 +32,19 @@ export function StatusDateFilters({
   const initialStart = searchParams.get('startDate') !== null ? searchParams.get('startDate') : defaultStart
   const initialEnd = searchParams.get('endDate') !== null ? searchParams.get('endDate') : defaultEnd
   const initialStatus = searchParams.get('status') || ''
+  const initialPlanId = searchParams.get('plan_id') || ''
 
   const [startDate, setStartDate] = useState(initialStart ?? '')
   const [endDate, setEndDate] = useState(initialEnd ?? '')
   const [status, setStatus] = useState(initialStatus)
+  const [planId, setPlanId] = useState(initialPlanId)
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [selectedRange, setSelectedRange] = useState('custom')
 
   const lastPushed = useRef({
     q: searchParams.get('q') || '',
     status: initialStatus,
+    plan_id: initialPlanId,
     startDate: initialStart,
     endDate: initialEnd
   })
@@ -48,6 +53,7 @@ export function StatusDateFilters({
   useEffect(() => {
     const q = searchParams.get('q') || ''
     const currentStatus = searchParams.get('status') || ''
+    const currentPlanId = searchParams.get('plan_id') || ''
     const currentStart = searchParams.get('startDate') !== null ? searchParams.get('startDate') : defaultStart
     const currentEnd = searchParams.get('endDate') !== null ? searchParams.get('endDate') : defaultEnd
 
@@ -58,6 +64,10 @@ export function StatusDateFilters({
     if (currentStatus !== lastPushed.current.status) {
       setStatus(currentStatus)
       lastPushed.current.status = currentStatus
+    }
+    if (currentPlanId !== lastPushed.current.plan_id) {
+      setPlanId(currentPlanId)
+      lastPushed.current.plan_id = currentPlanId
     }
     if (currentStart !== lastPushed.current.startDate) {
       setStartDate(currentStart as string)
@@ -74,9 +84,10 @@ export function StatusDateFilters({
     const currentStart = searchParams.get('startDate') !== null ? searchParams.get('startDate') : defaultStart
     const currentEnd = searchParams.get('endDate') !== null ? searchParams.get('endDate') : defaultEnd
     const currentStatus = searchParams.get('status') || ''
+    const currentPlanId = searchParams.get('plan_id') || ''
     const currentQ = searchParams.get('q') || ''
 
-    if (startDate === currentStart && endDate === currentEnd && status === currentStatus && query === currentQ) return
+    if (startDate === currentStart && endDate === currentEnd && status === currentStatus && planId === currentPlanId && query === currentQ) return
 
     const timeout = setTimeout(() => {
       startTransition(() => {
@@ -85,6 +96,7 @@ export function StatusDateFilters({
         lastPushed.current = {
           q: query,
           status: status,
+          plan_id: planId,
           startDate: startDate !== null ? startDate : defaultStart,
           endDate: endDate !== null ? endDate : defaultEnd
         }
@@ -99,6 +111,9 @@ export function StatusDateFilters({
         if (status) params.set('status', status)
         else params.delete('status')
 
+        if (planId) params.set('plan_id', planId)
+        else params.delete('plan_id')
+
         if (query) params.set('q', query)
         else params.delete('q')
 
@@ -107,12 +122,13 @@ export function StatusDateFilters({
     }, 300)
 
     return () => clearTimeout(timeout)
-  }, [startDate, endDate, status, query, pathname, router, searchParams, defaultStart, defaultEnd])
+  }, [startDate, endDate, status, planId, query, pathname, router, searchParams, defaultStart, defaultEnd])
 
   const handleReset = () => {
     setStartDate(defaultStart as string)
     setEndDate(defaultEnd as string)
     setStatus('')
+    setPlanId('')
     setQuery('')
     setSelectedRange('custom')
     startTransition(() => {
@@ -124,11 +140,13 @@ export function StatusDateFilters({
       else params.set('endDate', '')
 
       params.delete('status')
+      params.delete('plan_id')
       params.delete('q')
 
       lastPushed.current = {
         q: '',
         status: '',
+        plan_id: '',
         startDate: defaultStart,
         endDate: defaultEnd
       }
@@ -265,6 +283,21 @@ export function StatusDateFilters({
             <option value="no_plan">Sin Plan</option>
           </select>
         </div>
+        {plans && plans.length > 0 && (
+          <div className="flex-1 min-w-[120px]">
+            <label className="text-xs text-muted-foreground ml-1">Tipo de plan</label>
+            <select 
+              className="input h-10 w-full appearance-none bg-surface/50"
+              value={planId}
+              onChange={(e) => setPlanId(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {plans.map(p => (
+                <option key={p.id} value={p.id}>{p.description}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex items-end">
           <button 
             onClick={handleReset}
