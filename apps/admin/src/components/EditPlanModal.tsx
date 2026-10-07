@@ -15,8 +15,8 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
     }
   }, [state])
 
-  const defaultStart = (memberPlan as any).starts_at ? format(parseISO((memberPlan as any).starts_at), 'yyyy-MM-dd') : ''
-  const defaultEnd = memberPlan.expiration_date ? format(parseISO(memberPlan.expiration_date), 'yyyy-MM-dd') : ''
+  const defaultStart = (memberPlan as any).starts_at ? new Date((memberPlan as any).starts_at).toLocaleDateString('en-CA', { timeZone: 'UTC' }) : ''
+  const defaultEnd = memberPlan.expiration_date ? new Date(memberPlan.expiration_date).toLocaleDateString('en-CA', { timeZone: 'UTC' }) : ''
 
   let initialDuration = (memberPlan as any).plan?.expiration_days
   if (defaultStart && defaultEnd) {

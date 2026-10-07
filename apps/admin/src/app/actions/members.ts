@@ -37,9 +37,8 @@ export async function registerMember(prevState: any, formData: FormData) {
       return { error: 'Los valores personalizados del plan deben ser números válidos.' }
     }
 
-    // 1. Calculate dates (avoid timezone parsing issues by parsing manually)
-    const [year, month, day] = startsAtStr.split('-').map(Number)
-    const startsAt = new Date(year, month - 1, day)
+    // 1. Calculate dates in UTC
+    const startsAt = new Date(`${startsAtStr}T00:00:00Z`)
     
     if (isNaN(startsAt.getTime())) {
       return { error: 'Fecha de inicio inválida.' }
@@ -198,8 +197,7 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
     
     let startsAt: Date | undefined
     if (startsAtStr) {
-      const [year, month, day] = startsAtStr.split('-').map(Number)
-      startsAt = new Date(year, month - 1, day)
+      startsAt = new Date(`${startsAtStr}T00:00:00Z`)
     }
     
     const { processRecharge } = await import('@novafit/supabase/src/queries/member-plans')
@@ -259,16 +257,12 @@ export async function updatePlanAction(prevState: any, formData: FormData) {
     
     let startsAtISO: string | undefined
     if (startsAtStr) {
-      const [y, m, d] = startsAtStr.split('-').map(Number)
-      startsAtISO = new Date(y, m - 1, d).toISOString()
+      startsAtISO = new Date(`${startsAtStr}T00:00:00Z`).toISOString()
     }
 
     let expiresAtISO: string | undefined
     if (expiresAtStr) {
-      const [y, m, d] = expiresAtStr.split('-').map(Number)
-      const expDate = new Date(y, m - 1, d)
-      expDate.setHours(23, 59, 59, 999)
-      expiresAtISO = expDate.toISOString()
+      expiresAtISO = new Date(`${expiresAtStr}T23:59:59.999Z`).toISOString()
     }
     
     const appDate = await getAppDate();
