@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getCurrentStaff, hasRole } from '@novafit/supabase'
 import { getAttendances } from '@novafit/supabase/src/queries/checkin'
+import { getActivePlans } from '@novafit/supabase/src/queries/plans'
 import { BottomNav } from '@/components/BottomNav'
 import { StatusDateFilters } from '@/components/StatusDateFilters'
 
@@ -20,6 +21,7 @@ export default async function AttendancesPage({ searchParams }: Props) {
   const startDate = typeof resolvedSearchParams.startDate === 'string' ? resolvedSearchParams.startDate : todayStr
   const endDate = typeof resolvedSearchParams.endDate === 'string' ? resolvedSearchParams.endDate : todayStr
   const status = typeof resolvedSearchParams.status === 'string' ? resolvedSearchParams.status : undefined
+  const plan_id = typeof resolvedSearchParams.plan_id === 'string' ? resolvedSearchParams.plan_id : undefined
   const sort_by = typeof resolvedSearchParams.sort_by === 'string' ? resolvedSearchParams.sort_by : 'scanned_at'
   const order = typeof resolvedSearchParams.order === 'string' && resolvedSearchParams.order === 'asc' ? 'asc' : 'desc'
 
@@ -36,9 +38,12 @@ export default async function AttendancesPage({ searchParams }: Props) {
     startDate,
     endDate,
     status,
+    plan_id,
     sort_by,
     order
   })
+
+  const plans = await getActivePlans(supabase)
 
 
   return (
@@ -66,6 +71,7 @@ export default async function AttendancesPage({ searchParams }: Props) {
             defaultEnd={todayStr}
             searchPlaceholder="Buscar por nombre, ID o teléfono..."
             totalResults={attendances.length}
+            plans={plans}
           />
         </div>
 
@@ -140,6 +146,7 @@ function SortHeader({ label, field, sort_by, order, params }: { label: string, f
   if (params.startDate) searchParams.set('startDate', params.startDate)
   if (params.endDate) searchParams.set('endDate', params.endDate)
   if (params.status) searchParams.set('status', params.status)
+  if (params.plan_id) searchParams.set('plan_id', params.plan_id)
   searchParams.set('sort_by', field)
   searchParams.set('order', nextOrder)
 

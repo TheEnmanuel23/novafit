@@ -44,9 +44,10 @@ export async function getMembers(
     limit?: number;
     sort_by?: string;
     order?: 'asc' | 'desc';
+    plan_id?: string;
   } = {}
 ): Promise<{ members: MemberWithStatus[]; total: number }> {
-  const { search, startDate, endDate, page = 1, limit = 50, sort_by = 'created_at', order = 'desc' } = opts
+  const { search, startDate, endDate, page = 1, limit = 50, sort_by = 'created_at', order = 'desc', plan_id } = opts
   const offset = (page - 1) * limit
 
   const hasPlanDateFilter = !!(startDate || endDate);
@@ -89,7 +90,7 @@ export async function getMembers(
   }
 
   // To avoid pagination issues with post-filtering or JS sorting, we'll fetch more and filter/sort
-  const needsJSPostProcess = opts.status || ['status', 'plan', 'start_date'].includes(sort_by)
+  const needsJSPostProcess = opts.status || opts.plan_id || ['status', 'plan', 'start_date'].includes(sort_by)
   if (!needsJSPostProcess) {
     query = query.range(offset, offset + limit - 1)
   }
@@ -114,6 +115,10 @@ export async function getMembers(
     } else {
       members = members.filter((m) => m.status === opts.status)
     }
+  }
+
+  if (opts.plan_id) {
+    members = members.filter((m) => m.active_plan?.plan_id === opts.plan_id)
   }
 
   if (needsJSPostProcess) {

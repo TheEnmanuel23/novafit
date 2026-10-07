@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getMembers, getCurrentStaff, hasRole } from '@novafit/supabase'
+import { getMembers, getCurrentStaff, hasRole, getActivePlans } from '@novafit/supabase'
 import { BottomNav } from '@/components/BottomNav'
 import { StatusDateFilters } from '@/components/StatusDateFilters'
 import { MemberSortDropdown } from './MemberSortDropdown'
@@ -21,6 +21,7 @@ export default async function MembersPage({ searchParams }: Props) {
   const endDate = typeof resolvedSearchParams.endDate === 'string' ? resolvedSearchParams.endDate : ''
   const sort_by = typeof resolvedSearchParams.sort_by === 'string' ? resolvedSearchParams.sort_by : 'created_at'
   const order = typeof resolvedSearchParams.order === 'string' && resolvedSearchParams.order === 'asc' ? 'asc' : 'desc'
+  const plan_id = typeof resolvedSearchParams.plan_id === 'string' ? resolvedSearchParams.plan_id : undefined
 
   const supabase = await createClient()
   
@@ -30,7 +31,8 @@ export default async function MembersPage({ searchParams }: Props) {
     redirect('/dashboard')
   }
 
-  const { members, total } = await getMembers(supabase, { limit: 50, search, status, startDate, endDate, sort_by, order })
+  const { members, total } = await getMembers(supabase, { limit: 50, search, status, plan_id, startDate, endDate, sort_by, order })
+  const plans = await getActivePlans(supabase)
 
   return (
     <div className="app-container">
@@ -56,6 +58,7 @@ export default async function MembersPage({ searchParams }: Props) {
             defaultEnd=""
             searchPlaceholder="Buscar por nombre, ID o teléfono..."
             totalResults={total}
+            plans={plans}
           />
         </div>
 
