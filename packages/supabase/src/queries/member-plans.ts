@@ -213,7 +213,7 @@ export async function previewRecharge(
 
   if (!currentPlan) {
     newBalance = plan.visits_included;
-    newExpiration.setDate(newExpiration.getDate() + plan.expiration_days);
+    newExpiration.setDate(newExpiration.getDate() + Math.max(0, plan.expiration_days - 1));
   } else {
     if (isNewDay) {
       let activeCap = isCurrentDay ? null : currentPlan.plan.max_balance;
@@ -222,14 +222,14 @@ export async function previewRecharge(
       newBalance = newRemaining; // In preview, balanceAfter is just newBalance
       
       if (isCurrentDay) {
-        newExpiration.setDate(newExpiration.getDate() + plan.expiration_days);
+        newExpiration.setDate(newExpiration.getDate() + Math.max(0, plan.expiration_days - 1));
       } else {
         newExpiration = new Date(currentPlan.expiration_date);
       }
     } else {
       newBalance = rollover + plan.visits_included;
       if (maxBalanceCap) newBalance = Math.min(newBalance, maxBalanceCap);
-      newExpiration.setDate(newExpiration.getDate() + plan.expiration_days);
+      newExpiration.setDate(newExpiration.getDate() + Math.max(0, plan.expiration_days - 1));
     }
   }
 

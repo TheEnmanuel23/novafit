@@ -45,8 +45,8 @@ export async function registerMember(prevState: any, formData: FormData) {
     }
     
     const expirationDate = new Date(startsAt)
-    // Add calendar days
-    expirationDate.setDate(expirationDate.getDate() + customDays)
+    // Add calendar days (inclusive of start day)
+    expirationDate.setDate(expirationDate.getDate() + Math.max(0, customDays - 1))
     expirationDate.setHours(23, 59, 59, 999)
 
     // 2. Generate Username and QR code
