@@ -1,5 +1,5 @@
 'use server'
-import { getAppDate } from '@novafit/supabase/src/utils/date';
+import { getAppDate, parseDateOnly, calcExpirationDate } from '@novafit/supabase/src/utils/date';
 
 import { createServerClient } from '@novafit/supabase/src/server'
 import { redirect } from 'next/navigation'
@@ -38,16 +38,14 @@ export async function registerMember(prevState: any, formData: FormData) {
     }
 
     // 1. Calculate dates in UTC
-    const startsAt = new Date(`${startsAtStr}T00:00:00Z`)
+    const startsAt = parseDateOnly(startsAtStr)
     
     if (isNaN(startsAt.getTime())) {
       return { error: 'Fecha de inicio inválida.' }
     }
     
-    const expirationDate = new Date(startsAt)
-    // Add calendar days (inclusive of start day)
-    expirationDate.setDate(expirationDate.getDate() + Math.max(0, customDays - 1))
-    expirationDate.setHours(23, 59, 59, 999)
+    // Expiration = saved start date + days, computed in UTC
+    const expirationDate = calcExpirationDate(startsAt, customDays)
 
     // 2. Generate Username and QR code
     const username = await generateUniqueUsername(supabase)
@@ -197,7 +195,7 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
     
     let startsAt: Date | undefined
     if (startsAtStr) {
-      startsAt = new Date(`${startsAtStr}T00:00:00Z`)
+      startsAt = parseDateOnly(startsAtStr)
     }
     
     const { processRecharge } = await import('@novafit/supabase/src/queries/member-plans')
@@ -257,7 +255,7 @@ export async function updatePlanAction(prevState: any, formData: FormData) {
     
     let startsAtISO: string | undefined
     if (startsAtStr) {
-      startsAtISO = new Date(`${startsAtStr}T00:00:00Z`).toISOString()
+      startsAtISO = parseDateOnly(startsAtStr).toISOString()
     }
 
     let expiresAtISO: string | undefined

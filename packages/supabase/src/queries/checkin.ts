@@ -1,13 +1,11 @@
-import { getAppDate } from '@novafit/supabase/src/utils/date';
+import { getAppDate, getTodayYYYYMMDD, getManaguaDayRange } from '@novafit/supabase/src/utils/date';
 import { computeMemberState } from '@novafit/supabase/src/utils/member';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CheckInResult, MemberWithStatus } from '@novafit/types'
-import { isBefore, isEqual, isAfter, startOfDay, endOfDay } from 'date-fns'
 
 export async function getTodayVisitsCount(supabase: SupabaseClient): Promise<number> {
   const today = await getAppDate();
-  const start = startOfDay(today);
-  const end = endOfDay(today);
+  const { start, end } = getManaguaDayRange(getTodayYYYYMMDD(today));
 
   const { count, error } = await supabase
     .from('attendances')
@@ -69,15 +67,11 @@ export async function getAttendances(
     `)
 
   if (options?.startDate) {
-    const [year, month, day] = options.startDate.split('-').map(Number);
-    const start = new Date(year, month - 1, day, 0, 0, 0, 0);
-    query = query.gte('scanned_at', start.toISOString());
+    query = query.gte('scanned_at', getManaguaDayRange(options.startDate).start.toISOString());
   }
   
   if (options?.endDate) {
-    const [year, month, day] = options.endDate.split('-').map(Number);
-    const end = new Date(year, month - 1, day, 23, 59, 59, 999);
-    query = query.lte('scanned_at', end.toISOString());
+    query = query.lte('scanned_at', getManaguaDayRange(options.endDate).end.toISOString());
   }
 
   if (options?.search) {
@@ -191,8 +185,9 @@ export async function processCheckIn(
   const appDate = await getAppDate();
 
   // 1.5. Check for today's check-ins FIRST
-  const start = startOfDay(appDate).toISOString();
-  const end = endOfDay(appDate).toISOString();
+  const { start: dayStart, end: dayEnd } = getManaguaDayRange(getTodayYYYYMMDD(appDate));
+  const start = dayStart.toISOString();
+  const end = dayEnd.toISOString();
   
   const { data: todaysAttendances } = await supabase
     .from('attendances')

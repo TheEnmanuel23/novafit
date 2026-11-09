@@ -1,40 +1,50 @@
-import { cookies } from 'next/headers'
-import { parse } from 'date-fns'
+export const APP_TIMEZONE = 'America/Managua'
 
+/**
+ * Current instant. There is no simulated/override date: every "now" in the app is the real clock.
+ * Kept async so existing callers (`await getAppDate()`) keep working.
+ */
 export async function getAppDate(): Promise<Date> {
-  if (process.env.NODE_ENV !== 'production') {
-    try {
-      const parseSimulated = (val: string) => {
-        if (val.length === 10 && val.includes('-')) {
-          const parsed = parse(val, 'yyyy-MM-dd', new Date())
-          const date = new Date()
-          date.setFullYear(parsed.getFullYear(), parsed.getMonth(), parsed.getDate())
-          return date
-        }
-        return new Date(val)
-      }
-
-      if (typeof window !== 'undefined') {
-        const match = document.cookie.match(/(?:^|; )x-simulated-date=([^;]*)/)
-        if (match && match[1]) {
-          const date = parseSimulated(decodeURIComponent(match[1]))
-          if (!isNaN(date.getTime())) return date
-        }
-      } else {
-        const store = await cookies()
-        const simulated = store.get('x-simulated-date')?.value
-        if (simulated) {
-          const date = parseSimulated(simulated)
-          if (!isNaN(date.getTime())) return date
-        }
-      }
-    } catch (e: any) {
-      if (e && e.digest && e.digest.includes('DYNAMIC')) {
-        throw e;
-      }
-    }
-  }
   return new Date()
+}
+
+/** Today's calendar day in Nicaragua as YYYY-MM-DD. */
+export function getTodayYYYYMMDD(now: Date = new Date()): string {
+  return toTimezoneYYYYMMDD(now, APP_TIMEZONE)
+}
+
+/**
+ * Parses a YYYY-MM-DD string into the saved representation of a period date:
+ * midnight UTC of that day (e.g. "2026-09-18" -> 2026-09-18T00:00:00.000Z).
+ */
+export function parseDateOnly(dateStr: string): Date {
+  return new Date(`${dateStr}T00:00:00.000Z`)
+}
+
+/**
+ * Expiration date of a plan: the SAVED start date + N calendar days, computed purely in UTC
+ * (no local timezone involved). Stored as the end of that UTC day (23:59:59.999Z), so the UTC
+ * calendar day is always `startsAt + days`. Example: 2026-09-18 + 45 days -> 2026-11-02.
+ */
+export function calcExpirationDate(startsAt: Date | string, days: number): Date {
+  const s = new Date(startsAt)
+  return new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate() + Math.max(0, days), 23, 59, 59, 999))
+}
+
+/**
+ * Start (UTC midnight) of today's Nicaragua calendar day. Use it to compare against period dates
+ * (`starts_at` / `expiration_date`), which are saved as UTC days.
+ */
+export function getTodayPeriodStartISO(now: Date = new Date()): string {
+  return parseDateOnly(getTodayYYYYMMDD(now)).toISOString()
+}
+
+/** Start/end instants (UTC) of a Nicaragua calendar day (YYYY-MM-DD). Nicaragua has no DST (UTC-6). */
+export function getManaguaDayRange(dateStr: string): { start: Date; end: Date } {
+  return {
+    start: new Date(`${dateStr}T00:00:00.000-06:00`),
+    end: new Date(`${dateStr}T23:59:59.999-06:00`),
+  }
 }
 
 /**

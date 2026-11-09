@@ -20,8 +20,6 @@ export const viewport: Viewport = {
   themeColor: '#0a0b0f',
 }
 
-import { DevDateTools } from '@/components/DevDateTools'
-
 const isProduction = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production'
 
 export default function RootLayout({
@@ -33,7 +31,6 @@ export default function RootLayout({
     <html lang="es" className={inter.variable} suppressHydrationWarning>
       <body className="bg-background text-foreground antialiased" suppressHydrationWarning>
         {children}
-        <DevDateTools />
         {!isProduction && (
           <div className="fixed top-0 left-1/2 -translate-x-1/2 z-[9999] bg-warning text-warning-foreground text-[10px] font-bold px-4 py-0.5 rounded-b shadow-lg uppercase tracking-widest pointer-events-none opacity-80">
             Ambiente de Desarrollo

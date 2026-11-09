@@ -1,8 +1,7 @@
-import { getAppDate } from '@novafit/supabase/src/utils/date';
+import { getAppDate, parseDateOnly } from '@novafit/supabase/src/utils/date';
 import { computeMemberState } from '@novafit/supabase/src/utils/member';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Member, MemberWithStatus } from '@novafit/types'
-import { parseISO, startOfDay, endOfDay } from 'date-fns'
 
 /** Generate a short unique username: ABCD-1234 (no ambiguous chars) */
 export function generateUsername(): string {

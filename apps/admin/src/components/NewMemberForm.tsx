@@ -5,6 +5,7 @@ import { parseISO, addDays, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { Plan } from '@novafit/types'
 import { registerMember } from '@/app/actions/members'
+import { getTodayYYYYMMDD } from '@novafit/supabase/src/utils/date'
 
 type NewMemberFormProps = {
   plans: Plan[]
@@ -21,20 +22,7 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
   const [customVisits, setCustomVisits] = useState<number>(0)
   const [customVisitsUsed, setCustomVisitsUsed] = useState<number>(0)
   const [customDays, setCustomDays] = useState<number>(0)
-  const [startsAt, setStartsAt] = useState<string>(
-    typeof window !== 'undefined' 
-      ? (() => {
-          // Parse cookie safely client-side for initial state
-          const match = document.cookie.match(/(?:^|; )x-simulated-date=([^;]*)/)
-          if (match && match[1]) {
-            const val = decodeURIComponent(match[1])
-            if (val.length === 10 && val.includes('-')) return val
-          }
-          const d = new Date()
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-        })()
-      : new Date().toISOString().split('T')[0]
-  )
+  const [startsAt, setStartsAt] = useState<string>(() => getTodayYYYYMMDD())
   // Calculate preview
   let projectedBalance = 0;
   let projectedExpirationStr = '';

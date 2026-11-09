@@ -5,6 +5,7 @@ import { parseISO, addDays, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { Plan } from '@novafit/types'
 import { assignPlanAction } from '@/app/actions/members'
+import { getTodayYYYYMMDD } from '@novafit/supabase/src/utils/date'
 
 export function AssignPlanModal({ memberId, plans, currentRollover = 0 }: { memberId: string, plans: Plan[], currentRollover?: number }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -18,18 +19,7 @@ export function AssignPlanModal({ memberId, plans, currentRollover = 0 }: { memb
   const [customVisitsUsed, setCustomVisitsUsed] = useState<number>(0)
   const [customDays, setCustomDays] = useState<number>(0)
   
-  const [startsAt, setStartsAt] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      const match = document.cookie.match(/(?:^|; )x-simulated-date=([^;]*)/)
-      if (match && match[1]) {
-        const val = decodeURIComponent(match[1])
-        if (val.length === 10 && val.includes('-')) return val
-      }
-      const d = new Date()
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    }
-    return new Date().toISOString().split('T')[0]
-  })
+  const [startsAt, setStartsAt] = useState<string>(() => getTodayYYYYMMDD())
 
   // Calculate preview
   let projectedBalance = 0;

@@ -2,7 +2,8 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useTransition, useRef } from 'react'
-import { getClientAppDate } from '@novafit/supabase/src/utils/date-client'
+import { getTodayYYYYMMDD } from '@novafit/supabase/src/utils/date'
+import { parseISO } from 'date-fns'
 
 type StatusDateFiltersProps = {
   dateLabelStart?: string
@@ -179,7 +180,7 @@ export function StatusDateFilters({
 
   const setDateRange = (type: string) => {
     setSelectedRange(type);
-    const now = getClientAppDate();
+    const now = parseISO(getTodayYYYYMMDD());
     const format = (d: Date) => {
       const year = d.getFullYear()
       const month = String(d.getMonth() + 1).padStart(2, '0')

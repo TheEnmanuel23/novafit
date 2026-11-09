@@ -159,8 +159,6 @@ export async function searchMembersAction(query: string) {
     console.info('[CheckinAction:searchMembersAction] Searching via service client');
     let { members } = await getMembers(supabase, { search: query, limit: 50 })
     console.info('[CheckinAction:searchMembersAction] Found', members.length, 'members initially');
-    const { getAppDate } = await import('@novafit/supabase/src/utils/date')
-    const today = getAppDate()
     
     const exactQuery = query.trim().toLowerCase()
     members = members.filter(m => {
