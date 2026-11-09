@@ -2,15 +2,15 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getMembers, getCurrentStaff, hasRole, getActivePlans } from '@novafit/supabase'
+import { parseISO, startOfMonth, endOfMonth, format } from 'date-fns'
 import { BottomNav } from '@/components/BottomNav'
 import { StatusDateFilters } from '@/components/StatusDateFilters'
-import { MemberSortDropdown } from './MemberSortDropdown'
-import { formatDateTime, formatDateOnly, getAppDate, toTimezoneYYYYMMDD } from '@novafit/supabase/src/utils/date'
+import { getTodayYYYYMMDD } from '@novafit/supabase/src/utils/date'
+import { MembersList } from './MembersList'
 
 type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
-
 
 export default async function MembersPage({ searchParams }: Props) {
   const resolvedSearchParams = await searchParams
@@ -18,10 +18,9 @@ export default async function MembersPage({ searchParams }: Props) {
   const rawStatus = typeof resolvedSearchParams.status === 'string' ? resolvedSearchParams.status : undefined
 
   // Default filter: "Fecha de registro" + "Este mes"
-  const todayStr = toTimezoneYYYYMMDD(await getAppDate())
-  const [y, m] = todayStr.split('-').map(Number)
-  const defaultStart = `${y}-${String(m).padStart(2, '0')}-01`
-  const defaultEnd = `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`
+  const today = parseISO(getTodayYYYYMMDD())
+  const defaultStart = format(startOfMonth(today), 'yyyy-MM-dd')
+  const defaultEnd = format(endOfMonth(today), 'yyyy-MM-dd')
 
   const rawStart = typeof resolvedSearchParams.startDate === 'string' ? resolvedSearchParams.startDate : defaultStart
   const rawEnd = typeof resolvedSearchParams.endDate === 'string' ? resolvedSearchParams.endDate : defaultEnd
@@ -35,8 +34,6 @@ export default async function MembersPage({ searchParams }: Props) {
   const endDate = isSearching ? '' : rawEnd
   const dateType = rawDateType
   const plan_id = isSearching ? undefined : rawPlanId
-  const sort_by = typeof resolvedSearchParams.sort_by === 'string' ? resolvedSearchParams.sort_by : 'created_at'
-  const order = typeof resolvedSearchParams.order === 'string' && resolvedSearchParams.order === 'asc' ? 'asc' : 'desc'
 
   const supabase = await createClient()
   
@@ -46,7 +43,7 @@ export default async function MembersPage({ searchParams }: Props) {
     redirect('/dashboard')
   }
 
-  const { members, total } = await getMembers(supabase, { limit: 50, search, status, plan_id, startDate, endDate, dateType, sort_by, order })
+  const { members, total } = await getMembers(supabase, { limit: 50, search, status, plan_id, startDate, endDate, dateType })
   const plans = await getActivePlans(supabase)
 
   return (
@@ -79,75 +76,10 @@ export default async function MembersPage({ searchParams }: Props) {
           />
         </div>
 
-        <div className="flex mb-4">
-          <MemberSortDropdown sort_by={sort_by} order={order} params={resolvedSearchParams} />
-        </div>
-
-        <div className="flex flex-col gap-3">
-          {members.map((member: any) => {
-            // Find the most recent plan regardless of status to display the plan name
-            const displayPlan = member.active_plan || 
-              (member.member_plans && member.member_plans.length > 0 
-                ? [...member.member_plans].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] 
-                : null);
-
-            return (
-              <Link key={member.id} href={`/members/${member.id}`} className="glass p-4 flex justify-between items-start hover-lift group">
-                <div className="flex-1">
-                  <div className="font-semibold group-hover:text-accent transition-colors">{member.name}</div>
-                  <div className="text-sm text-muted-foreground mt-0.5">
-                    {member.username} {member.phone && `• ${member.phone}`}
-                  </div>
-                  
-                  <div className="flex flex-col gap-1 mt-3">
-                    <div className="text-[10px] text-muted-foreground">
-                      <span className="font-medium text-white/70">Registrado el:</span> {formatDateTime(member.created_at)} por {member.creator?.name || 'Sistema'}
-                    </div>
-                    {displayPlan?.starts_at && (
-                      <div className="text-[10px] text-muted-foreground">
-                        <span className="font-medium text-white/70">Inicio de plan:</span> {formatDateOnly(displayPlan.starts_at)}
-                        {displayPlan.expiration_date && (
-                          <> <span className="font-medium text-white/70 ml-2">• Expira:</span> {formatDateOnly(displayPlan.expiration_date)}</>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right flex flex-col items-end gap-1">
-                  <StatusBadge status={member.status} />
-                  
-                  {displayPlan && (
-                    <div className="text-xs font-medium mt-1">
-                      {displayPlan.plan?.description}
-                    </div>
-                  )}
-
-                  {member.active_plan && (
-                    <div className="text-sm font-medium mt-1">
-                      {member.active_plan.visits_remaining} / {member.active_plan.visits_purchased} <span className="text-muted-foreground text-xs font-normal">días disponibles</span>
-                    </div>
-                  )}
-                </div>
-              </Link>
-            )
-          })}
-          
-          {members.length === 0 && (
-            <div className="text-center p-8 text-muted-foreground">
-              No hay miembros registrados aún.
-            </div>
-          )}
-        </div>
+        <MembersList members={members} />
       </main>
       
       <BottomNav currentPath="/members" />
     </div>
   )
-}
-
-function StatusBadge({ status }: { status: any }) {
-  if (status === 'active') return <span className="badge badge-active">Activo</span>
-  if (status === 'low_balance') return <span className="badge badge-warning">Por expirar</span>
-  if (status === 'expired') return <span className="badge badge-expired">Expirado</span>
-  return <span className="badge badge-no-plan">Sin Plan</span>
 }

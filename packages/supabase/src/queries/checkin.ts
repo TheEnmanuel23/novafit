@@ -78,18 +78,9 @@ export async function getAttendances(
     query = query.or(`name.ilike.%${options.search}%,username.ilike.%${options.search}%,phone.ilike.%${options.search}%`, { foreignTable: 'members' });
   }
 
-  if (options?.sort_by) {
-    const ascending = options.order === 'asc';
-    if (options.sort_by === 'name' || options.sort_by === 'status') {
-      // Supabase sorting by foreign tables has limited support depending on syntax,
-      // but we can try to sort locally or rely on the query if supported.
-      // Usually foreign table sort requires a different syntax or isn't fully supported via PostgREST natively for multiple layers.
-      // For simplicity, if they sort by name, we might just sort the array in JS since limit is 100, 
-      // but let's try Postgres first:
-      query = query.order(`members(${options.sort_by})`, { ascending });
-    } else {
-      query = query.order(options.sort_by, { ascending });
-    }
+  const dbSortFields = ['scanned_at', 'checkin_type', 'balance_after', 'balance_before']
+  if (options?.sort_by && dbSortFields.includes(options.sort_by)) {
+    query = query.order(options.sort_by, { ascending: options.order === 'asc' });
   } else {
     query = query.order('scanned_at', { ascending: false });
   }
@@ -129,13 +120,29 @@ export async function getAttendances(
     result = result.filter(r => r.member_plan?.plan_id === options.plan_id);
   }
 
-  // Fallback JS sort if PostgREST foreign sort failed or if sorting by status
-  if (options?.sort_by === 'name' || options?.sort_by === 'status') {
+  // Sort locally for foreign/computed fields
+  const sortBy = options?.sort_by;
+  const isAsc = options?.order === 'asc';
+  if (sortBy === 'name' || sortBy === 'username') {
     result.sort((a: any, b: any) => {
-      const valA = a.members[options.sort_by!] || '';
-      const valB = b.members[options.sort_by!] || '';
-      if (valA < valB) return options.order === 'asc' ? -1 : 1;
-      if (valA > valB) return options.order === 'asc' ? 1 : -1;
+      const valA = (a.members?.[sortBy] || '').toLowerCase();
+      const valB = (b.members?.[sortBy] || '').toLowerCase();
+      if (valA < valB) return isAsc ? -1 : 1;
+      if (valA > valB) return isAsc ? 1 : -1;
+      return 0;
+    });
+  } else if (sortBy === 'status') {
+    const orderMap: Record<string, number> = { active: 1, low_balance: 2, expired: 3, no_plan: 4 };
+    result.sort((a: any, b: any) => {
+      const diff = (orderMap[a.members?.status] || 99) - (orderMap[b.members?.status] || 99);
+      return isAsc ? diff : -diff;
+    });
+  } else if (sortBy === 'plan') {
+    result.sort((a: any, b: any) => {
+      const valA = (a.member_plan?.plan?.description || '').toLowerCase();
+      const valB = (b.member_plan?.plan?.description || '').toLowerCase();
+      if (valA < valB) return isAsc ? -1 : 1;
+      if (valA > valB) return isAsc ? 1 : -1;
       return 0;
     });
   }

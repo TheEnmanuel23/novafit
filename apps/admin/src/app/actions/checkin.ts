@@ -2,7 +2,7 @@
 
 import { createServerClient, createServiceClient } from '@novafit/supabase/src/server'
 import { getMembers } from '@novafit/supabase/src/queries/members'
-import { processCheckIn } from '@novafit/supabase/src/queries/checkin'
+import { processCheckIn, getAttendances } from '@novafit/supabase/src/queries/checkin'
 import { getCurrentStaff, hasRole, isGlobalAdmin } from '@novafit/supabase/src/queries/staff'
 
 /**
@@ -193,4 +193,21 @@ export async function searchMembersAction(query: string) {
     console.error('[CheckinAction:searchMembersAction] failed:', error)
     return []
   }
+}
+
+export async function getAttendancesAction(options?: {
+  startDate?: string
+  endDate?: string
+  search?: string
+  status?: string
+  plan_id?: string
+}) {
+  const authClient = await createServerClient()
+  const staff = await getCurrentStaff(authClient)
+  if (!staff) {
+    throw new Error('Sesión no válida. Inicia sesión nuevamente.')
+  }
+
+  const supabase = createServiceClient()
+  return await getAttendances(supabase, options)
 }
