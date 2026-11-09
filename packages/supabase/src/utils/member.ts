@@ -1,5 +1,5 @@
 import type { MemberWithStatus, MemberPlanWithDetails, MemberPlanStatus } from '@novafit/types';
-import { toTimezoneYYYYMMDD } from './date';
+import { getTodayYYYYMMDD, toPeriodYYYYMMDD } from './date';
 
 /**
  * Determines if a given plan is currently active based on its status and expiration date.
@@ -8,10 +8,10 @@ import { toTimezoneYYYYMMDD } from './date';
 export function isPlanActive(plan: Partial<MemberPlanWithDetails>, appDate: Date): boolean {
   if (!plan.expiration_date) return false;
   
-  const appDateStr = toTimezoneYYYYMMDD(appDate);
+  const appDateStr = getTodayYYYYMMDD(appDate);
   const remaining = (plan.visits_purchased || 0) - (plan.visits_used || 0);
 
-  const expDateStr = toTimezoneYYYYMMDD(plan.expiration_date, 'UTC');
+  const expDateStr = toPeriodYYYYMMDD(plan.expiration_date);
 
   if (plan.status !== 'active') {
     return false;
@@ -30,9 +30,9 @@ export function isPlanActive(plan: Partial<MemberPlanWithDetails>, appDate: Date
 export function isPlanExpired(plan: Partial<MemberPlanWithDetails>, appDate: Date): boolean {
   if (!plan.expiration_date) return false;
 
-  const appDateStr = toTimezoneYYYYMMDD(appDate);
+  const appDateStr = getTodayYYYYMMDD(appDate);
   const remaining = (plan.visits_purchased || 0) - (plan.visits_used || 0);
-  const expDateStr = toTimezoneYYYYMMDD(plan.expiration_date, 'UTC');
+  const expDateStr = toPeriodYYYYMMDD(plan.expiration_date);
 
   if (plan.status === 'expired') {
     return true;

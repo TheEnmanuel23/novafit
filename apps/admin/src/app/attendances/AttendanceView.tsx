@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useTransition } from 'react'
 import Link from 'next/link'
+import { compareAsc, parseISO } from 'date-fns'
 import { StatusDateFilters, type FilterChangeValues } from '@/components/StatusDateFilters'
 import { SortDropdown } from '@/components/SortDropdown'
 import { getAttendancesAction } from '@/app/actions/checkin'
@@ -66,7 +67,7 @@ export function AttendanceView({ initialAttendances, plans, todayStr }: Attendan
     const isAsc = order === 'asc'
     return [...attendances].sort((a, b) => {
       if (sortBy === 'scanned_at') {
-        const diff = new Date(a.scanned_at).getTime() - new Date(b.scanned_at).getTime()
+        const diff = compareAsc(parseISO(a.scanned_at), parseISO(b.scanned_at))
         return isAsc ? diff : -diff
       }
       if (sortBy === 'balance_after') {

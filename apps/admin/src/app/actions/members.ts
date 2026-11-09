@@ -1,5 +1,5 @@
 'use server'
-import { getAppDate, parseDateOnly, calcExpirationDate } from '@novafit/supabase/src/utils/date';
+import { getAppDate, parseDateOnly, parseDateEnd, calcExpirationDate } from '@novafit/supabase/src/utils/date';
 
 import { createServerClient } from '@novafit/supabase/src/server'
 import { redirect } from 'next/navigation'
@@ -260,7 +260,7 @@ export async function updatePlanAction(prevState: any, formData: FormData) {
 
     let expiresAtISO: string | undefined
     if (expiresAtStr) {
-      expiresAtISO = new Date(`${expiresAtStr}T23:59:59.999Z`).toISOString()
+      expiresAtISO = parseDateEnd(expiresAtStr).toISOString()
     }
     
     const appDate = await getAppDate();

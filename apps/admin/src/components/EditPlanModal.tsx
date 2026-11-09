@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useActionState, useEffect } from 'react'
-import { parseISO, addDays, differenceInDays, format } from 'date-fns'
+import { parseISO, addDays, differenceInCalendarDays, format } from 'date-fns'
 import type { MemberPlan } from '@novafit/types'
 import { updatePlanAction } from '@/app/actions/members'
+import { toPeriodYYYYMMDD } from '@novafit/supabase/src/utils/date'
 
 export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan, memberId: string }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -15,12 +16,12 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
     }
   }, [state])
 
-  const defaultStart = (memberPlan as any).starts_at ? new Date((memberPlan as any).starts_at).toLocaleDateString('en-CA', { timeZone: 'UTC' }) : ''
-  const defaultEnd = memberPlan.expiration_date ? new Date(memberPlan.expiration_date).toLocaleDateString('en-CA', { timeZone: 'UTC' }) : ''
+  const defaultStart = toPeriodYYYYMMDD((memberPlan as any).starts_at)
+  const defaultEnd = toPeriodYYYYMMDD(memberPlan.expiration_date)
 
   let initialDuration = (memberPlan as any).plan?.expiration_days
   if (defaultStart && defaultEnd) {
-    initialDuration = differenceInDays(parseISO(defaultEnd), parseISO(defaultStart))
+    initialDuration = differenceInCalendarDays(parseISO(defaultEnd), parseISO(defaultStart))
   }
 
   const [startsAt, setStartsAt] = useState(defaultStart)
@@ -49,7 +50,7 @@ export function EditPlanModal({ memberPlan, memberId }: { memberPlan: MemberPlan
     const newEnd = e.target.value
     setExpiresAt(newEnd)
     if (startsAt && newEnd) {
-      setDurationDays(differenceInDays(parseISO(newEnd), parseISO(startsAt)))
+      setDurationDays(differenceInCalendarDays(parseISO(newEnd), parseISO(startsAt)))
     }
   }
 

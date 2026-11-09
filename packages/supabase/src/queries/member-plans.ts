@@ -1,3 +1,4 @@
+import { parseISO } from 'date-fns';
 import { getAppDate, parseDateOnly, calcExpirationDate, getTodayYYYYMMDD, getTodayPeriodStartISO } from '@novafit/supabase/src/utils/date';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MemberPlan } from '@novafit/types'
@@ -122,7 +123,7 @@ export async function processRecharge(
         newExpiration = calcExpirationDate(startsAt, expirationDays);
       } else {
         finalPlanId = currentPlan.plan_id;
-        newExpiration = new Date(currentPlan.expiration_date);
+        newExpiration = parseISO(currentPlan.expiration_date);
       }
     } else {
       newBalance = rollover + visitsIncluded;
@@ -224,7 +225,7 @@ export async function previewRecharge(
       if (isCurrentDay) {
         newExpiration = calcExpirationDate(startsAt, plan.expiration_days);
       } else {
-        newExpiration = new Date(currentPlan.expiration_date);
+        newExpiration = parseISO(currentPlan.expiration_date);
       }
     } else {
       newBalance = rollover + plan.visits_included;

@@ -1,4 +1,4 @@
-import { getAppDate, parseDateOnly } from '@novafit/supabase/src/utils/date';
+import { getAppDate, getManaguaDayRange, getPeriodDayRange } from '@novafit/supabase/src/utils/date';
 import { computeMemberState } from '@novafit/supabase/src/utils/member';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Member, MemberWithStatus } from '@novafit/types'
@@ -76,21 +76,17 @@ export async function getMembers(
 
   if (dateType === 'created_at') {
     if (startDate) {
-      const start = new Date(`${startDate}T00:00:00.000-06:00`)
-      query = query.gte('created_at', start.toISOString())
+      query = query.gte('created_at', getManaguaDayRange(startDate).start.toISOString())
     }
     if (endDate) {
-      const end = new Date(`${endDate}T23:59:59.999-06:00`)
-      query = query.lte('created_at', end.toISOString())
+      query = query.lte('created_at', getManaguaDayRange(endDate).end.toISOString())
     }
   } else {
     if (startDate) {
-      const start = new Date(`${startDate}T00:00:00.000Z`)
-      query = query.gte('member_plans.starts_at', start.toISOString())
+      query = query.gte('member_plans.starts_at', getPeriodDayRange(startDate).start.toISOString())
     }
     if (endDate) {
-      const end = new Date(`${endDate}T23:59:59.999Z`)
-      query = query.lte('member_plans.starts_at', end.toISOString())
+      query = query.lte('member_plans.starts_at', getPeriodDayRange(endDate).end.toISOString())
     }
   }
 

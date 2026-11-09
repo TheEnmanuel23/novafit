@@ -1,34 +1,67 @@
+import { addDays, format, parseISO } from 'date-fns'
+import { es } from 'date-fns/locale'
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
+
 export const APP_TIMEZONE = 'America/Managua'
 
 /**
- * Current instant. There is no simulated/override date: every "now" in the app is the real clock.
+ * Current instant. Every "now" in the app uses the real clock.
  * Kept async so existing callers (`await getAppDate()`) keep working.
  */
 export async function getAppDate(): Promise<Date> {
   return new Date()
 }
 
-/** Today's calendar day in Nicaragua as YYYY-MM-DD. */
+/**
+ * Returns a date formatted as YYYY-MM-DD in the given timezone (defaults to America/Managua).
+ * Safe for lexicographical comparisons (e.g. '2026-10-06' < '2026-10-07') and <input type="date">.
+ */
+export function toTimezoneYYYYMMDD(dateInput: string | Date, timeZone: string = APP_TIMEZONE): string {
+  return formatInTimeZone(dateInput, timeZone, 'yyyy-MM-dd')
+}
+
+/** Today's calendar day in Nicaragua (America/Managua) as YYYY-MM-DD. */
 export function getTodayYYYYMMDD(now: Date = new Date()): string {
-  return toTimezoneYYYYMMDD(now, APP_TIMEZONE)
+  return formatInTimeZone(now, APP_TIMEZONE, 'yyyy-MM-dd')
 }
 
 /**
- * Parses a YYYY-MM-DD string into the saved representation of a period date:
+ * Extracts the YYYY-MM-DD calendar date of a plan period field (`starts_at` / `expiration_date`),
+ * which are stored as UTC calendar days.
+ */
+export function toPeriodYYYYMMDD(dateInput: string | Date | null | undefined): string {
+  if (!dateInput) return ''
+  return formatInTimeZone(dateInput, 'UTC', 'yyyy-MM-dd')
+}
+
+/**
+ * Parses a YYYY-MM-DD string into the saved start representation of a period date:
  * midnight UTC of that day (e.g. "2026-09-18" -> 2026-09-18T00:00:00.000Z).
  */
 export function parseDateOnly(dateStr: string): Date {
-  return new Date(`${dateStr}T00:00:00.000Z`)
+  return fromZonedTime(`${dateStr}T00:00:00.000`, 'UTC')
 }
 
 /**
- * Expiration date of a plan: the SAVED start date + N calendar days, computed purely in UTC
- * (no local timezone involved). Stored as the end of that UTC day (23:59:59.999Z), so the UTC
- * calendar day is always `startsAt + days`. Example: 2026-09-18 + 45 days -> 2026-11-02.
+ * Parses a YYYY-MM-DD string into the saved end representation of a period date:
+ * end of day UTC (e.g. "2026-09-18" -> 2026-09-18T23:59:59.999Z).
+ */
+export function parseDateEnd(dateStr: string): Date {
+  return fromZonedTime(`${dateStr}T23:59:59.999`, 'UTC')
+}
+
+/**
+ * Expiration date of a plan: the saved start date + N calendar days using date-fns `addDays`,
+ * stored at the end of that UTC day (23:59:59.999Z).
+ * Example: 2026-09-18 + 45 days -> 2026-11-02T23:59:59.999Z.
  */
 export function calcExpirationDate(startsAt: Date | string, days: number): Date {
-  const s = new Date(startsAt)
-  return new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate() + Math.max(0, days), 23, 59, 59, 999))
+  const startYmd =
+    typeof startsAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(startsAt)
+      ? startsAt
+      : formatInTimeZone(startsAt, 'UTC', 'yyyy-MM-dd')
+  const expDate = addDays(parseISO(startYmd), Math.max(0, days))
+  return parseDateEnd(format(expDate, 'yyyy-MM-dd'))
 }
 
 /**
@@ -39,48 +72,49 @@ export function getTodayPeriodStartISO(now: Date = new Date()): string {
   return parseDateOnly(getTodayYYYYMMDD(now)).toISOString()
 }
 
-/** Start/end instants (UTC) of a Nicaragua calendar day (YYYY-MM-DD). Nicaragua has no DST (UTC-6). */
+/** Start/end instants (UTC) of a Nicaragua calendar day (YYYY-MM-DD) in America/Managua (UTC-6). */
 export function getManaguaDayRange(dateStr: string): { start: Date; end: Date } {
   return {
-    start: new Date(`${dateStr}T00:00:00.000-06:00`),
-    end: new Date(`${dateStr}T23:59:59.999-06:00`),
+    start: fromZonedTime(`${dateStr}T00:00:00.000`, APP_TIMEZONE),
+    end: fromZonedTime(`${dateStr}T23:59:59.999`, APP_TIMEZONE),
+  }
+}
+
+/** Start/end instants (UTC) of a period calendar day (YYYY-MM-DD) for `starts_at` / `expiration_date`. */
+export function getPeriodDayRange(dateStr: string): { start: Date; end: Date } {
+  return {
+    start: parseDateOnly(dateStr),
+    end: parseDateEnd(dateStr),
   }
 }
 
 /**
- * Formats a timestamp into a readable date and time string in the Managua timezone.
- * Example: "5 oct 2026, 06:14"
+ * Formats an event timestamp (`created_at`, `scanned_at`, `updated_at`) into a readable date and time
+ * in the Managua timezone using date-fns-tz.
+ * Example: "5 oct 2026, 06:14 p. m."
  */
 export function formatDateTime(dateString: string | Date | null | undefined): string {
   if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleString('es-NI', {
-    timeZone: 'America/Managua',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  return formatInTimeZone(dateString, APP_TIMEZONE, 'd MMM yyyy, hh:mm a', { locale: es })
 }
 
 /**
- * Formats a date-only string (like plan start/expiration dates) into a UTC date string to prevent timezone shifts.
+ * Formats a period date (`starts_at` / `expiration_date`) without timezone shift using date-fns-tz.
  * Example: "5/10/2026"
  */
 export function formatDateOnly(dateString: string | Date | null | undefined): string {
   if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleDateString('es-NI', {
-    timeZone: 'UTC'
-  })
+  return formatInTimeZone(dateString, 'UTC', 'd/M/yyyy', { locale: es })
 }
 
 /**
- * Returns a date formatted as YYYY-MM-DD for a specific timezone.
- * We use 'en-CA' because it natively formats dates in YYYY-MM-DD format,
- * which is required for safe lexicographical comparisons (e.g. '2026-10-06' < '2026-10-07').
- * If we used 'es-NI', it would return '6/10/2026' which breaks string comparisons.
+ * Formats a timestamp or date into a long Spanish date in the given timezone (defaults to America/Managua).
+ * Example: "9 de noviembre de 2026"
  */
-export function toTimezoneYYYYMMDD(dateInput: string | Date, timeZone: string = 'America/Managua'): string {
-  return new Date(dateInput).toLocaleDateString('en-CA', { timeZone });
+export function formatLongDate(
+  dateString: string | Date | null | undefined,
+  timeZone: string = APP_TIMEZONE
+): string {
+  if (!dateString) return 'N/A'
+  return formatInTimeZone(dateString, timeZone, "d 'de' MMMM 'de' yyyy", { locale: es })
 }
-

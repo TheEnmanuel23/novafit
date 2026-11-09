@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { compareAsc, compareDesc, parseISO } from 'date-fns'
 import { SortDropdown } from '@/components/SortDropdown'
 import { formatDateTime, formatDateOnly } from '@novafit/supabase/src/utils/date'
 
@@ -28,7 +29,7 @@ export function MembersList({ members }: { members: any[] }) {
     const isAsc = order === 'asc'
     return [...members].sort((a, b) => {
       if (sortBy === 'created_at') {
-        const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        const diff = compareAsc(parseISO(a.created_at), parseISO(b.created_at))
         return isAsc ? diff : -diff
       }
       if (sortBy === 'status') {
@@ -72,8 +73,8 @@ export function MembersList({ members }: { members: any[] }) {
           const displayPlan =
             member.active_plan ||
             (member.member_plans && member.member_plans.length > 0
-              ? [...member.member_plans].sort(
-                  (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              ? [...member.member_plans].sort((a, b) =>
+                  compareDesc(parseISO(a.created_at), parseISO(b.created_at))
                 )[0]
               : null)
 
