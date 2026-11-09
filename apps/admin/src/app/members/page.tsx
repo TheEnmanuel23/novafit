@@ -5,7 +5,7 @@ import { getMembers, getCurrentStaff, hasRole, getActivePlans } from '@novafit/s
 import { BottomNav } from '@/components/BottomNav'
 import { StatusDateFilters } from '@/components/StatusDateFilters'
 import { MemberSortDropdown } from './MemberSortDropdown'
-import { formatDateTime, formatDateOnly } from '@novafit/supabase/src/utils/date'
+import { formatDateTime, formatDateOnly, getAppDate, toTimezoneYYYYMMDD } from '@novafit/supabase/src/utils/date'
 
 type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -15,13 +15,28 @@ type Props = {
 export default async function MembersPage({ searchParams }: Props) {
   const resolvedSearchParams = await searchParams
   const search = typeof resolvedSearchParams.q === 'string' ? resolvedSearchParams.q : undefined
-  const status = typeof resolvedSearchParams.status === 'string' ? resolvedSearchParams.status : undefined
-  
-  const startDate = typeof resolvedSearchParams.startDate === 'string' ? resolvedSearchParams.startDate : ''
-  const endDate = typeof resolvedSearchParams.endDate === 'string' ? resolvedSearchParams.endDate : ''
+  const rawStatus = typeof resolvedSearchParams.status === 'string' ? resolvedSearchParams.status : undefined
+
+  // Default filter: "Fecha de registro" + "Este mes"
+  const todayStr = toTimezoneYYYYMMDD(await getAppDate())
+  const [y, m] = todayStr.split('-').map(Number)
+  const defaultStart = `${y}-${String(m).padStart(2, '0')}-01`
+  const defaultEnd = `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`
+
+  const rawStart = typeof resolvedSearchParams.startDate === 'string' ? resolvedSearchParams.startDate : defaultStart
+  const rawEnd = typeof resolvedSearchParams.endDate === 'string' ? resolvedSearchParams.endDate : defaultEnd
+  const rawDateType = resolvedSearchParams.dateType === 'starts_at' ? 'starts_at' : 'created_at'
+  const rawPlanId = typeof resolvedSearchParams.plan_id === 'string' ? resolvedSearchParams.plan_id : undefined
+
+  // When searching, ignore all filters so the search covers every member
+  const isSearching = !!search
+  const status = isSearching ? undefined : rawStatus
+  const startDate = isSearching ? '' : rawStart
+  const endDate = isSearching ? '' : rawEnd
+  const dateType = rawDateType
+  const plan_id = isSearching ? undefined : rawPlanId
   const sort_by = typeof resolvedSearchParams.sort_by === 'string' ? resolvedSearchParams.sort_by : 'created_at'
   const order = typeof resolvedSearchParams.order === 'string' && resolvedSearchParams.order === 'asc' ? 'asc' : 'desc'
-  const plan_id = typeof resolvedSearchParams.plan_id === 'string' ? resolvedSearchParams.plan_id : undefined
 
   const supabase = await createClient()
   
@@ -31,7 +46,7 @@ export default async function MembersPage({ searchParams }: Props) {
     redirect('/dashboard')
   }
 
-  const { members, total } = await getMembers(supabase, { limit: 50, search, status, plan_id, startDate, endDate, sort_by, order })
+  const { members, total } = await getMembers(supabase, { limit: 50, search, status, plan_id, startDate, endDate, dateType, sort_by, order })
   const plans = await getActivePlans(supabase)
 
   return (
@@ -54,11 +69,13 @@ export default async function MembersPage({ searchParams }: Props) {
           <StatusDateFilters 
             dateLabelStart="Inicio de Plan Desde" 
             dateLabelEnd="Inicio de Plan Hasta" 
-            defaultStart=""
-            defaultEnd=""
+            defaultStart={defaultStart}
+            defaultEnd={defaultEnd}
+            defaultDateType="created_at"
             searchPlaceholder="Buscar por nombre, ID o teléfono..."
             totalResults={total}
             plans={plans}
+            showDateTypeFilter
           />
         </div>
 

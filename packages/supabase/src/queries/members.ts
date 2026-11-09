@@ -40,6 +40,7 @@ export async function getMembers(
     status?: string; 
     startDate?: string; 
     endDate?: string; 
+    dateType?: 'starts_at' | 'created_at';
     page?: number; 
     limit?: number;
     sort_by?: string;
@@ -47,10 +48,10 @@ export async function getMembers(
     plan_id?: string;
   } = {}
 ): Promise<{ members: MemberWithStatus[]; total: number }> {
-  const { search, startDate, endDate, page = 1, limit = 50, sort_by = 'created_at', order = 'desc', plan_id } = opts
+  const { search, startDate, endDate, dateType = 'starts_at', page = 1, limit = 50, sort_by = 'created_at', order = 'desc', plan_id } = opts
   const offset = (page - 1) * limit
 
-  const hasPlanDateFilter = !!(startDate || endDate);
+  const hasPlanDateFilter = !!(startDate || endDate) && dateType === 'starts_at';
   const memberPlansRelation = hasPlanDateFilter ? 'member_plans!inner' : 'member_plans';
 
   let query = supabase
@@ -74,14 +75,24 @@ export async function getMembers(
     query = query.or(`name.ilike.%${search}%,username.ilike.%${search}%,phone.ilike.%${search}%`)
   }
 
-  if (startDate) {
-    const start = startOfDay(parseISO(startDate))
-    query = query.gte('member_plans.starts_at', start.toISOString())
-  }
-  
-  if (endDate) {
-    const end = endOfDay(parseISO(endDate))
-    query = query.lte('member_plans.starts_at', end.toISOString())
+  if (dateType === 'created_at') {
+    if (startDate) {
+      const start = new Date(`${startDate}T00:00:00.000-06:00`)
+      query = query.gte('created_at', start.toISOString())
+    }
+    if (endDate) {
+      const end = new Date(`${endDate}T23:59:59.999-06:00`)
+      query = query.lte('created_at', end.toISOString())
+    }
+  } else {
+    if (startDate) {
+      const start = new Date(`${startDate}T00:00:00.000Z`)
+      query = query.gte('member_plans.starts_at', start.toISOString())
+    }
+    if (endDate) {
+      const end = new Date(`${endDate}T23:59:59.999Z`)
+      query = query.lte('member_plans.starts_at', end.toISOString())
+    }
   }
 
   // Database sorting for direct columns
