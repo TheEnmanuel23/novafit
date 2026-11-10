@@ -63,6 +63,9 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
             type="text"
             autoComplete="off"
             onChange={(e) => checkName(e.target.value)}
+            onBlur={(e) => {
+              e.currentTarget.value = e.currentTarget.value.trim().replace(/\s+/g, ' ')
+            }}
             aria-describedby={nameMatches.length > 0 ? 'name-duplicate-warning' : undefined}
             className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl"
             required
@@ -87,8 +90,11 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
             inputMode="numeric"
             autoComplete="off"
             onInput={(e) => {
-              e.currentTarget.value = e.currentTarget.value.replace(/[^0-9-]/g, '')
+              e.currentTarget.value = e.currentTarget.value.replace(/[^0-9-]/g, '').trim()
               checkPhone(e.currentTarget.value)
+            }}
+            onBlur={(e) => {
+              e.currentTarget.value = e.currentTarget.value.trim()
             }}
             aria-describedby={phoneMatches.length > 0 ? 'phone-duplicate-warning' : undefined}
             className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl" 

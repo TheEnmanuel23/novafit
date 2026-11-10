@@ -288,10 +288,12 @@ export async function createMember(
     qr_code: string
   }
 ): Promise<Member> {
+  const cleanName = input.name.trim().replace(/\s+/g, ' ')
+  const cleanPhone = input.phone?.trim() || null
   const { data, error } = await supabase
     .from('members')
-    .insert({ name: input.name, phone: input.phone ?? null,
-      username: input.username.toUpperCase(),
+    .insert({ name: cleanName, phone: cleanPhone,
+      username: input.username.toUpperCase().trim(),
       qr_code: input.qr_code,
     })
     .select()
@@ -324,9 +326,11 @@ export async function updateMemberDetails(
   staffId: string
 ): Promise<void> {
   const appDate = await getAppDate();
+  const cleanName = input.name.trim().replace(/\s+/g, ' ')
+  const cleanPhone = input.phone?.trim() || null
   const { error } = await supabase
     .from('members')
-    .update({ name: input.name, phone: input.phone || null,
+    .update({ name: cleanName, phone: cleanPhone,
       updated_by: staffId,
       updated_at: appDate.toISOString(),
     })
