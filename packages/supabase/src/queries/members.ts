@@ -353,3 +353,57 @@ export async function softDeleteMember(
   if (error) throw new Error(`Failed to deactivate member: ${error.message}`)
 }
 
+export async function findDuplicateMembers(
+  supabase: SupabaseClient,
+  input: { field: 'name' | 'phone'; value: string }
+): Promise<Pick<MemberWithStatus, 'id' | 'member_id' | 'name' | 'username' | 'phone' | 'status'>[]> {
+  const trimmed = input.value.trim().replace(/\s+/g, ' ')
+  if (!trimmed) return []
+
+  let query = supabase
+    .from('members')
+    .select(
+      `
+      id,
+      member_id,
+      name,
+      username,
+      phone,
+      member_plans (
+        id, plan_id, visits_purchased, visits_used, expiration_date, starts_at, status, created_at, updated_at
+      )
+    `
+    )
+    .eq('deleted', false)
+    .limit(5)
+
+  if (input.field === 'name') {
+    if (trimmed.length < 3) return []
+    query = query.ilike('name', `%${trimmed}%`)
+  } else {
+    const digits = trimmed.replace(/\D/g, '')
+    if (digits.length < 4) return []
+    const hyphenated = digits.length > 4 ? `${digits.slice(0, 4)}-${digits.slice(4)}` : digits
+    const patterns = Array.from(new Set([trimmed, digits, hyphenated]))
+    const orFilter = patterns.map((p) => `phone.ilike.%${p}%`).join(',')
+    query = query.or(orFilter)
+  }
+
+  const { data, error } = await query
+  if (error || !data) return []
+
+  const appDate = await getAppDate()
+  return data.map((m: any) => {
+    const { status } = computeMemberState(m.member_plans as any[], appDate)
+    return {
+      id: m.id,
+      member_id: m.member_id,
+      name: m.name,
+      username: m.username,
+      phone: m.phone,
+      status,
+    }
+  })
+}
+
+

@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useTransition, useRef } from 'react'
+import { useDebouncedCallback } from 'use-debounce'
 import { getTodayYYYYMMDD } from '@novafit/supabase/src/utils/date'
 import { parseISO, format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from 'date-fns'
 
@@ -62,8 +63,6 @@ export function StatusDateFilters({
   const [query, setQuery] = useState(onFilterChange ? '' : (searchParams.get('q') || ''))
   const [selectedRange, setSelectedRange] = useState('custom')
 
-  const isFirstRender = useRef(true)
-
   const lastPushed = useRef({
     q: query,
     status: initialStatus,
@@ -110,80 +109,62 @@ export function StatusDateFilters({
     }
   }, [searchParams, defaultStart, defaultEnd, defaultDateType, onFilterChange])
 
-  useEffect(() => {
-    // When onFilterChange is provided, trigger callback instead of pushing to URL
+  const emitFilters = useDebouncedCallback((next: Required<FilterChangeValues>) => {
     if (onFilterChange) {
-      if (isFirstRender.current) {
-        isFirstRender.current = false
-        return
-      }
-
-      const timeout = setTimeout(() => {
-        onFilterChange({
-          startDate: startDate !== null ? startDate : defaultStart,
-          endDate: endDate !== null ? endDate : defaultEnd,
-          status,
-          plan_id: planId,
-          dateType,
-          q: query,
-        })
-      }, 300)
-
-      return () => clearTimeout(timeout)
+      onFilterChange(next)
+      return
     }
 
-    // If param is null, it means it's not in the URL, but the component initializes with defaultStart/defaultEnd
-    const currentStart = searchParams.get('startDate') !== null ? searchParams.get('startDate') : defaultStart
-    const currentEnd = searchParams.get('endDate') !== null ? searchParams.get('endDate') : defaultEnd
-    const currentStatus = searchParams.get('status') || ''
-    const currentPlanId = searchParams.get('plan_id') || ''
-    const currentDateType = (searchParams.get('dateType') as 'starts_at' | 'created_at') || defaultDateType
-    const currentQ = searchParams.get('q') || ''
+    startTransition(() => {
+      const params = new URLSearchParams(searchParams.toString())
 
-    if (startDate === currentStart && endDate === currentEnd && status === currentStatus && planId === currentPlanId && dateType === currentDateType && query === currentQ) return
+      lastPushed.current = {
+        q: next.q,
+        status: next.status,
+        plan_id: next.plan_id,
+        dateType: next.dateType,
+        startDate: next.startDate,
+        endDate: next.endDate,
+      }
 
-    const timeout = setTimeout(() => {
-      startTransition(() => {
-        const params = new URLSearchParams(searchParams.toString())
-        
-        lastPushed.current = {
-          q: query,
-          status: status,
-          plan_id: planId,
-          dateType: dateType,
-          startDate: startDate !== null ? startDate : defaultStart,
-          endDate: endDate !== null ? endDate : defaultEnd
-        }
+      if (next.startDate !== '') params.set('startDate', next.startDate)
+      else params.set('startDate', '')
 
-        // We set explicitly to support empty strings for clearing the date
-        if (startDate !== null && startDate !== '') params.set('startDate', startDate)
-        else if (startDate === '') params.set('startDate', '')
-        
-        if (endDate !== null && endDate !== '') params.set('endDate', endDate)
-        else if (endDate === '') params.set('endDate', '')
-        
-        if (status) params.set('status', status)
-        else params.delete('status')
+      if (next.endDate !== '') params.set('endDate', next.endDate)
+      else params.set('endDate', '')
 
-        if (planId) params.set('plan_id', planId)
-        else params.delete('plan_id')
+      if (next.status) params.set('status', next.status)
+      else params.delete('status')
 
-        if (showDateTypeFilter) {
-          if (dateType && dateType !== defaultDateType) params.set('dateType', dateType)
-          else params.delete('dateType')
-        }
+      if (next.plan_id) params.set('plan_id', next.plan_id)
+      else params.delete('plan_id')
 
-        if (query) params.set('q', query)
-        else params.delete('q')
+      if (showDateTypeFilter) {
+        if (next.dateType && next.dateType !== defaultDateType) params.set('dateType', next.dateType)
+        else params.delete('dateType')
+      }
 
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-      })
-    }, 300)
+      if (next.q) params.set('q', next.q)
+      else params.delete('q')
 
-    return () => clearTimeout(timeout)
-  }, [startDate, endDate, status, planId, dateType, query, pathname, router, searchParams, defaultStart, defaultEnd, showDateTypeFilter, defaultDateType, onFilterChange])
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    })
+  }, 300)
+
+  const updateFilters = (overrides: Partial<FilterChangeValues>) => {
+    const next = {
+      startDate: overrides.startDate !== undefined ? overrides.startDate : startDate,
+      endDate: overrides.endDate !== undefined ? overrides.endDate : endDate,
+      status: overrides.status !== undefined ? overrides.status : status,
+      plan_id: overrides.plan_id !== undefined ? overrides.plan_id : planId,
+      dateType: overrides.dateType !== undefined ? overrides.dateType : dateType,
+      q: overrides.q !== undefined ? overrides.q : query,
+    }
+    emitFilters(next)
+  }
 
   const handleReset = () => {
+    emitFilters.cancel()
     setStartDate(defaultStart as string)
     setEndDate(defaultEnd as string)
     setStatus('')
@@ -268,14 +249,18 @@ export function StatusDateFilters({
       case 'clear':
         setStartDate('');
         setEndDate('');
+        updateFilters({ startDate: '', endDate: '' });
         return;
       case 'custom':
         return;
     }
 
     if (start && end) {
-      setStartDate(format(start, 'yyyy-MM-dd'));
-      setEndDate(format(end, 'yyyy-MM-dd'));
+      const nextStart = format(start, 'yyyy-MM-dd');
+      const nextEnd = format(end, 'yyyy-MM-dd');
+      setStartDate(nextStart);
+      setEndDate(nextEnd);
+      updateFilters({ startDate: nextStart, endDate: nextEnd });
     }
   }
 
@@ -295,7 +280,11 @@ export function StatusDateFilters({
           className="input pl-9 h-10 w-full" 
           placeholder={searchPlaceholder} 
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            const nextQ = e.target.value
+            setQuery(nextQ)
+            updateFilters({ q: nextQ })
+          }}
         />
       </div>
 
@@ -306,7 +295,11 @@ export function StatusDateFilters({
             <select 
               className="input h-10 w-full appearance-none bg-surface/50"
               value={dateType}
-              onChange={(e) => setDateType(e.target.value as 'starts_at' | 'created_at')}
+              onChange={(e) => {
+                const nextType = e.target.value as 'starts_at' | 'created_at'
+                setDateType(nextType)
+                updateFilters({ dateType: nextType })
+              }}
             >
               <option value="starts_at">Inicio de plan</option>
               <option value="created_at">Fecha de registro</option>
@@ -338,8 +331,10 @@ export function StatusDateFilters({
             className="input h-10 w-full"
             value={startDate}
             onChange={(e) => {
-              setStartDate(e.target.value)
+              const nextStart = e.target.value
+              setStartDate(nextStart)
               setSelectedRange('custom')
+              updateFilters({ startDate: nextStart })
             }}
           />
         </div>
@@ -350,8 +345,10 @@ export function StatusDateFilters({
             className="input h-10 w-full"
             value={endDate}
             onChange={(e) => {
-              setEndDate(e.target.value)
+              const nextEnd = e.target.value
+              setEndDate(nextEnd)
               setSelectedRange('custom')
+              updateFilters({ endDate: nextEnd })
             }}
           />
         </div>
@@ -360,7 +357,11 @@ export function StatusDateFilters({
           <select 
             className="input h-10 w-full appearance-none bg-surface/50"
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => {
+              const nextStatus = e.target.value
+              setStatus(nextStatus)
+              updateFilters({ status: nextStatus })
+            }}
           >
             <option value="">Todos</option>
             <option value="active">Activo</option>
@@ -376,7 +377,11 @@ export function StatusDateFilters({
             <select 
               className="input h-10 w-full appearance-none bg-surface/50"
               value={planId}
-              onChange={(e) => setPlanId(e.target.value)}
+              onChange={(e) => {
+                const nextPlanId = e.target.value
+                setPlanId(nextPlanId)
+                updateFilters({ plan_id: nextPlanId })
+              }}
             >
               <option value="">Todos</option>
               {plans.map(p => (

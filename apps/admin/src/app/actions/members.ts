@@ -5,7 +5,7 @@ import { createServerClient } from '@novafit/supabase/src/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { getCurrentStaff, hasRole } from '@novafit/supabase'
-import { generateUniqueUsername, createMember, updateMemberDetails, softDeleteMember } from '@novafit/supabase/src/queries/members'
+import { generateUniqueUsername, createMember, updateMemberDetails, softDeleteMember, findDuplicateMembers } from '@novafit/supabase/src/queries/members'
 
 export async function registerMember(prevState: any, formData: FormData) {
   console.info(`[MembersAction:registerMember] Starting registration`)
@@ -320,4 +320,17 @@ export async function activateScheduledPlanAction(planId: string, memberId: stri
   revalidatePath(`/members/${memberId}`)
   revalidatePath('/members')
   return { success: true }
+}
+
+export async function checkDuplicateMembersAction(field: 'name' | 'phone', value: string) {
+  try {
+    const supabase = await createServerClient()
+    const staff = await getCurrentStaff(supabase)
+    if (!staff) return []
+
+    return await findDuplicateMembers(supabase, { field, value })
+  } catch (error) {
+    console.error(`[MembersAction:checkDuplicateMembersAction] Error:`, error)
+    return []
+  }
 }

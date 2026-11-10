@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useDebouncedCallback } from 'use-debounce'
 import QRCode from 'qrcode'
 import type { Member } from '@novafit/types'
 
@@ -41,12 +42,14 @@ export function ShareMemberAppModal({ member }: ShareMemberAppModalProps) {
     }
   }, [isOpen, urlString])
 
+  const resetCopied = useDebouncedCallback(() => setCopied(false), 2000)
+
   const copyToClipboard = async () => {
     const textToCopy = `¡Hola ${member.name}! 👋\n\nEste es tu enlace para registrarte en la aplicación de miembros de NovaFit:\n\n${urlString}\n\nTu ID de usuario es: ${member.username}\n\nPor favor, ingresa al enlace para crear tu contraseña.`
     try {
       await navigator.clipboard.writeText(textToCopy)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      resetCopied()
     } catch (err) {
       console.error('Failed to copy', err)
     }
