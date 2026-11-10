@@ -164,7 +164,7 @@ export async function deactivateMemberAction(memberId: string) {
 
   } catch (error: any) {
     console.error(`[MembersAction:deactivateMemberAction] Error:`, error)
-    throw new Error(error.message || 'Error inesperado al desactivar el miembro.')
+    return { error: error.message || 'Error inesperado al desactivar el miembro.' }
   }
 
   revalidatePath('/members')

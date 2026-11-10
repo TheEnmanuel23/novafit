@@ -9,10 +9,9 @@ export function DeactivateMemberButton({ memberId }: { memberId: string }) {
   const handleDeactivate = () => {
     if (window.confirm('¿Estás seguro de que deseas desactivar a este miembro? Ya no aparecerá en los listados ni podrá realizar acciones.')) {
       startTransition(async () => {
-        try {
-          await deactivateMemberAction(memberId)
-        } catch (error: any) {
-          alert(error.message || 'Error al desactivar el miembro.')
+        const res = await deactivateMemberAction(memberId)
+        if (res?.error) {
+          alert(res.error)
         }
       })
     }
