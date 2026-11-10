@@ -1,13 +1,12 @@
-import { getAppDate } from '@novafit/supabase/src/utils/date';
+import { getAppDate, getTodayYYYYMMDD, getManaguaDayRange, formatDateOnly } from '@novafit/supabase/src/utils/date';
 import { computeMemberState } from '@novafit/supabase/src/utils/member';
+import { syncMemberPlans } from '@novafit/supabase/src/queries/member-plans';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CheckInResult, MemberWithStatus } from '@novafit/types'
-import { isBefore, isEqual, isAfter, startOfDay, endOfDay } from 'date-fns'
 
 export async function getTodayVisitsCount(supabase: SupabaseClient): Promise<number> {
   const today = await getAppDate();
-  const start = startOfDay(today);
-  const end = endOfDay(today);
+  const { start, end } = getManaguaDayRange(getTodayYYYYMMDD(today));
 
   const { count, error } = await supabase
     .from('attendances')
@@ -21,6 +20,42 @@ export async function getTodayVisitsCount(supabase: SupabaseClient): Promise<num
   }
 
   return count || 0;
+}
+
+export async function getMemberAttendances(
+  supabase: SupabaseClient,
+  memberId: string,
+  limit = 50
+): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('attendances')
+    .select(`
+      id,
+      scanned_at,
+      balance_before,
+      balance_after,
+      checkin_type,
+      registered_by,
+      registrar:staff!attendances_registered_by_fkey(name),
+      member_plan:member_plans (
+        id,
+        plan_id,
+        plan:plans (
+          id,
+          description
+        )
+      )
+    `)
+    .eq('member_id', memberId)
+    .order('scanned_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error fetching member attendances:', error);
+    return [];
+  }
+
+  return data ?? [];
 }
 
 export async function getAttendances(
@@ -60,42 +95,31 @@ export async function getAttendances(
         phone,
         member_plans (
           status,
+          starts_at,
           expiration_date,
           visits_purchased,
           visits_used,
+          created_at,
           updated_at
         )
       )
     `)
 
   if (options?.startDate) {
-    const [year, month, day] = options.startDate.split('-').map(Number);
-    const start = new Date(year, month - 1, day, 0, 0, 0, 0);
-    query = query.gte('scanned_at', start.toISOString());
+    query = query.gte('scanned_at', getManaguaDayRange(options.startDate).start.toISOString());
   }
   
   if (options?.endDate) {
-    const [year, month, day] = options.endDate.split('-').map(Number);
-    const end = new Date(year, month - 1, day, 23, 59, 59, 999);
-    query = query.lte('scanned_at', end.toISOString());
+    query = query.lte('scanned_at', getManaguaDayRange(options.endDate).end.toISOString());
   }
 
   if (options?.search) {
     query = query.or(`name.ilike.%${options.search}%,username.ilike.%${options.search}%,phone.ilike.%${options.search}%`, { foreignTable: 'members' });
   }
 
-  if (options?.sort_by) {
-    const ascending = options.order === 'asc';
-    if (options.sort_by === 'name' || options.sort_by === 'status') {
-      // Supabase sorting by foreign tables has limited support depending on syntax,
-      // but we can try to sort locally or rely on the query if supported.
-      // Usually foreign table sort requires a different syntax or isn't fully supported via PostgREST natively for multiple layers.
-      // For simplicity, if they sort by name, we might just sort the array in JS since limit is 100, 
-      // but let's try Postgres first:
-      query = query.order(`members(${options.sort_by})`, { ascending });
-    } else {
-      query = query.order(options.sort_by, { ascending });
-    }
+  const dbSortFields = ['scanned_at', 'checkin_type', 'balance_after', 'balance_before']
+  if (options?.sort_by && dbSortFields.includes(options.sort_by)) {
+    query = query.order(options.sort_by, { ascending: options.order === 'asc' });
   } else {
     query = query.order('scanned_at', { ascending: false });
   }
@@ -135,13 +159,29 @@ export async function getAttendances(
     result = result.filter(r => r.member_plan?.plan_id === options.plan_id);
   }
 
-  // Fallback JS sort if PostgREST foreign sort failed or if sorting by status
-  if (options?.sort_by === 'name' || options?.sort_by === 'status') {
+  // Sort locally for foreign/computed fields
+  const sortBy = options?.sort_by;
+  const isAsc = options?.order === 'asc';
+  if (sortBy === 'name' || sortBy === 'username') {
     result.sort((a: any, b: any) => {
-      const valA = a.members[options.sort_by!] || '';
-      const valB = b.members[options.sort_by!] || '';
-      if (valA < valB) return options.order === 'asc' ? -1 : 1;
-      if (valA > valB) return options.order === 'asc' ? 1 : -1;
+      const valA = (a.members?.[sortBy] || '').toLowerCase();
+      const valB = (b.members?.[sortBy] || '').toLowerCase();
+      if (valA < valB) return isAsc ? -1 : 1;
+      if (valA > valB) return isAsc ? 1 : -1;
+      return 0;
+    });
+  } else if (sortBy === 'status') {
+    const orderMap: Record<string, number> = { active: 1, low_balance: 2, scheduled: 3, expired: 4, no_plan: 5 };
+    result.sort((a: any, b: any) => {
+      const diff = (orderMap[a.members?.status] || 99) - (orderMap[b.members?.status] || 99);
+      return isAsc ? diff : -diff;
+    });
+  } else if (sortBy === 'plan') {
+    result.sort((a: any, b: any) => {
+      const valA = (a.member_plan?.plan?.description || '').toLowerCase();
+      const valB = (b.member_plan?.plan?.description || '').toLowerCase();
+      if (valA < valB) return isAsc ? -1 : 1;
+      if (valA > valB) return isAsc ? 1 : -1;
       return 0;
     });
   }
@@ -166,7 +206,7 @@ export async function processCheckIn(
       `
       *,
       member_plans (
-        id, plan_id, visits_purchased, visits_used, expiration_date, status, starts_at, updated_at,
+        id, plan_id, visits_purchased, visits_used, expiration_date, status, starts_at, created_at, updated_at,
         plan:plans (*)
       )
     `
@@ -191,8 +231,9 @@ export async function processCheckIn(
   const appDate = await getAppDate();
 
   // 1.5. Check for today's check-ins FIRST
-  const start = startOfDay(appDate).toISOString();
-  const end = endOfDay(appDate).toISOString();
+  const { start: dayStart, end: dayEnd } = getManaguaDayRange(getTodayYYYYMMDD(appDate));
+  const start = dayStart.toISOString();
+  const end = dayEnd.toISOString();
   
   const { data: todaysAttendances } = await supabase
     .from('attendances')
@@ -234,12 +275,20 @@ export async function processCheckIn(
     }
   }
 
-  // 2. Find active plan (using member state logic which considers same-day exhaustion)
-  const { active_plan: activePlan } = computeMemberState(member.member_plans, appDate);
+  // 2. Sync any scheduled plans that should now be active, then find active plan
+  await syncMemberPlans(supabase, member.member_plans, appDate);
+  const { active_plan: activePlan, scheduled_plans: scheduledPlans, status } = computeMemberState(member.member_plans, appDate);
 
   if (!activePlan) {
-    // Check if there's an expired plan
-    const { status } = computeMemberState(member.member_plans, appDate);
+    if (scheduledPlans && scheduledPlans.length > 0) {
+      return {
+        type: 'no_plan',
+        member,
+        expiration_date: scheduledPlans[0].starts_at,
+        message: `El plan de este miembro está programado para iniciar el ${formatDateOnly(scheduledPlans[0].starts_at)}.`,
+      }
+    }
+
     const hasExpired = status === 'expired';
     
     return {

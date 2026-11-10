@@ -1,95 +1,48 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import { parseISO, addDays, format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import Link from 'next/link'
+import { useDebouncedCallback } from 'use-debounce'
 import type { Plan } from '@novafit/types'
-import { registerMember } from '@/app/actions/members'
+import { registerMember, checkDuplicateMembersAction } from '@/app/actions/members'
+import { PlanAssignmentFields } from './PlanAssignmentFields'
 
 type NewMemberFormProps = {
   plans: Plan[]
 }
 
+type DuplicateMatch = {
+  id: string
+  member_id: string
+  name: string
+  username: string
+  phone: string | null
+  status: string
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  active: 'Activo',
+  low_balance: 'Por expirar',
+  scheduled: 'Programado',
+  expired: 'Expirado',
+  no_plan: 'Sin Plan',
+}
+
 export function NewMemberForm({ plans }: NewMemberFormProps) {
   const [state, formAction, pending] = useActionState(registerMember, null)
-  
-  // State for the selected plan and customized fields
   const [selectedPlanId, setSelectedPlanId] = useState<string>('')
-  const [isDiaPlan, setIsDiaPlan] = useState<boolean>(false)
-  const [diaQuantity, setDiaQuantity] = useState<number>(1)
-  const [customPrice, setCustomPrice] = useState<number>(0)
-  const [customVisits, setCustomVisits] = useState<number>(0)
-  const [customVisitsUsed, setCustomVisitsUsed] = useState<number>(0)
-  const [customDays, setCustomDays] = useState<number>(0)
-  const [startsAt, setStartsAt] = useState<string>(
-    typeof window !== 'undefined' 
-      ? (() => {
-          // Parse cookie safely client-side for initial state
-          const match = document.cookie.match(/(?:^|; )x-simulated-date=([^;]*)/)
-          if (match && match[1]) {
-            const val = decodeURIComponent(match[1])
-            if (val.length === 10 && val.includes('-')) return val
-          }
-          const d = new Date()
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-        })()
-      : new Date().toISOString().split('T')[0]
-  )
-  // Calculate preview
-  let projectedBalance = 0;
-  let projectedExpirationStr = '';
-  
-  if (selectedPlanId) {
-    const plan = plans.find(p => p.id === selectedPlanId);
-    if (plan) {
-      projectedBalance = customVisits - customVisitsUsed;
-      if (plan.max_balance && projectedBalance > plan.max_balance) {
-        projectedBalance = plan.max_balance;
-      }
-      
-      try {
-        if (startsAt) {
-          const expDate = addDays(parseISO(startsAt), customDays);
-          projectedExpirationStr = format(expDate, "d 'de' MMMM 'de' yyyy", { locale: es });
-        }
-      } catch (e) {
-        // ignore invalid dates
-      }
-    }
-  }
+  const [nameMatches, setNameMatches] = useState<DuplicateMatch[]>([])
+  const [phoneMatches, setPhoneMatches] = useState<DuplicateMatch[]>([])
 
-  const handlePlanSelect = (planId: string) => {
-    setSelectedPlanId(planId)
-    const plan = plans.find(p => p.id === planId)
-    if (plan) {
-      const isDia = plan.key === 'day'
-      setIsDiaPlan(isDia)
-      if (isDia) {
-        setDiaQuantity(1)
-        setCustomPrice(plan.price)
-        setCustomVisits(1)
-        setCustomVisitsUsed(0)
-        setCustomDays(2)
-      } else {
-        setCustomPrice(plan.price)
-        setCustomVisits(plan.visits_included)
-        setCustomVisitsUsed(0)
-        setCustomDays(plan.expiration_days)
-      }
-    }
-  }
+  const checkName = useDebouncedCallback(async (value: string) => {
+    const trimmed = value.trim()
+    setNameMatches(trimmed.length >= 3 ? await checkDuplicateMembersAction('name', trimmed) : [])
+  }, 350)
 
-  const handleDiaQuantityChange = (val: number) => {
-    const qty = val > 0 ? val : 1;
-    setDiaQuantity(qty);
-    const plan = plans.find(p => p.id === selectedPlanId);
-    if (plan) {
-       setCustomVisits(qty);
-       setCustomVisitsUsed(0);
-       setCustomDays(qty * 2);
-       setCustomPrice(plan.price * qty);
-    }
-  }
+  const checkPhone = useDebouncedCallback(async (value: string) => {
+    const digits = value.replace(/\D/g, '')
+    setPhoneMatches(digits.length >= 4 ? await checkDuplicateMembersAction('phone', value) : [])
+  }, 350)
 
   return (
     <form className="flex flex-col gap-6" action={formAction}>
@@ -104,7 +57,28 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
         
         <div className="input-group">
           <label className="input-label" htmlFor="name">Nombre Completo *</label>
-          <input id="name" name="name" type="text" className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl" required placeholder="Ej. Juan Pérez" />
+          <input
+            id="name"
+            name="name"
+            type="text"
+            autoComplete="off"
+            onChange={(e) => checkName(e.target.value)}
+            onBlur={(e) => {
+              e.currentTarget.value = e.currentTarget.value.trim().replace(/\s+/g, ' ')
+            }}
+            aria-describedby={nameMatches.length > 0 ? 'name-duplicate-warning' : undefined}
+            className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl"
+            required
+            placeholder="Ej. Juan Pérez"
+          />
+          <div id="name-duplicate-warning" aria-live="polite">
+            {nameMatches.length > 0 && (
+              <DuplicateWarningBox
+                title="Ya existe un miembro con un nombre similar:"
+                matches={nameMatches}
+              />
+            )}
+          </div>
         </div>
 
         <div className="input-group">
@@ -114,202 +88,92 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
             name="phone" 
             type="tel" 
             inputMode="numeric"
+            autoComplete="off"
+            onInput={(e) => {
+              e.currentTarget.value = e.currentTarget.value.replace(/[^0-9-]/g, '').trim()
+              checkPhone(e.currentTarget.value)
+            }}
+            onBlur={(e) => {
+              e.currentTarget.value = e.currentTarget.value.trim()
+            }}
+            aria-describedby={phoneMatches.length > 0 ? 'phone-duplicate-warning' : undefined}
             className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl" 
             placeholder="Ej. 8888-8888" 
-            onInput={(e) => {
-              e.currentTarget.value = e.currentTarget.value.replace(/[^0-9-]/g, '')
-            }}
           />
+          <div id="phone-duplicate-warning" aria-live="polite">
+            {phoneMatches.length > 0 && (
+              <DuplicateWarningBox
+                title="Ya existe un miembro con un teléfono similar:"
+                matches={phoneMatches}
+              />
+            )}
+          </div>
         </div>
       </section>
 
       <section className="glass p-5 flex flex-col gap-4">
         <h2 className="section-title !mb-0">Plan Inicial</h2>
         <p className="text-xs text-muted-foreground mb-2">Selecciona el paquete base. Podrás personalizar los detalles antes de guardar.</p>
-        
-        {plans.length === 0 ? (
-          <div className="bg-error/10 border border-error/20 text-error px-4 py-3 rounded-xl text-sm font-medium">
-            No hay planes activos disponibles. Por favor, crea uno primero en Configuración &gt; Planes.
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 mb-2">
-            {plans.map((plan) => (
-              <label key={plan.id} className="cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="plan_id" 
-                  value={plan.id} 
-                  className="peer sr-only" 
-                  required 
-                  checked={selectedPlanId === plan.id}
-                  onChange={() => handlePlanSelect(plan.id)}
-                />
-                <div className="glass p-3 rounded-lg border-2 border-transparent peer-checked:border-accent peer-checked:bg-accent-subtle transition-all">
-                  <div className="font-bold text-sm">{plan.description}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{plan.visits_included} {plan.visits_included === 1 ? 'visita' : 'visitas'}</div>
-                  <div className="font-semibold text-accent mt-2">C$ {plan.price}</div>
-                </div>
-              </label>
-            ))}
-          </div>
-        )}
 
-        {selectedPlanId && (
-          <div className="mt-4 p-4 rounded-xl bg-black/20 border border-white/5 flex flex-col gap-4 animate-in fade-in zoom-in-95">
-            <h3 className="text-sm font-bold text-accent">Personalizar Asignación</h3>
-            
-            <div className="input-group">
-              <label className="input-label text-xs" htmlFor="starts_at">Fecha de Inicio del Plan</label>
-              <input 
-                id="starts_at"
-                name="starts_at"
-                type="date" 
-                value={startsAt}
-                onChange={(e) => setStartsAt(e.target.value)}
-                className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
-                required 
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">Los días de vigencia contarán a partir de esta fecha.</p>
-            </div>
-
-            {isDiaPlan ? (
-              <div className="input-group mt-2">
-                <label className="input-label text-xs" htmlFor="dia_quantity">Cantidad de Días (Día Plan)</label>
-                <input 
-                  id="dia_quantity"
-                  type="number" 
-                  min="1"
-                  value={diaQuantity}
-                  onChange={(e) => handleDiaQuantityChange(parseInt(e.target.value) || 1)}
-                  className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
-                  required 
-                />
-                <div className="mt-2 p-3 bg-black/30 rounded-lg text-xs flex flex-col gap-1">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Visitas:</span>
-                    <span className="font-bold text-white">{customVisits}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Vigencia:</span>
-                    <span className="font-bold text-white">{customDays} días calendario</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Precio:</span>
-                    <span className="font-bold text-accent">C$ {customPrice}</span>
-                  </div>
-                </div>
-                <input type="hidden" name="custom_visits" value={customVisits} />
-                <input type="hidden" name="custom_visits_used" value={customVisitsUsed} />
-                <input type="hidden" name="custom_days" value={customDays} />
-                <input type="hidden" name="custom_price" value={customPrice} />
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                  <div className="input-group">
-                    <label className="input-label text-xs" htmlFor="custom_visits">Visitas a Asignar</label>
-                    <input 
-                      id="custom_visits"
-                      name="custom_visits"
-                      type="number" 
-                      min="1"
-                      value={customVisits}
-                      onChange={(e) => setCustomVisits(parseInt(e.target.value) || 0)}
-                      className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
-                      required 
-                    />
-                  </div>
-
-                  <div className="input-group">
-                    <label className="input-label text-xs" htmlFor="custom_days">Días de Vigencia</label>
-                    <input 
-                      id="custom_days"
-                      name="custom_days"
-                      type="number" 
-                      min="1"
-                      value={customDays}
-                      onChange={(e) => setCustomDays(parseInt(e.target.value) || 0)}
-                      className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
-                      required 
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                  <div className="input-group">
-                    <label className="input-label text-xs" htmlFor="custom_price">Precio Cobrado (C$)</label>
-                    <input 
-                      id="custom_price"
-                      name="custom_price"
-                      type="number" 
-                      min="0"
-                      value={customPrice}
-                      onChange={(e) => setCustomPrice(parseInt(e.target.value) || 0)}
-                      className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
-                      required 
-                    />
-                  </div>
-                  
-                  <div className="input-group">
-                    <label className="input-label text-xs" htmlFor="custom_visits_used">Visitas ya usadas</label>
-                    <input 
-                      id="custom_visits_used"
-                      name="custom_visits_used"
-                      type="number" 
-                      min="0"
-                      max={customVisits}
-                      value={customVisitsUsed}
-                      onChange={(e) => setCustomVisitsUsed(parseInt(e.target.value) || 0)}
-                      className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm" 
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
-            <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 flex flex-col gap-2 mt-2">
-              <p className="text-xs text-accent font-bold uppercase tracking-wider mb-1">Previsualización</p>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Visitas Nuevas:</span>
-                <span className="font-medium">{customVisits}</span>
-              </div>
-              {customVisitsUsed > 0 && (
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">Visitas Ya Usadas:</span>
-                  <span className="font-medium text-error">-{customVisitsUsed}</span>
-                </div>
-              )}
-              <div className="flex justify-between items-center text-sm border-t border-accent/10 pt-2 mt-1">
-                <span className="text-accent/80 font-medium">Balance Total (con max.):</span>
-                <span className="font-bold text-accent">{projectedBalance}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm mt-1">
-                <span className="text-accent/80 font-medium">Nueva Fecha Expiración:</span>
-                <span className="font-bold text-accent">{projectedExpirationStr || 'N/A'}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 mt-4 bg-black/20 p-3 rounded-xl border border-white/5">
-              <input 
-                type="checkbox" 
-                id="register_visit" 
-                name="register_visit" 
-                className="w-5 h-5 rounded border-white/20 bg-black/40 accent-accent"
-              />
-              <label htmlFor="register_visit" className="text-sm font-medium cursor-pointer flex-1">
-                Registrar visita automáticamente
-                <span className="block text-xs text-muted-foreground font-normal">
-                  Descuenta una visita hoy (ej. si el cliente ya está en el gimnasio).
-                </span>
-              </label>
-            </div>
-          </div>
-        )}
+        <PlanAssignmentFields
+          plans={plans}
+          showCustomizeHeader
+          selectedPlanId={selectedPlanId}
+          onSelectPlan={setSelectedPlanId}
+          emptyMessage="No hay planes activos disponibles. Por favor, crea uno primero en Configuración > Planes."
+        />
       </section>
 
       <button type="submit" disabled={pending} className="btn h-14 text-base font-bold text-white bg-gradient-to-r from-accent to-[#818cf8] border-none shadow-[0_0_30px_-5px_rgba(99,102,241,0.6)] hover:shadow-[0_0_50px_-5px_rgba(99,102,241,0.8)] hover:scale-[1.02] transition-all rounded-xl mt-2">
         {pending ? 'Registrando...' : 'Registrar y Generar QR'}
       </button>
     </form>
+  )
+}
+
+function DuplicateWarningBox({
+  title,
+  matches,
+}: {
+  title: string
+  matches: DuplicateMatch[]
+}) {
+  return (
+    <div className="mt-1.5 rounded-xl bg-warning/10 border border-warning/30 p-3 text-xs flex flex-col gap-2 animate-in fade-in">
+      <div className="flex items-center gap-2 text-warning font-semibold">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+          <path d="M12 9v4" />
+          <path d="M12 17h.01" />
+        </svg>
+        <span>{title}</span>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {matches.map((m) => (
+          <div
+            key={m.id}
+            className="flex items-center justify-between gap-2 p-2 rounded-lg bg-black/30 border border-white/5"
+          >
+            <div className="min-w-0">
+              <div className="font-semibold text-white truncate">{m.name}</div>
+              <div className="text-[11px] text-muted-foreground">
+                {m.username}
+                {m.phone ? ` • ${m.phone}` : ''}
+                {m.status ? ` • ${STATUS_LABELS[m.status] || m.status}` : ''}
+              </div>
+            </div>
+            <Link
+              href={`/members/${m.member_id}`}
+              className="px-2.5 py-1 rounded-lg bg-warning/20 hover:bg-warning/30 text-warning font-semibold text-[11px] shrink-0 transition-colors"
+            >
+              Ver perfil →
+            </Link>
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Si es la misma persona, abre su perfil para asignarle un plan. Si es otra persona, puedes continuar con el registro.
+      </p>
+    </div>
   )
 }

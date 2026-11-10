@@ -49,7 +49,10 @@ export function EditMemberModal({ member }: { member: any }) {
                   id="name" 
                   name="name" 
                   type="text" 
-                  defaultValue={member.name}
+                  defaultValue={member.name?.trim()}
+                  onBlur={(e) => {
+                    e.currentTarget.value = e.currentTarget.value.trim().replace(/\s+/g, ' ')
+                  }}
                   className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl" 
                   required 
                 />
@@ -62,10 +65,13 @@ export function EditMemberModal({ member }: { member: any }) {
                   name="phone" 
                   type="tel" 
                   inputMode="numeric"
-                  defaultValue={member.phone || ''}
+                  defaultValue={(member.phone || '').trim()}
                   className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl" 
                   onInput={(e) => {
-                    e.currentTarget.value = e.currentTarget.value.replace(/[^0-9-]/g, '')
+                    e.currentTarget.value = e.currentTarget.value.replace(/[^0-9-]/g, '').trim()
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.value = e.currentTarget.value.trim()
                   }}
                 />
               </div>

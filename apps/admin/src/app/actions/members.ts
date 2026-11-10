@@ -1,11 +1,11 @@
 'use server'
-import { getAppDate } from '@novafit/supabase/src/utils/date';
+import { getAppDate, getTodayYYYYMMDD, parseDateOnly, parseDateEnd, calcExpirationDate } from '@novafit/supabase/src/utils/date';
 
 import { createServerClient } from '@novafit/supabase/src/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { getCurrentStaff, hasRole } from '@novafit/supabase'
-import { generateUniqueUsername, createMember, updateMemberDetails, softDeleteMember } from '@novafit/supabase/src/queries/members'
+import { generateUniqueUsername, createMember, updateMemberDetails, softDeleteMember, findDuplicateMembers } from '@novafit/supabase/src/queries/members'
 
 export async function registerMember(prevState: any, formData: FormData) {
   console.info(`[MembersAction:registerMember] Starting registration`)
@@ -18,7 +18,7 @@ export async function registerMember(prevState: any, formData: FormData) {
       throw new Error('No tienes permisos para registrar miembros.')
     }
     
-    const name = (formData.get('name') as string)?.trim()
+    const name = (formData.get('name') as string)?.trim().replace(/\s+/g, ' ')
     const phone = (formData.get('phone') as string)?.trim()
     const planId = formData.get('plan_id') as string
     
@@ -38,16 +38,14 @@ export async function registerMember(prevState: any, formData: FormData) {
     }
 
     // 1. Calculate dates in UTC
-    const startsAt = new Date(`${startsAtStr}T00:00:00Z`)
+    const startsAt = parseDateOnly(startsAtStr)
     
     if (isNaN(startsAt.getTime())) {
       return { error: 'Fecha de inicio inválida.' }
     }
     
-    const expirationDate = new Date(startsAt)
-    // Add calendar days (inclusive of start day)
-    expirationDate.setDate(expirationDate.getDate() + Math.max(0, customDays - 1))
-    expirationDate.setHours(23, 59, 59, 999)
+    // Expiration = saved start date + days, computed in UTC
+    const expirationDate = calcExpirationDate(startsAt, customDays)
 
     // 2. Generate Username and QR code
     const username = await generateUniqueUsername(supabase)
@@ -92,8 +90,10 @@ export async function registerMember(prevState: any, formData: FormData) {
 
     if (txError) throw new Error(`Error registrando pago: ${txError.message}`)
 
+    const appDate = await getAppDate()
+    const isFutureStart = startsAtStr > getTodayYYYYMMDD(appDate)
     const registerVisit = formData.get('register_visit') === 'on'
-    if (registerVisit) {
+    if (registerVisit && !isFutureStart) {
       console.info(`[MembersAction:registerMember] Auto-registering visit for ${member.member_id}`)
       const { processCheckIn } = await import('@novafit/supabase/src/queries/checkin')
       await processCheckIn(supabase, { type: 'member_id', value: member.member_id }, { staff, checkinType: 'auto_assignment' })
@@ -121,7 +121,7 @@ export async function updateMemberAction(prevState: any, formData: FormData) {
       throw new Error('No tienes permisos para editar miembros.')
     }
     
-    const name = (formData.get('name') as string)?.trim()
+    const name = (formData.get('name') as string)?.trim().replace(/\s+/g, ' ')
     const phone = (formData.get('phone') as string)?.trim()
     
     if (!memberId || !name) {
@@ -197,7 +197,7 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
     
     let startsAt: Date | undefined
     if (startsAtStr) {
-      startsAt = new Date(`${startsAtStr}T00:00:00Z`)
+      startsAt = parseDateOnly(startsAtStr)
     }
     
     const { processRecharge } = await import('@novafit/supabase/src/queries/member-plans')
@@ -213,8 +213,10 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
       customDays: isNaN(customDays) ? undefined : customDays
     })
 
+    const appDate = await getAppDate()
+    const isFutureStart = !!(startsAtStr && startsAtStr > getTodayYYYYMMDD(appDate))
     const registerVisit = formData.get('register_visit') === 'on'
-    if (registerVisit) {
+    if (registerVisit && !isFutureStart) {
       console.info(`[MembersAction:assignPlanAction] Auto-registering visit for ${memberId}`)
       const { processCheckIn } = await import('@novafit/supabase/src/queries/checkin')
       await processCheckIn(supabase, { type: 'member_id', value: memberId }, { staff, checkinType: 'auto_assignment' })
@@ -257,12 +259,12 @@ export async function updatePlanAction(prevState: any, formData: FormData) {
     
     let startsAtISO: string | undefined
     if (startsAtStr) {
-      startsAtISO = new Date(`${startsAtStr}T00:00:00Z`).toISOString()
+      startsAtISO = parseDateOnly(startsAtStr).toISOString()
     }
 
     let expiresAtISO: string | undefined
     if (expiresAtStr) {
-      expiresAtISO = new Date(`${expiresAtStr}T23:59:59.999Z`).toISOString()
+      expiresAtISO = parseDateEnd(expiresAtStr).toISOString()
     }
     
     const appDate = await getAppDate();
@@ -289,4 +291,46 @@ export async function updatePlanAction(prevState: any, formData: FormData) {
 
   revalidatePath(`/members/${memberId}`)
   return { success: true }
+}
+
+export async function activateScheduledPlanAction(planId: string, memberId: string) {
+  console.info(`[MembersAction:activateScheduledPlanAction] Activating scheduled plan ${planId} for member ${memberId}`)
+  const supabase = await createServerClient()
+
+  try {
+    const staff = await getCurrentStaff(supabase)
+    if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      console.warn(`[MembersAction:activateScheduledPlanAction] Unauthorized access attempt`)
+      throw new Error('No tienes permisos para activar planes.')
+    }
+
+    const { activateScheduledPlan } = await import('@novafit/supabase/src/queries/member-plans')
+    await activateScheduledPlan(supabase, {
+      planId,
+      memberId,
+      staffId: staff.id,
+    })
+
+    console.info(`[MembersAction:activateScheduledPlanAction] Successfully activated plan ${planId}`)
+  } catch (error: any) {
+    console.error(`[MembersAction:activateScheduledPlanAction] Error:`, error)
+    return { error: error.message || 'Error inesperado al activar el plan.' }
+  }
+
+  revalidatePath(`/members/${memberId}`)
+  revalidatePath('/members')
+  return { success: true }
+}
+
+export async function checkDuplicateMembersAction(field: 'name' | 'phone', value: string) {
+  try {
+    const supabase = await createServerClient()
+    const staff = await getCurrentStaff(supabase)
+    if (!staff) return []
+
+    return await findDuplicateMembers(supabase, { field, value })
+  } catch (error) {
+    console.error(`[MembersAction:checkDuplicateMembersAction] Error:`, error)
+    return []
+  }
 }

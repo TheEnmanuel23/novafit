@@ -36,6 +36,7 @@ export interface MemberPlan {
   plan_id: string;
   visits_purchased: number;
   visits_used: number;
+  starts_at?: string;
   expiration_date: string;
   status: MemberPlanStatus;
   created_at: string;
@@ -125,10 +126,11 @@ export interface StaffWithProfile extends Staff {
 
 // ─── Composite / UI helpers ───────────────────────────────────────────────────
 
-export type MemberStatus = 'active' | 'expired' | 'low_balance' | 'no_plan';
+export type MemberStatus = 'active' | 'expired' | 'low_balance' | 'scheduled' | 'no_plan';
 
 export interface MemberWithStatus extends Member {
   active_plan: MemberPlanWithDetails | null;
+  scheduled_plans?: MemberPlanWithDetails[];
   status: MemberStatus;
 }
 

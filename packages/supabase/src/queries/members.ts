@@ -1,8 +1,8 @@
-import { getAppDate } from '@novafit/supabase/src/utils/date';
+import { getAppDate, getManaguaDayRange, getPeriodDayRange } from '@novafit/supabase/src/utils/date';
 import { computeMemberState } from '@novafit/supabase/src/utils/member';
+import { syncMemberPlans } from '@novafit/supabase/src/queries/member-plans';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Member, MemberWithStatus } from '@novafit/types'
-import { parseISO, startOfDay, endOfDay } from 'date-fns'
 
 /** Generate a short unique username: ABCD-1234 (no ambiguous chars) */
 export function generateUsername(): string {
@@ -40,6 +40,7 @@ export async function getMembers(
     status?: string; 
     startDate?: string; 
     endDate?: string; 
+    dateType?: 'starts_at' | 'created_at';
     page?: number; 
     limit?: number;
     sort_by?: string;
@@ -47,10 +48,10 @@ export async function getMembers(
     plan_id?: string;
   } = {}
 ): Promise<{ members: MemberWithStatus[]; total: number }> {
-  const { search, startDate, endDate, page = 1, limit = 50, sort_by = 'created_at', order = 'desc', plan_id } = opts
+  const { search, startDate, endDate, dateType = 'starts_at', page = 1, limit = 50, sort_by = 'created_at', order = 'desc', plan_id } = opts
   const offset = (page - 1) * limit
 
-  const hasPlanDateFilter = !!(startDate || endDate);
+  const hasPlanDateFilter = !!(startDate || endDate) && dateType === 'starts_at';
   const memberPlansRelation = hasPlanDateFilter ? 'member_plans!inner' : 'member_plans';
 
   let query = supabase
@@ -74,14 +75,20 @@ export async function getMembers(
     query = query.or(`name.ilike.%${search}%,username.ilike.%${search}%,phone.ilike.%${search}%`)
   }
 
-  if (startDate) {
-    const start = startOfDay(parseISO(startDate))
-    query = query.gte('member_plans.starts_at', start.toISOString())
-  }
-  
-  if (endDate) {
-    const end = endOfDay(parseISO(endDate))
-    query = query.lte('member_plans.starts_at', end.toISOString())
+  if (dateType === 'created_at') {
+    if (startDate) {
+      query = query.gte('created_at', getManaguaDayRange(startDate).start.toISOString())
+    }
+    if (endDate) {
+      query = query.lte('created_at', getManaguaDayRange(endDate).end.toISOString())
+    }
+  } else {
+    if (startDate) {
+      query = query.gte('member_plans.starts_at', getPeriodDayRange(startDate).start.toISOString())
+    }
+    if (endDate) {
+      query = query.lte('member_plans.starts_at', getPeriodDayRange(endDate).end.toISOString())
+    }
   }
 
   // Database sorting for direct columns
@@ -99,47 +106,57 @@ export async function getMembers(
   if (error) throw new Error(`Failed to fetch members: ${error.message}`)
 
   const appDate = await getAppDate();
-  let members = (data ?? []).map((m: any) => {
-    const { status, active_plan } = computeMemberState(m.member_plans as any[], appDate);
+  let members = await Promise.all(
+    (data ?? []).map(async (m: any) => {
+      await syncMemberPlans(supabase, m.member_plans as any[], appDate);
+      const { status, active_plan, scheduled_plans } = computeMemberState(m.member_plans as any[], appDate);
 
-    return {
-      ...m,
-      active_plan,
-      status,
-    } satisfies MemberWithStatus
-  })
+      return {
+        ...m,
+        active_plan,
+        scheduled_plans,
+        status,
+      } satisfies MemberWithStatus
+    })
+  )
 
   if (opts.status) {
     if (opts.status === 'active') {
       members = members.filter((m) => m.status === 'active' || m.status === 'low_balance')
+    } else if (opts.status === 'scheduled') {
+      members = members.filter((m) => m.status === 'scheduled' || (m.scheduled_plans && m.scheduled_plans.length > 0))
     } else {
       members = members.filter((m) => m.status === opts.status)
     }
   }
 
   if (opts.plan_id) {
-    members = members.filter((m) => m.active_plan?.plan_id === opts.plan_id)
+    members = members.filter(
+      (m) =>
+        m.active_plan?.plan_id === opts.plan_id ||
+        m.scheduled_plans?.some((sp: any) => sp.plan_id === opts.plan_id)
+    )
   }
 
   if (needsJSPostProcess) {
     if (sort_by === 'status') {
-      const orderMap: Record<string, number> = { 'active': 1, 'low_balance': 2, 'expired': 3, 'no_plan': 4 }
+      const orderMap: Record<string, number> = { active: 1, low_balance: 2, scheduled: 3, expired: 4, no_plan: 5 }
       members.sort((a, b) => {
         const diff = (orderMap[a.status] || 99) - (orderMap[b.status] || 99)
         return order === 'asc' ? diff : -diff
       })
     } else if (sort_by === 'plan') {
       members.sort((a, b) => {
-        const valA = a.active_plan?.plan?.description || ''
-        const valB = b.active_plan?.plan?.description || ''
+        const valA = a.active_plan?.plan?.description || a.scheduled_plans?.[0]?.plan?.description || ''
+        const valB = b.active_plan?.plan?.description || b.scheduled_plans?.[0]?.plan?.description || ''
         if (valA < valB) return order === 'asc' ? -1 : 1
         if (valA > valB) return order === 'asc' ? 1 : -1
         return 0
       })
     } else if (sort_by === 'start_date') {
       members.sort((a, b) => {
-        const valA = a.active_plan?.starts_at || '0000-00-00'
-        const valB = b.active_plan?.starts_at || '0000-00-00'
+        const valA = a.active_plan?.starts_at || a.scheduled_plans?.[0]?.starts_at || '0000-00-00'
+        const valB = b.active_plan?.starts_at || b.scheduled_plans?.[0]?.starts_at || '0000-00-00'
         if (valA < valB) return order === 'asc' ? -1 : 1
         if (valA > valB) return order === 'asc' ? 1 : -1
         return 0
@@ -178,11 +195,13 @@ export async function getMemberByUsername(
   if (!data) return null
 
   const appDate = await getAppDate();
-  const { status, active_plan } = computeMemberState(data.member_plans as any[], appDate);
+  await syncMemberPlans(supabase, data.member_plans as any[], appDate);
+  const { status, active_plan, scheduled_plans } = computeMemberState(data.member_plans as any[], appDate);
 
   return {
     ...data,
     active_plan,
+    scheduled_plans,
     status,
   } as MemberWithStatus
 }
@@ -212,11 +231,13 @@ export async function getMemberByQrCode(
   if (!data) return null
 
   const appDate = await getAppDate();
-  const { status, active_plan } = computeMemberState(data.member_plans as any[], appDate);
+  await syncMemberPlans(supabase, data.member_plans as any[], appDate);
+  const { status, active_plan, scheduled_plans } = computeMemberState(data.member_plans as any[], appDate);
 
   return {
     ...data,
     active_plan,
+    scheduled_plans,
     status,
   } as MemberWithStatus
 }
@@ -234,6 +255,8 @@ export async function getMemberById(
       updater:staff!members_updated_by_fkey(name),
       member_plans (
         id, plan_id, visits_purchased, visits_used, expiration_date, starts_at, status, created_at, updated_at,
+        creator:staff!member_plans_created_by_fkey(name),
+        updater:staff!member_plans_updated_by_fkey(name),
         plan:plans (*)
       )
     `
@@ -246,11 +269,13 @@ export async function getMemberById(
   if (!data) return null
 
   const appDate = await getAppDate();
-  const { status, active_plan } = computeMemberState(data.member_plans as any[], appDate);
+  await syncMemberPlans(supabase, data.member_plans as any[], appDate);
+  const { status, active_plan, scheduled_plans } = computeMemberState(data.member_plans as any[], appDate);
 
   return {
     ...data,
     active_plan,
+    scheduled_plans,
     status,
   } as MemberWithStatus
 }
@@ -263,10 +288,12 @@ export async function createMember(
     qr_code: string
   }
 ): Promise<Member> {
+  const cleanName = input.name.trim().replace(/\s+/g, ' ')
+  const cleanPhone = input.phone?.trim() || null
   const { data, error } = await supabase
     .from('members')
-    .insert({ name: input.name, phone: input.phone ?? null,
-      username: input.username.toUpperCase(),
+    .insert({ name: cleanName, phone: cleanPhone,
+      username: input.username.toUpperCase().trim(),
       qr_code: input.qr_code,
     })
     .select()
@@ -299,9 +326,11 @@ export async function updateMemberDetails(
   staffId: string
 ): Promise<void> {
   const appDate = await getAppDate();
+  const cleanName = input.name.trim().replace(/\s+/g, ' ')
+  const cleanPhone = input.phone?.trim() || null
   const { error } = await supabase
     .from('members')
-    .update({ name: input.name, phone: input.phone || null,
+    .update({ name: cleanName, phone: cleanPhone,
       updated_by: staffId,
       updated_at: appDate.toISOString(),
     })
@@ -327,4 +356,58 @@ export async function softDeleteMember(
 
   if (error) throw new Error(`Failed to deactivate member: ${error.message}`)
 }
+
+export async function findDuplicateMembers(
+  supabase: SupabaseClient,
+  input: { field: 'name' | 'phone'; value: string }
+): Promise<Pick<MemberWithStatus, 'id' | 'member_id' | 'name' | 'username' | 'phone' | 'status'>[]> {
+  const trimmed = input.value.trim().replace(/\s+/g, ' ')
+  if (!trimmed) return []
+
+  let query = supabase
+    .from('members')
+    .select(
+      `
+      id,
+      member_id,
+      name,
+      username,
+      phone,
+      member_plans (
+        id, plan_id, visits_purchased, visits_used, expiration_date, starts_at, status, created_at, updated_at
+      )
+    `
+    )
+    .eq('deleted', false)
+    .limit(5)
+
+  if (input.field === 'name') {
+    if (trimmed.length < 3) return []
+    query = query.ilike('name', `%${trimmed}%`)
+  } else {
+    const digits = trimmed.replace(/\D/g, '')
+    if (digits.length < 4) return []
+    const hyphenated = digits.length > 4 ? `${digits.slice(0, 4)}-${digits.slice(4)}` : digits
+    const patterns = Array.from(new Set([trimmed, digits, hyphenated]))
+    const orFilter = patterns.map((p) => `phone.ilike.%${p}%`).join(',')
+    query = query.or(orFilter)
+  }
+
+  const { data, error } = await query
+  if (error || !data) return []
+
+  const appDate = await getAppDate()
+  return data.map((m: any) => {
+    const { status } = computeMemberState(m.member_plans as any[], appDate)
+    return {
+      id: m.id,
+      member_id: m.member_id,
+      name: m.name,
+      username: m.username,
+      phone: m.phone,
+      status,
+    }
+  })
+}
+
 

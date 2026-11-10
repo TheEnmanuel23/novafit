@@ -1,6 +1,7 @@
 'use server'
 
 import { createServerClient } from '@novafit/supabase/src/server'
+import { getAppDate } from '@novafit/supabase/src/utils/date'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -58,7 +59,7 @@ export async function updateBusinessSettings(prevState: any, formData: FormData)
       phone,
       address,
       logo_url: logoUrl,
-      updated_at: new Date().toISOString()
+      updated_at: (await getAppDate()).toISOString()
     })
 
   if (error) {

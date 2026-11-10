@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getStaffById, getCurrentStaff, hasRole, isGlobalAdmin } from '@novafit/supabase'
+import { formatLongDate } from '@novafit/supabase/src/utils/date'
 import ResetPasswordButton from './ResetPasswordButton'
 
 export default async function StaffDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -65,7 +66,7 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
 
           <div className="flex flex-col gap-1 mt-2">
             <span className="text-xs text-muted-foreground uppercase font-semibold">Fecha de Registro</span>
-            <span className="font-medium">{new Date(staff.created_at).toLocaleDateString('es-ES', { timeZone: 'America/Managua', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+            <span className="font-medium">{formatLongDate(staff.created_at)}</span>
           </div>
         </section>
 

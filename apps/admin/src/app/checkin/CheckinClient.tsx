@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useEffect } from 'react'
+import { useDebouncedCallback } from 'use-debounce'
 import { manualCheckinAction, searchMembersAction } from '@/app/actions/checkin'
 import { UserDropdown } from '@/components/UserDropdown'
 
@@ -31,22 +32,25 @@ export function CheckinClient({ canQR, canManual, staffName }: Props) {
     }
   }, [result])
 
-  useEffect(() => {
-    if (username.length < 2) {
+  const debouncedSearch = useDebouncedCallback(async (val: string) => {
+    const results = await searchMembersAction(val)
+    setSearchResults(results)
+    setHasSearched(true)
+    setIsSearching(false)
+  }, 300)
+
+  const handleUsernameChange = (val: string) => {
+    setUsername(val)
+    if (val.length < 2) {
+      debouncedSearch.cancel()
       setSearchResults([])
       setHasSearched(false)
       setIsSearching(false)
       return
     }
     setIsSearching(true)
-    const timer = setTimeout(async () => {
-      const results = await searchMembersAction(username)
-      setSearchResults(results)
-      setHasSearched(true)
-      setIsSearching(false)
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [username])
+    debouncedSearch(val)
+  }
 
   const notFound = hasSearched && !isSearching && searchResults.length === 0 && username.length >= 2
 
@@ -55,7 +59,7 @@ export function CheckinClient({ canQR, canManual, staffName }: Props) {
       const res = await manualCheckinAction(username, memberId)
       setResult(res)
       if (res?.type === 'success' || res?.type === 'no_visits') {
-        setUsername('')
+        handleUsernameChange('')
       }
     })
   }
@@ -182,7 +186,7 @@ export function CheckinClient({ canQR, canManual, staffName }: Props) {
                 <input
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => handleUsernameChange(e.target.value)}
                   className="input text-center text-xl font-bold tracking-wide placeholder:text-muted/30 h-16"
                   autoFocus
                   disabled={isPending}

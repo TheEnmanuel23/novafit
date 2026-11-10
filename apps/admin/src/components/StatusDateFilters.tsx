@@ -2,7 +2,18 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useTransition, useRef } from 'react'
-import { getClientAppDate } from '@novafit/supabase/src/utils/date-client'
+import { useDebouncedCallback } from 'use-debounce'
+import { getTodayYYYYMMDD } from '@novafit/supabase/src/utils/date'
+import { parseISO, format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from 'date-fns'
+
+export type FilterChangeValues = {
+  startDate?: string
+  endDate?: string
+  status?: string
+  plan_id?: string
+  dateType?: 'starts_at' | 'created_at'
+  q?: string
+}
 
 type StatusDateFiltersProps = {
   dateLabelStart?: string
@@ -12,6 +23,10 @@ type StatusDateFiltersProps = {
   searchPlaceholder?: string
   totalResults?: number
   plans?: { id: string, description: string }[]
+  showDateTypeFilter?: boolean
+  defaultDateType?: 'starts_at' | 'created_at'
+  onFilterChange?: (filters: FilterChangeValues) => void
+  isPending?: boolean
 }
 
 export function StatusDateFilters({ 
@@ -21,39 +36,50 @@ export function StatusDateFilters({
   defaultEnd = '',
   searchPlaceholder = 'Buscar...',
   totalResults,
-  plans
+  plans,
+  showDateTypeFilter = false,
+  defaultDateType = 'starts_at',
+  onFilterChange,
+  isPending: externalPending,
 }: StatusDateFiltersProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [isPending, startTransition] = useTransition()
+  const [internalPending, startTransition] = useTransition()
+  const isPending = externalPending !== undefined ? externalPending : internalPending
   
-  // Set defaults based on props if no query params exist
-  const initialStart = searchParams.get('startDate') !== null ? searchParams.get('startDate') : defaultStart
-  const initialEnd = searchParams.get('endDate') !== null ? searchParams.get('endDate') : defaultEnd
-  const initialStatus = searchParams.get('status') || ''
-  const initialPlanId = searchParams.get('plan_id') || ''
+  // Set defaults based on props if no query params exist (or when onFilterChange is used)
+  const initialStart = onFilterChange ? defaultStart : (searchParams.get('startDate') !== null ? searchParams.get('startDate') : defaultStart)
+  const initialEnd = onFilterChange ? defaultEnd : (searchParams.get('endDate') !== null ? searchParams.get('endDate') : defaultEnd)
+  const initialStatus = onFilterChange ? '' : (searchParams.get('status') || '')
+  const initialPlanId = onFilterChange ? '' : (searchParams.get('plan_id') || '')
+  const initialDateType = onFilterChange ? defaultDateType : ((searchParams.get('dateType') as 'starts_at' | 'created_at') || defaultDateType)
 
   const [startDate, setStartDate] = useState(initialStart ?? '')
   const [endDate, setEndDate] = useState(initialEnd ?? '')
   const [status, setStatus] = useState(initialStatus)
   const [planId, setPlanId] = useState(initialPlanId)
-  const [query, setQuery] = useState(searchParams.get('q') || '')
+  const [dateType, setDateType] = useState<'starts_at' | 'created_at'>(initialDateType)
+  const [query, setQuery] = useState(onFilterChange ? '' : (searchParams.get('q') || ''))
   const [selectedRange, setSelectedRange] = useState('custom')
 
   const lastPushed = useRef({
-    q: searchParams.get('q') || '',
+    q: query,
     status: initialStatus,
     plan_id: initialPlanId,
+    dateType: initialDateType,
     startDate: initialStart,
     endDate: initialEnd
   })
 
-  // Sync local state if URL changes from outside (e.g. back/forward buttons)
+  // Sync local state if URL changes from outside (e.g. back/forward buttons) - only when onFilterChange is NOT provided
   useEffect(() => {
+    if (onFilterChange) return
+
     const q = searchParams.get('q') || ''
     const currentStatus = searchParams.get('status') || ''
     const currentPlanId = searchParams.get('plan_id') || ''
+    const currentDateType = (searchParams.get('dateType') as 'starts_at' | 'created_at') || defaultDateType
     const currentStart = searchParams.get('startDate') !== null ? searchParams.get('startDate') : defaultStart
     const currentEnd = searchParams.get('endDate') !== null ? searchParams.get('endDate') : defaultEnd
 
@@ -69,6 +95,10 @@ export function StatusDateFilters({
       setPlanId(currentPlanId)
       lastPushed.current.plan_id = currentPlanId
     }
+    if (currentDateType !== lastPushed.current.dateType) {
+      setDateType(currentDateType)
+      lastPushed.current.dateType = currentDateType
+    }
     if (currentStart !== lastPushed.current.startDate) {
       setStartDate(currentStart as string)
       lastPushed.current.startDate = currentStart
@@ -77,60 +107,84 @@ export function StatusDateFilters({
       setEndDate(currentEnd as string)
       lastPushed.current.endDate = currentEnd
     }
-  }, [searchParams, defaultStart, defaultEnd])
+  }, [searchParams, defaultStart, defaultEnd, defaultDateType, onFilterChange])
 
-  useEffect(() => {
-    // If param is null, it means it's not in the URL, but the component initializes with defaultStart/defaultEnd
-    const currentStart = searchParams.get('startDate') !== null ? searchParams.get('startDate') : defaultStart
-    const currentEnd = searchParams.get('endDate') !== null ? searchParams.get('endDate') : defaultEnd
-    const currentStatus = searchParams.get('status') || ''
-    const currentPlanId = searchParams.get('plan_id') || ''
-    const currentQ = searchParams.get('q') || ''
+  const emitFilters = useDebouncedCallback((next: Required<FilterChangeValues>) => {
+    if (onFilterChange) {
+      onFilterChange(next)
+      return
+    }
 
-    if (startDate === currentStart && endDate === currentEnd && status === currentStatus && planId === currentPlanId && query === currentQ) return
+    startTransition(() => {
+      const params = new URLSearchParams(searchParams.toString())
 
-    const timeout = setTimeout(() => {
-      startTransition(() => {
-        const params = new URLSearchParams(searchParams.toString())
-        
-        lastPushed.current = {
-          q: query,
-          status: status,
-          plan_id: planId,
-          startDate: startDate !== null ? startDate : defaultStart,
-          endDate: endDate !== null ? endDate : defaultEnd
-        }
+      lastPushed.current = {
+        q: next.q,
+        status: next.status,
+        plan_id: next.plan_id,
+        dateType: next.dateType,
+        startDate: next.startDate,
+        endDate: next.endDate,
+      }
 
-        // We set explicitly to support empty strings for clearing the date
-        if (startDate !== null && startDate !== '') params.set('startDate', startDate)
-        else if (startDate === '') params.set('startDate', '')
-        
-        if (endDate !== null && endDate !== '') params.set('endDate', endDate)
-        else if (endDate === '') params.set('endDate', '')
-        
-        if (status) params.set('status', status)
-        else params.delete('status')
+      if (next.startDate !== '') params.set('startDate', next.startDate)
+      else params.set('startDate', '')
 
-        if (planId) params.set('plan_id', planId)
-        else params.delete('plan_id')
+      if (next.endDate !== '') params.set('endDate', next.endDate)
+      else params.set('endDate', '')
 
-        if (query) params.set('q', query)
-        else params.delete('q')
+      if (next.status) params.set('status', next.status)
+      else params.delete('status')
 
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-      })
-    }, 300)
+      if (next.plan_id) params.set('plan_id', next.plan_id)
+      else params.delete('plan_id')
 
-    return () => clearTimeout(timeout)
-  }, [startDate, endDate, status, planId, query, pathname, router, searchParams, defaultStart, defaultEnd])
+      if (showDateTypeFilter) {
+        if (next.dateType && next.dateType !== defaultDateType) params.set('dateType', next.dateType)
+        else params.delete('dateType')
+      }
+
+      if (next.q) params.set('q', next.q)
+      else params.delete('q')
+
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    })
+  }, 300)
+
+  const updateFilters = (overrides: Partial<FilterChangeValues>) => {
+    const next = {
+      startDate: overrides.startDate !== undefined ? overrides.startDate : startDate,
+      endDate: overrides.endDate !== undefined ? overrides.endDate : endDate,
+      status: overrides.status !== undefined ? overrides.status : status,
+      plan_id: overrides.plan_id !== undefined ? overrides.plan_id : planId,
+      dateType: overrides.dateType !== undefined ? overrides.dateType : dateType,
+      q: overrides.q !== undefined ? overrides.q : query,
+    }
+    emitFilters(next)
+  }
 
   const handleReset = () => {
+    emitFilters.cancel()
     setStartDate(defaultStart as string)
     setEndDate(defaultEnd as string)
     setStatus('')
     setPlanId('')
+    setDateType(defaultDateType)
     setQuery('')
     setSelectedRange('custom')
+
+    if (onFilterChange) {
+      onFilterChange({
+        startDate: defaultStart as string,
+        endDate: defaultEnd as string,
+        status: '',
+        plan_id: '',
+        dateType: defaultDateType,
+        q: '',
+      })
+      return
+    }
+
     startTransition(() => {
       const params = new URLSearchParams(searchParams.toString())
       if (defaultStart) params.set('startDate', defaultStart)
@@ -141,12 +195,14 @@ export function StatusDateFilters({
 
       params.delete('status')
       params.delete('plan_id')
+      params.delete('dateType')
       params.delete('q')
 
       lastPushed.current = {
         q: '',
         status: '',
         plan_id: '',
+        dateType: defaultDateType,
         startDate: defaultStart,
         endDate: defaultEnd
       }
@@ -157,61 +213,63 @@ export function StatusDateFilters({
 
   const setDateRange = (type: string) => {
     setSelectedRange(type);
-    const now = getClientAppDate();
-    const format = (d: Date) => {
-      const year = d.getFullYear()
-      const month = String(d.getMonth() + 1).padStart(2, '0')
-      const day = String(d.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
-    }
+    const now = parseISO(getTodayYYYYMMDD());
 
-    let start, end;
-    
-    switch(type) {
+    let start: Date | undefined, end: Date | undefined;
+
+    switch (type) {
       case 'today':
         start = end = now;
         break;
       case 'yesterday':
-        start = new Date(now);
-        start.setDate(now.getDate() - 1);
-        end = new Date(start);
+        start = end = subDays(now, 1);
         break;
       case 'this_week':
-        start = new Date(now);
-        start.setDate(now.getDate() - now.getDay());
-        end = new Date(start);
-        end.setDate(start.getDate() + 6);
+        start = startOfWeek(now);
+        end = endOfWeek(now);
         break;
       case 'last_two_weeks':
-        end = new Date(now);
-        start = new Date(now);
-        start.setDate(now.getDate() - 14);
+        start = subDays(now, 14);
+        end = now;
         break;
       case 'this_month':
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        start = startOfMonth(now);
+        end = endOfMonth(now);
         break;
-      case 'last_month':
-        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        end = new Date(now.getFullYear(), now.getMonth(), 0);
+      case 'last_month': {
+        const lastMonth = subMonths(now, 1);
+        start = startOfMonth(lastMonth);
+        end = endOfMonth(lastMonth);
         break;
+      }
       case 'last_two_months':
-        start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-        end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        start = startOfMonth(subMonths(now, 2));
+        end = endOfMonth(now);
         break;
       case 'clear':
         setStartDate('');
         setEndDate('');
+        updateFilters({ startDate: '', endDate: '' });
         return;
       case 'custom':
         return;
     }
-    
+
     if (start && end) {
-      setStartDate(format(start));
-      setEndDate(format(end));
+      const nextStart = format(start, 'yyyy-MM-dd');
+      const nextEnd = format(end, 'yyyy-MM-dd');
+      setStartDate(nextStart);
+      setEndDate(nextEnd);
+      updateFilters({ startDate: nextStart, endDate: nextEnd });
     }
   }
+
+  const effectiveLabelStart = showDateTypeFilter
+    ? (dateType === 'created_at' ? 'Registrado Desde' : 'Inicio de Plan Desde')
+    : dateLabelStart
+  const effectiveLabelEnd = showDateTypeFilter
+    ? (dateType === 'created_at' ? 'Registrado Hasta' : 'Inicio de Plan Hasta')
+    : dateLabelEnd
 
   return (
     <div className="flex flex-col gap-4 relative">
@@ -222,11 +280,32 @@ export function StatusDateFilters({
           className="input pl-9 h-10 w-full" 
           placeholder={searchPlaceholder} 
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            const nextQ = e.target.value
+            setQuery(nextQ)
+            updateFilters({ q: nextQ })
+          }}
         />
       </div>
 
       <div className="flex gap-2 flex-wrap text-sm">
+        {showDateTypeFilter && (
+          <div className="flex-1 min-w-[140px]">
+            <label className="text-xs text-muted-foreground ml-1">Filtrar fecha por</label>
+            <select 
+              className="input h-10 w-full appearance-none bg-surface/50"
+              value={dateType}
+              onChange={(e) => {
+                const nextType = e.target.value as 'starts_at' | 'created_at'
+                setDateType(nextType)
+                updateFilters({ dateType: nextType })
+              }}
+            >
+              <option value="starts_at">Inicio de plan</option>
+              <option value="created_at">Fecha de registro</option>
+            </select>
+          </div>
+        )}
         <div className="flex-1 min-w-[130px]">
           <label className="text-xs text-muted-foreground ml-1">Rango de fechas</label>
           <select 
@@ -246,26 +325,30 @@ export function StatusDateFilters({
           </select>
         </div>
         <div className="flex-1 min-w-[120px]">
-          <label className="text-xs text-muted-foreground ml-1">{dateLabelStart}</label>
+          <label className="text-xs text-muted-foreground ml-1">{effectiveLabelStart}</label>
           <input 
             type="date" 
             className="input h-10 w-full"
             value={startDate}
             onChange={(e) => {
-              setStartDate(e.target.value)
+              const nextStart = e.target.value
+              setStartDate(nextStart)
               setSelectedRange('custom')
+              updateFilters({ startDate: nextStart })
             }}
           />
         </div>
         <div className="flex-1 min-w-[120px]">
-          <label className="text-xs text-muted-foreground ml-1">{dateLabelEnd}</label>
+          <label className="text-xs text-muted-foreground ml-1">{effectiveLabelEnd}</label>
           <input 
             type="date" 
             className="input h-10 w-full"
             value={endDate}
             onChange={(e) => {
-              setEndDate(e.target.value)
+              const nextEnd = e.target.value
+              setEndDate(nextEnd)
               setSelectedRange('custom')
+              updateFilters({ endDate: nextEnd })
             }}
           />
         </div>
@@ -274,11 +357,16 @@ export function StatusDateFilters({
           <select 
             className="input h-10 w-full appearance-none bg-surface/50"
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => {
+              const nextStatus = e.target.value
+              setStatus(nextStatus)
+              updateFilters({ status: nextStatus })
+            }}
           >
             <option value="">Todos</option>
             <option value="active">Activo</option>
             <option value="low_balance">Por expirar</option>
+            <option value="scheduled">Programado</option>
             <option value="expired">Expirado</option>
             <option value="no_plan">Sin Plan</option>
           </select>
@@ -289,7 +377,11 @@ export function StatusDateFilters({
             <select 
               className="input h-10 w-full appearance-none bg-surface/50"
               value={planId}
-              onChange={(e) => setPlanId(e.target.value)}
+              onChange={(e) => {
+                const nextPlanId = e.target.value
+                setPlanId(nextPlanId)
+                updateFilters({ plan_id: nextPlanId })
+              }}
             >
               <option value="">Todos</option>
               {plans.map(p => (
