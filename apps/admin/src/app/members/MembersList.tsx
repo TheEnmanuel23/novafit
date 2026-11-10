@@ -17,8 +17,9 @@ const MEMBER_SORT_OPTIONS = [
 const STATUS_ORDER: Record<string, number> = {
   active: 1,
   low_balance: 2,
-  expired: 3,
-  no_plan: 4,
+  scheduled: 3,
+  expired: 4,
+  no_plan: 5,
 }
 
 export function MembersList({ members }: { members: any[] }) {
@@ -42,11 +43,11 @@ export function MembersList({ members }: { members: any[] }) {
         valA = (a.name || '').toLowerCase()
         valB = (b.name || '').toLowerCase()
       } else if (sortBy === 'plan') {
-        valA = (a.active_plan?.plan?.description || '').toLowerCase()
-        valB = (b.active_plan?.plan?.description || '').toLowerCase()
+        valA = (a.active_plan?.plan?.description || a.scheduled_plans?.[0]?.plan?.description || '').toLowerCase()
+        valB = (b.active_plan?.plan?.description || b.scheduled_plans?.[0]?.plan?.description || '').toLowerCase()
       } else if (sortBy === 'start_date') {
-        valA = a.active_plan?.starts_at || '0000-00-00'
-        valB = b.active_plan?.starts_at || '0000-00-00'
+        valA = a.active_plan?.starts_at || a.scheduled_plans?.[0]?.starts_at || '0000-00-00'
+        valB = b.active_plan?.starts_at || b.scheduled_plans?.[0]?.starts_at || '0000-00-00'
       }
       if (valA < valB) return isAsc ? -1 : 1
       if (valA > valB) return isAsc ? 1 : -1
@@ -70,8 +71,10 @@ export function MembersList({ members }: { members: any[] }) {
 
       <div className="flex flex-col gap-3">
         {sortedMembers.map((member: any) => {
+          const scheduledPlans = member.scheduled_plans || []
           const displayPlan =
             member.active_plan ||
+            scheduledPlans[0] ||
             (member.member_plans && member.member_plans.length > 0
               ? [...member.member_plans].sort((a, b) =>
                   compareDesc(parseISO(a.created_at), parseISO(b.created_at))
@@ -98,10 +101,22 @@ export function MembersList({ members }: { members: any[] }) {
                       )}
                     </div>
                   )}
+                  {member.active_plan && scheduledPlans.length > 0 && (
+                    <div className="text-[10px] text-warning font-medium">
+                      Próximo plan programado: {scheduledPlans[0].plan?.description} (inicia {formatDateOnly(scheduledPlans[0].starts_at)})
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="text-right flex flex-col items-end gap-1">
-                <StatusBadge status={member.status} />
+                <div className="flex items-center gap-1.5">
+                  <StatusBadge status={member.status} />
+                  {member.active_plan && scheduledPlans.length > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-warning/15 text-warning border border-warning/25">
+                      +{scheduledPlans.length} prog.
+                    </span>
+                  )}
+                </div>
 
                 {displayPlan && (
                   <div className="text-xs font-medium mt-1">
@@ -109,11 +124,15 @@ export function MembersList({ members }: { members: any[] }) {
                   </div>
                 )}
 
-                {member.active_plan && (
+                {member.active_plan ? (
                   <div className="text-sm font-medium mt-1">
                     {member.active_plan.visits_remaining} / {member.active_plan.visits_purchased} <span className="text-muted-foreground text-xs font-normal">días disponibles</span>
                   </div>
-                )}
+                ) : scheduledPlans.length > 0 ? (
+                  <div className="text-sm font-medium mt-1 text-warning">
+                    {scheduledPlans[0].visits_remaining} / {scheduledPlans[0].visits_purchased} <span className="text-muted-foreground text-xs font-normal">días programados</span>
+                  </div>
+                ) : null}
               </div>
             </Link>
           )
@@ -132,6 +151,7 @@ export function MembersList({ members }: { members: any[] }) {
 function StatusBadge({ status }: { status: any }) {
   if (status === 'active') return <span className="badge badge-active">Activo</span>
   if (status === 'low_balance') return <span className="badge badge-warning">Por expirar</span>
+  if (status === 'scheduled') return <span className="badge badge-warning">Programado</span>
   if (status === 'expired') return <span className="badge badge-expired">Expirado</span>
   return <span className="badge badge-no-plan">Sin Plan</span>
 }

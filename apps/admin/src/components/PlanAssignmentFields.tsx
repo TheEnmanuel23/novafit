@@ -4,11 +4,12 @@ import { useState } from 'react'
 import { parseISO, addDays, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { Plan } from '@novafit/types'
-import { getTodayYYYYMMDD } from '@novafit/supabase/src/utils/date'
+import { getTodayYYYYMMDD, toPeriodYYYYMMDD } from '@novafit/supabase/src/utils/date'
 
 type PlanAssignmentFieldsProps = {
   plans: Plan[]
   currentRollover?: number
+  currentPlanExpiration?: string
   showRollover?: boolean
   showCustomizeHeader?: boolean
   selectedPlanId: string
@@ -19,6 +20,7 @@ type PlanAssignmentFieldsProps = {
 export function PlanAssignmentFields({
   plans,
   currentRollover = 0,
+  currentPlanExpiration,
   showRollover = false,
   showCustomizeHeader = false,
   selectedPlanId,
@@ -31,27 +33,60 @@ export function PlanAssignmentFields({
   const [customVisits, setCustomVisits] = useState<number>(0)
   const [customVisitsUsed, setCustomVisitsUsed] = useState<number>(0)
   const [customDays, setCustomDays] = useState<number>(0)
-  const [startsAt, setStartsAt] = useState<string>(() => getTodayYYYYMMDD())
+  const todayStr = getTodayYYYYMMDD()
+  const [startsAt, setStartsAt] = useState<string>(() => todayStr)
+
+  const isFutureStart = Boolean(startsAt && startsAt > todayStr)
+
+  let nextAfterCurrentStr = ''
+  let nextAfterCurrentLabel = ''
+  if (currentPlanExpiration) {
+    try {
+      const expYmd = toPeriodYYYYMMDD(currentPlanExpiration)
+      if (expYmd) {
+        const nextDate = addDays(parseISO(expYmd), 1)
+        nextAfterCurrentStr = format(nextDate, 'yyyy-MM-dd')
+        nextAfterCurrentLabel = format(nextDate, 'd/M/yyyy')
+      }
+    } catch {
+      // ignore invalid date
+    }
+  }
+
+  let in30DaysStr = ''
+  let in30DaysLabel = ''
+  try {
+    const plus30 = addDays(parseISO(todayStr), 30)
+    in30DaysStr = format(plus30, 'yyyy-MM-dd')
+    in30DaysLabel = format(plus30, 'd/M/yyyy')
+  } catch {
+    // ignore
+  }
 
   let projectedBalance = 0
+  let projectedStartStr = ''
   let projectedExpirationStr = ''
+  const selectedPlan = selectedPlanId ? plans.find((p) => p.id === selectedPlanId) : undefined
 
-  if (selectedPlanId) {
-    const plan = plans.find((p) => p.id === selectedPlanId)
-    if (plan) {
+  if (selectedPlan) {
+    if (isFutureStart) {
+      projectedBalance = customVisits - customVisitsUsed
+    } else {
       projectedBalance = currentRollover + customVisits - customVisitsUsed
-      if (!isDiaPlan && plan.max_balance && projectedBalance > plan.max_balance) {
-        projectedBalance = plan.max_balance
+      if (!isDiaPlan && selectedPlan.max_balance && projectedBalance > selectedPlan.max_balance) {
+        projectedBalance = selectedPlan.max_balance
       }
+    }
 
-      try {
-        if (startsAt) {
-          const expDate = addDays(parseISO(startsAt), customDays)
-          projectedExpirationStr = format(expDate, "d 'de' MMMM 'de' yyyy", { locale: es })
-        }
-      } catch {
-        // ignore invalid dates
+    try {
+      if (startsAt) {
+        const parsedStart = parseISO(startsAt)
+        projectedStartStr = format(parsedStart, "d 'de' MMMM 'de' yyyy", { locale: es })
+        const expDate = addDays(parsedStart, customDays)
+        projectedExpirationStr = format(expDate, "d 'de' MMMM 'de' yyyy", { locale: es })
       }
+    } catch {
+      // ignore invalid dates
     }
   }
 
@@ -136,9 +171,50 @@ export function PlanAssignmentFields({
               className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl text-sm"
               required
             />
-            {showCustomizeHeader && (
-              <p className="text-[10px] text-muted-foreground mt-1">Los días de vigencia contarán a partir de esta fecha.</p>
-            )}
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              <button
+                type="button"
+                onClick={() => setStartsAt(todayStr)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                  startsAt === todayStr
+                    ? 'bg-accent/20 text-accent border-accent/40'
+                    : 'bg-white/5 text-muted-foreground border-white/10 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                Hoy (Activar ahora)
+              </button>
+              {nextAfterCurrentStr && nextAfterCurrentStr > todayStr && (
+                <button
+                  type="button"
+                  onClick={() => setStartsAt(nextAfterCurrentStr)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                    startsAt === nextAfterCurrentStr
+                      ? 'bg-accent/20 text-accent border-accent/40'
+                      : 'bg-white/5 text-muted-foreground border-white/10 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  Al vencer plan actual ({nextAfterCurrentLabel})
+                </button>
+              )}
+              {in30DaysStr && in30DaysStr !== nextAfterCurrentStr && (
+                <button
+                  type="button"
+                  onClick={() => setStartsAt(in30DaysStr)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                    startsAt === in30DaysStr
+                      ? 'bg-accent/20 text-accent border-accent/40'
+                      : 'bg-white/5 text-muted-foreground border-white/10 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  En 30 días ({in30DaysLabel})
+                </button>
+              )}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              {isFutureStart
+                ? 'Al elegir una fecha futura, el plan quedará programado y no afectará el plan activo actual.'
+                : 'Los días de vigencia contarán a partir de esta fecha.'}
+            </p>
           </div>
 
           {isDiaPlan ? (
@@ -237,8 +313,15 @@ export function PlanAssignmentFields({
           )}
 
           <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 flex flex-col gap-2 mt-2">
-            <p className="text-xs text-accent font-bold uppercase tracking-wider mb-1">Previsualización</p>
-            {showRollover && (
+            <div className="flex justify-between items-center mb-1">
+              <p className="text-xs text-accent font-bold uppercase tracking-wider">Previsualización</p>
+              {isFutureStart && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-warning/20 text-warning border border-warning/30">
+                  Programado
+                </span>
+              )}
+            </div>
+            {!isFutureStart && showRollover && (
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">Visitas Trasladadas (Rollover):</span>
                 <span className="font-medium">{currentRollover}</span>
@@ -255,29 +338,46 @@ export function PlanAssignmentFields({
               </div>
             )}
             <div className="flex justify-between items-center text-sm border-t border-accent/10 pt-2 mt-1">
-              <span className="text-accent/80 font-medium">Balance Total (con max.):</span>
+              <span className="text-accent/80 font-medium">
+                {isFutureStart ? 'Visitas del Plan Programado:' : 'Balance Total (con max.):'}
+              </span>
               <span className="font-bold text-accent">{projectedBalance}</span>
             </div>
+            {isFutureStart && (
+              <div className="flex justify-between items-center text-sm mt-1">
+                <span className="text-accent/80 font-medium">Inicia el:</span>
+                <span className="font-bold text-warning">{projectedStartStr || 'N/A'}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center text-sm mt-1">
               <span className="text-accent/80 font-medium">Nueva Fecha Expiración:</span>
               <span className="font-bold text-accent">{projectedExpirationStr || 'N/A'}</span>
             </div>
+            {isFutureStart && (
+              <p className="text-[11px] text-muted-foreground mt-2 pt-2 border-t border-accent/10 leading-relaxed">
+                {showRollover && currentRollover > 0
+                  ? `El plan actual seguirá activo hoy. Cuando inicie este plan (o al activarlo), las visitas sobrantes se trasladarán automáticamente${selectedPlan?.max_balance && !isDiaPlan ? ` (hasta el límite de ${selectedPlan.max_balance} días)` : ''}.`
+                  : 'Este plan quedará en espera y se activará automáticamente en su fecha de inicio.'}
+              </p>
+            )}
           </div>
 
-          <div className="flex items-center gap-3 mt-4 bg-black/20 p-3 rounded-xl border border-white/5">
-            <input
-              type="checkbox"
-              id="register_visit"
-              name="register_visit"
-              className="w-5 h-5 rounded border-white/20 bg-black/40 accent-accent"
-            />
-            <label htmlFor="register_visit" className="text-sm font-medium cursor-pointer flex-1">
-              Registrar visita automáticamente
-              <span className="block text-xs text-muted-foreground font-normal">
-                Descuenta una visita hoy (ej. si el cliente ya está en el gimnasio).
-              </span>
-            </label>
-          </div>
+          {!isFutureStart && (
+            <div className="flex items-center gap-3 mt-4 bg-black/20 p-3 rounded-xl border border-white/5">
+              <input
+                type="checkbox"
+                id="register_visit"
+                name="register_visit"
+                className="w-5 h-5 rounded border-white/20 bg-black/40 accent-accent"
+              />
+              <label htmlFor="register_visit" className="text-sm font-medium cursor-pointer flex-1">
+                Registrar visita automáticamente
+                <span className="block text-xs text-muted-foreground font-normal">
+                  Descuenta una visita hoy (ej. si el cliente ya está en el gimnasio).
+                </span>
+              </label>
+            </div>
+          )}
         </div>
       )}
     </>

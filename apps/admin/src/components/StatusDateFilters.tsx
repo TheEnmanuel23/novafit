@@ -365,6 +365,7 @@ export function StatusDateFilters({
             <option value="">Todos</option>
             <option value="active">Activo</option>
             <option value="low_balance">Por expirar</option>
+            <option value="scheduled">Programado</option>
             <option value="expired">Expirado</option>
             <option value="no_plan">Sin Plan</option>
           </select>

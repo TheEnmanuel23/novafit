@@ -8,7 +8,8 @@ import { getMemberPlanHistory } from '@novafit/supabase/src/queries/member-plans
 import { EditMemberModal } from '@/components/EditMemberModal'
 import { DeactivateMemberButton } from '@/components/DeactivateMemberButton'
 import { AssignPlanModal } from '@/components/AssignPlanModal'
-import { isPlanActive, isPlanExpired } from '@novafit/supabase/src/utils/member'
+import { ActivatePlanButton } from '@/components/ActivatePlanButton'
+import { isPlanActive, isPlanExpired, isPlanScheduled } from '@novafit/supabase/src/utils/member'
 import { getAppDate, formatDateOnly, formatDateTime } from '@novafit/supabase/src/utils/date'
 import { EditPlanModal } from '@/components/EditPlanModal'
 import { ShareMemberAppModal } from '@/components/ShareMemberAppModal'
@@ -46,6 +47,11 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
   const plans = await getActivePlans(supabase)
   const planHistory = await getMemberPlanHistory(supabase, member.member_id)
   const appDate = await getAppDate()
+  const scheduledPlans = member.scheduled_plans ?? []
+  const latestPlanExpiration =
+    scheduledPlans.length > 0
+      ? scheduledPlans[scheduledPlans.length - 1].expiration_date
+      : member.active_plan?.expiration_date
 
   return (
     <div className="app-container">
@@ -93,7 +99,12 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
               <h2 className="text-lg font-semibold">Plan Activo</h2>
               <div className="flex gap-2">
                 <EditPlanModal memberPlan={member.active_plan} memberId={member.member_id} />
-                <AssignPlanModal memberId={member.member_id} plans={plans} currentRollover={member.active_plan.visits_remaining} />
+                <AssignPlanModal
+                  memberId={member.member_id}
+                  plans={plans}
+                  currentRollover={member.active_plan.visits_remaining}
+                  currentPlanExpiration={latestPlanExpiration}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -142,9 +153,67 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
           </div>
         ) : (
           <div className="glass p-8 rounded-xl flex flex-col items-center justify-center gap-4 text-center">
-            <h2 className="text-xl font-bold text-muted-foreground">Sin Plan Activo</h2>
-            <p className="text-sm text-muted-foreground max-w-sm mb-2">Este miembro no tiene un plan activo. Asigna uno nuevo para continuar.</p>
-            <AssignPlanModal memberId={member.member_id} plans={plans} currentRollover={0} />
+            <h2 className="text-xl font-bold text-muted-foreground">Sin Plan Activo Hoy</h2>
+            <p className="text-sm text-muted-foreground max-w-sm mb-2">
+              {scheduledPlans.length > 0
+                ? 'Este miembro tiene un plan programado para iniciar próximamente. Puedes activarlo ahora o asignar otro plan.'
+                : 'Este miembro no tiene un plan activo. Asigna uno nuevo para continuar.'}
+            </p>
+            <AssignPlanModal
+              memberId={member.member_id}
+              plans={plans}
+              currentRollover={0}
+              currentPlanExpiration={latestPlanExpiration}
+            />
+          </div>
+        )}
+
+        {scheduledPlans.length > 0 && (
+          <div className="glass p-6 rounded-xl flex flex-col gap-4 border border-warning/20">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">
+                  {scheduledPlans.length === 1 ? 'Plan Programado' : 'Planes Programados'}
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-warning/20 text-warning border border-warning/30">
+                  {scheduledPlans.length} en espera
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3">
+              {scheduledPlans.map((sp: any) => (
+                <div key={sp.id} className="p-4 rounded-xl bg-black/25 border border-warning/20 flex flex-col gap-3">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <p className="font-semibold text-sm">{sp.plan?.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Inicia: <span className="text-warning font-medium">{formatDateOnly(sp.starts_at)}</span> • Expira: <span className="text-white/90 font-medium">{formatDateOnly(sp.expiration_date)}</span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ActivatePlanButton
+                        planId={sp.id}
+                        memberId={member.member_id}
+                        hasActivePlan={Boolean(member.active_plan)}
+                      />
+                      <EditPlanModal memberPlan={sp} memberId={member.member_id} />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-6">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Días Comprados</p>
+                      <p className="text-xs font-medium">{sp.visits_purchased} <span className="text-muted-foreground font-normal">días</span></p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Disponibles al Iniciar</p>
+                      <p className="text-xs font-medium text-accent">
+                        {sp.visits_purchased - sp.visits_used} <span className="text-muted-foreground font-normal">días (+ rollover si aplica)</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -166,13 +235,20 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                         isPlanExpired(mp, appDate) ? 'bg-error/20 text-error border border-error/20' : 
+                        isPlanScheduled(mp, appDate) ? 'bg-warning/20 text-warning border border-warning/20' :
                         isPlanActive(mp, appDate) ? 'bg-accent/20 text-accent border border-accent/20' : 
                         'bg-white/10 text-white/70'
                       }`}>
-                        {isPlanExpired(mp, appDate) ? 'expired' : isPlanActive(mp, appDate) ? 'active' : mp.status}
+                        {isPlanExpired(mp, appDate)
+                          ? 'expired'
+                          : isPlanScheduled(mp, appDate)
+                            ? 'programado'
+                            : isPlanActive(mp, appDate)
+                              ? 'active'
+                              : mp.status}
                       </span>
                       {!isPlanExpired(mp, appDate) && (
-                         <EditPlanModal memberPlan={mp} memberId={member.member_id} />
+                        <EditPlanModal memberPlan={mp} memberId={member.member_id} />
                       )}
                     </div>
                   </div>

@@ -1,5 +1,6 @@
 import { getAppDate, getManaguaDayRange, getPeriodDayRange } from '@novafit/supabase/src/utils/date';
 import { computeMemberState } from '@novafit/supabase/src/utils/member';
+import { syncMemberPlans } from '@novafit/supabase/src/queries/member-plans';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Member, MemberWithStatus } from '@novafit/types'
 
@@ -105,47 +106,57 @@ export async function getMembers(
   if (error) throw new Error(`Failed to fetch members: ${error.message}`)
 
   const appDate = await getAppDate();
-  let members = (data ?? []).map((m: any) => {
-    const { status, active_plan } = computeMemberState(m.member_plans as any[], appDate);
+  let members = await Promise.all(
+    (data ?? []).map(async (m: any) => {
+      await syncMemberPlans(supabase, m.member_plans as any[], appDate);
+      const { status, active_plan, scheduled_plans } = computeMemberState(m.member_plans as any[], appDate);
 
-    return {
-      ...m,
-      active_plan,
-      status,
-    } satisfies MemberWithStatus
-  })
+      return {
+        ...m,
+        active_plan,
+        scheduled_plans,
+        status,
+      } satisfies MemberWithStatus
+    })
+  )
 
   if (opts.status) {
     if (opts.status === 'active') {
       members = members.filter((m) => m.status === 'active' || m.status === 'low_balance')
+    } else if (opts.status === 'scheduled') {
+      members = members.filter((m) => m.status === 'scheduled' || (m.scheduled_plans && m.scheduled_plans.length > 0))
     } else {
       members = members.filter((m) => m.status === opts.status)
     }
   }
 
   if (opts.plan_id) {
-    members = members.filter((m) => m.active_plan?.plan_id === opts.plan_id)
+    members = members.filter(
+      (m) =>
+        m.active_plan?.plan_id === opts.plan_id ||
+        m.scheduled_plans?.some((sp: any) => sp.plan_id === opts.plan_id)
+    )
   }
 
   if (needsJSPostProcess) {
     if (sort_by === 'status') {
-      const orderMap: Record<string, number> = { 'active': 1, 'low_balance': 2, 'expired': 3, 'no_plan': 4 }
+      const orderMap: Record<string, number> = { active: 1, low_balance: 2, scheduled: 3, expired: 4, no_plan: 5 }
       members.sort((a, b) => {
         const diff = (orderMap[a.status] || 99) - (orderMap[b.status] || 99)
         return order === 'asc' ? diff : -diff
       })
     } else if (sort_by === 'plan') {
       members.sort((a, b) => {
-        const valA = a.active_plan?.plan?.description || ''
-        const valB = b.active_plan?.plan?.description || ''
+        const valA = a.active_plan?.plan?.description || a.scheduled_plans?.[0]?.plan?.description || ''
+        const valB = b.active_plan?.plan?.description || b.scheduled_plans?.[0]?.plan?.description || ''
         if (valA < valB) return order === 'asc' ? -1 : 1
         if (valA > valB) return order === 'asc' ? 1 : -1
         return 0
       })
     } else if (sort_by === 'start_date') {
       members.sort((a, b) => {
-        const valA = a.active_plan?.starts_at || '0000-00-00'
-        const valB = b.active_plan?.starts_at || '0000-00-00'
+        const valA = a.active_plan?.starts_at || a.scheduled_plans?.[0]?.starts_at || '0000-00-00'
+        const valB = b.active_plan?.starts_at || b.scheduled_plans?.[0]?.starts_at || '0000-00-00'
         if (valA < valB) return order === 'asc' ? -1 : 1
         if (valA > valB) return order === 'asc' ? 1 : -1
         return 0
@@ -184,11 +195,13 @@ export async function getMemberByUsername(
   if (!data) return null
 
   const appDate = await getAppDate();
-  const { status, active_plan } = computeMemberState(data.member_plans as any[], appDate);
+  await syncMemberPlans(supabase, data.member_plans as any[], appDate);
+  const { status, active_plan, scheduled_plans } = computeMemberState(data.member_plans as any[], appDate);
 
   return {
     ...data,
     active_plan,
+    scheduled_plans,
     status,
   } as MemberWithStatus
 }
@@ -218,11 +231,13 @@ export async function getMemberByQrCode(
   if (!data) return null
 
   const appDate = await getAppDate();
-  const { status, active_plan } = computeMemberState(data.member_plans as any[], appDate);
+  await syncMemberPlans(supabase, data.member_plans as any[], appDate);
+  const { status, active_plan, scheduled_plans } = computeMemberState(data.member_plans as any[], appDate);
 
   return {
     ...data,
     active_plan,
+    scheduled_plans,
     status,
   } as MemberWithStatus
 }
@@ -240,6 +255,8 @@ export async function getMemberById(
       updater:staff!members_updated_by_fkey(name),
       member_plans (
         id, plan_id, visits_purchased, visits_used, expiration_date, starts_at, status, created_at, updated_at,
+        creator:staff!member_plans_created_by_fkey(name),
+        updater:staff!member_plans_updated_by_fkey(name),
         plan:plans (*)
       )
     `
@@ -252,11 +269,13 @@ export async function getMemberById(
   if (!data) return null
 
   const appDate = await getAppDate();
-  const { status, active_plan } = computeMemberState(data.member_plans as any[], appDate);
+  await syncMemberPlans(supabase, data.member_plans as any[], appDate);
+  const { status, active_plan, scheduled_plans } = computeMemberState(data.member_plans as any[], appDate);
 
   return {
     ...data,
     active_plan,
+    scheduled_plans,
     status,
   } as MemberWithStatus
 }

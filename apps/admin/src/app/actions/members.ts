@@ -1,5 +1,5 @@
 'use server'
-import { getAppDate, parseDateOnly, parseDateEnd, calcExpirationDate } from '@novafit/supabase/src/utils/date';
+import { getAppDate, getTodayYYYYMMDD, parseDateOnly, parseDateEnd, calcExpirationDate } from '@novafit/supabase/src/utils/date';
 
 import { createServerClient } from '@novafit/supabase/src/server'
 import { redirect } from 'next/navigation'
@@ -90,8 +90,10 @@ export async function registerMember(prevState: any, formData: FormData) {
 
     if (txError) throw new Error(`Error registrando pago: ${txError.message}`)
 
+    const appDate = await getAppDate()
+    const isFutureStart = startsAtStr > getTodayYYYYMMDD(appDate)
     const registerVisit = formData.get('register_visit') === 'on'
-    if (registerVisit) {
+    if (registerVisit && !isFutureStart) {
       console.info(`[MembersAction:registerMember] Auto-registering visit for ${member.member_id}`)
       const { processCheckIn } = await import('@novafit/supabase/src/queries/checkin')
       await processCheckIn(supabase, { type: 'member_id', value: member.member_id }, { staff, checkinType: 'auto_assignment' })
@@ -211,8 +213,10 @@ export async function assignPlanAction(prevState: any, formData: FormData) {
       customDays: isNaN(customDays) ? undefined : customDays
     })
 
+    const appDate = await getAppDate()
+    const isFutureStart = !!(startsAtStr && startsAtStr > getTodayYYYYMMDD(appDate))
     const registerVisit = formData.get('register_visit') === 'on'
-    if (registerVisit) {
+    if (registerVisit && !isFutureStart) {
       console.info(`[MembersAction:assignPlanAction] Auto-registering visit for ${memberId}`)
       const { processCheckIn } = await import('@novafit/supabase/src/queries/checkin')
       await processCheckIn(supabase, { type: 'member_id', value: memberId }, { staff, checkinType: 'auto_assignment' })
@@ -286,5 +290,34 @@ export async function updatePlanAction(prevState: any, formData: FormData) {
   }
 
   revalidatePath(`/members/${memberId}`)
+  return { success: true }
+}
+
+export async function activateScheduledPlanAction(planId: string, memberId: string) {
+  console.info(`[MembersAction:activateScheduledPlanAction] Activating scheduled plan ${planId} for member ${memberId}`)
+  const supabase = await createServerClient()
+
+  try {
+    const staff = await getCurrentStaff(supabase)
+    if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      console.warn(`[MembersAction:activateScheduledPlanAction] Unauthorized access attempt`)
+      throw new Error('No tienes permisos para activar planes.')
+    }
+
+    const { activateScheduledPlan } = await import('@novafit/supabase/src/queries/member-plans')
+    await activateScheduledPlan(supabase, {
+      planId,
+      memberId,
+      staffId: staff.id,
+    })
+
+    console.info(`[MembersAction:activateScheduledPlanAction] Successfully activated plan ${planId}`)
+  } catch (error: any) {
+    console.error(`[MembersAction:activateScheduledPlanAction] Error:`, error)
+    return { error: error.message || 'Error inesperado al activar el plan.' }
+  }
+
+  revalidatePath(`/members/${memberId}`)
+  revalidatePath('/members')
   return { success: true }
 }

@@ -5,7 +5,17 @@ import type { Plan } from '@novafit/types'
 import { assignPlanAction } from '@/app/actions/members'
 import { PlanAssignmentFields } from './PlanAssignmentFields'
 
-export function AssignPlanModal({ memberId, plans, currentRollover = 0 }: { memberId: string, plans: Plan[], currentRollover?: number }) {
+export function AssignPlanModal({
+  memberId,
+  plans,
+  currentRollover = 0,
+  currentPlanExpiration,
+}: {
+  memberId: string
+  plans: Plan[]
+  currentRollover?: number
+  currentPlanExpiration?: string
+}) {
   const [isOpen, setIsOpen] = useState(false)
   const [state, formAction, pending] = useActionState(assignPlanAction, null)
   const [selectedPlanId, setSelectedPlanId] = useState<string>('')
@@ -49,6 +59,7 @@ export function AssignPlanModal({ memberId, plans, currentRollover = 0 }: { memb
               <PlanAssignmentFields
                 plans={plans}
                 currentRollover={currentRollover}
+                currentPlanExpiration={currentPlanExpiration}
                 showRollover
                 selectedPlanId={selectedPlanId}
                 onSelectPlan={setSelectedPlanId}

@@ -1,5 +1,6 @@
-import { getAppDate, getTodayYYYYMMDD, getManaguaDayRange } from '@novafit/supabase/src/utils/date';
+import { getAppDate, getTodayYYYYMMDD, getManaguaDayRange, formatDateOnly } from '@novafit/supabase/src/utils/date';
 import { computeMemberState } from '@novafit/supabase/src/utils/member';
+import { syncMemberPlans } from '@novafit/supabase/src/queries/member-plans';
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CheckInResult, MemberWithStatus } from '@novafit/types'
 
@@ -58,9 +59,11 @@ export async function getAttendances(
         phone,
         member_plans (
           status,
+          starts_at,
           expiration_date,
           visits_purchased,
           visits_used,
+          created_at,
           updated_at
         )
       )
@@ -132,7 +135,7 @@ export async function getAttendances(
       return 0;
     });
   } else if (sortBy === 'status') {
-    const orderMap: Record<string, number> = { active: 1, low_balance: 2, expired: 3, no_plan: 4 };
+    const orderMap: Record<string, number> = { active: 1, low_balance: 2, scheduled: 3, expired: 4, no_plan: 5 };
     result.sort((a: any, b: any) => {
       const diff = (orderMap[a.members?.status] || 99) - (orderMap[b.members?.status] || 99);
       return isAsc ? diff : -diff;
@@ -167,7 +170,7 @@ export async function processCheckIn(
       `
       *,
       member_plans (
-        id, plan_id, visits_purchased, visits_used, expiration_date, status, starts_at, updated_at,
+        id, plan_id, visits_purchased, visits_used, expiration_date, status, starts_at, created_at, updated_at,
         plan:plans (*)
       )
     `
@@ -236,12 +239,20 @@ export async function processCheckIn(
     }
   }
 
-  // 2. Find active plan (using member state logic which considers same-day exhaustion)
-  const { active_plan: activePlan } = computeMemberState(member.member_plans, appDate);
+  // 2. Sync any scheduled plans that should now be active, then find active plan
+  await syncMemberPlans(supabase, member.member_plans, appDate);
+  const { active_plan: activePlan, scheduled_plans: scheduledPlans, status } = computeMemberState(member.member_plans, appDate);
 
   if (!activePlan) {
-    // Check if there's an expired plan
-    const { status } = computeMemberState(member.member_plans, appDate);
+    if (scheduledPlans && scheduledPlans.length > 0) {
+      return {
+        type: 'no_plan',
+        member,
+        expiration_date: scheduledPlans[0].starts_at,
+        message: `El plan de este miembro está programado para iniciar el ${formatDateOnly(scheduledPlans[0].starts_at)}.`,
+      }
+    }
+
     const hasExpired = status === 'expired';
     
     return {
