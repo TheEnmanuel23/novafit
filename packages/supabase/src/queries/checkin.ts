@@ -22,6 +22,42 @@ export async function getTodayVisitsCount(supabase: SupabaseClient): Promise<num
   return count || 0;
 }
 
+export async function getMemberAttendances(
+  supabase: SupabaseClient,
+  memberId: string,
+  limit = 50
+): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('attendances')
+    .select(`
+      id,
+      scanned_at,
+      balance_before,
+      balance_after,
+      checkin_type,
+      registered_by,
+      registrar:staff!attendances_registered_by_fkey(name),
+      member_plan:member_plans (
+        id,
+        plan_id,
+        plan:plans (
+          id,
+          description
+        )
+      )
+    `)
+    .eq('member_id', memberId)
+    .order('scanned_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error fetching member attendances:', error);
+    return [];
+  }
+
+  return data ?? [];
+}
+
 export async function getAttendances(
   supabase: SupabaseClient,
   options?: {
