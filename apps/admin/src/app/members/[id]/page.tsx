@@ -11,7 +11,7 @@ import { DeactivateMemberButton } from '@/components/DeactivateMemberButton'
 import { AssignPlanModal } from '@/components/AssignPlanModal'
 import { ActivatePlanButton } from '@/components/ActivatePlanButton'
 import { isPlanActive, isPlanExpired, isPlanScheduled } from '@novafit/supabase/src/utils/member'
-import { getAppDate, formatDateOnly, formatDateTime } from '@novafit/supabase/src/utils/date'
+import { getAppDate, formatDateOnly, formatDateTime, calcExpirationDate } from '@novafit/supabase/src/utils/date'
 import { EditPlanModal } from '@/components/EditPlanModal'
 import { ShareMemberAppModal } from '@/components/ShareMemberAppModal'
 
@@ -53,6 +53,15 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
   const latestPlanExpiration =
     scheduledPlans.length > 0
       ? scheduledPlans[scheduledPlans.length - 1].expiration_date
+      : member.active_plan?.expiration_date
+
+  const activePlanBaseDays =
+    member.active_plan?.plan?.key === 'day'
+      ? member.active_plan.visits_purchased || member.active_plan.plan?.visits_included || 1
+      : member.active_plan?.plan?.visits_included
+  const activePlanBaseEndDate =
+    member.active_plan && (member.active_plan as any).starts_at && activePlanBaseDays
+      ? calcExpirationDate((member.active_plan as any).starts_at, activePlanBaseDays)
       : member.active_plan?.expiration_date
 
   return (
@@ -147,6 +156,7 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
                 <p className="text-sm text-muted-foreground mb-1">Fechas</p>
                 <div className="text-sm flex flex-col gap-1">
                   <p><span className="text-muted-foreground w-16 inline-block">Inicio:</span> <span className="font-medium">{formatDateOnly((member.active_plan as any).starts_at)}</span></p>
+                  <p><span className="text-muted-foreground w-16 inline-block">Vence:</span> <span className="font-medium">{formatDateOnly(activePlanBaseEndDate)}</span></p>
                   <p><span className="text-muted-foreground w-16 inline-block">Expira:</span> <span className="font-medium">{formatDateOnly(member.active_plan.expiration_date)}</span></p>
                 </div>
               </div>
