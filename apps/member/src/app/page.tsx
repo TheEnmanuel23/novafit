@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
+import QRCode from 'qrcode'
 import { MemberProfileCards } from '@novafit/ui'
 import {
   signInMember,
@@ -23,6 +24,10 @@ function MemberAppContent() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [dashboard, setDashboard] = useState<MemberDashboardData | null>(null)
+
+  // QR Modal state
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState<string>('')
 
   useEffect(() => {
     const paramUser = searchParams.get('id') || searchParams.get('username')
@@ -46,6 +51,31 @@ function MemberAppContent() {
       active = false
     }
   }, [])
+
+  // Generate high-contrast QR code encoding the member's ID when the QR modal opens
+  useEffect(() => {
+    if (isQrModalOpen && dashboard?.member?.username) {
+      QRCode.toDataURL(dashboard.member.username, {
+        width: 280,
+        margin: 2,
+        color: {
+          dark: '#0a0b0f',
+          light: '#ffffff',
+        },
+      })
+        .then((url) => setQrDataUrl(url))
+        .catch((err) => console.error('Failed to generate QR:', err))
+    }
+  }, [isQrModalOpen, dashboard?.member?.username])
+
+  const handleCloseQrModal = async () => {
+    setIsQrModalOpen(false)
+    // Refresh dashboard data in case the receptionist just scanned the member's QR
+    const updated = await getAuthenticatedMemberDashboard()
+    if (updated) {
+      setDashboard(updated)
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -86,6 +116,7 @@ function MemberAppContent() {
     setDashboard(null)
     setPassword('')
     setShowPassword(false)
+    setIsQrModalOpen(false)
   }
 
   if (isCheckingSession) {
@@ -121,6 +152,14 @@ function MemberAppContent() {
             <div className="flex items-center gap-2 ml-auto">
               <button
                 type="button"
+                onClick={() => setIsQrModalOpen(true)}
+                className="btn btn-primary min-h-10 px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-[0_0_20px_-4px_rgba(99,102,241,0.6)]"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>
+                Mi QR
+              </button>
+              <button
+                type="button"
                 onClick={handleLogout}
                 className="btn btn-ghost min-h-10 px-3 py-1.5 rounded-xl text-xs font-semibold"
               >
@@ -144,6 +183,64 @@ function MemberAppContent() {
             />
           </main>
         </div>
+
+        {/* Member QR Check-in Modal */}
+        {isQrModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={handleCloseQrModal}
+          >
+            <div
+              className="bg-[#12141c] border border-white/15 w-full max-w-sm rounded-3xl shadow-2xl p-6 flex flex-col items-center gap-5 animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-full flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-white">Pase de Acceso QR</h2>
+                  <p className="text-xs text-muted-foreground">Muestra este código en recepción</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseQrModal}
+                  aria-label="Cerrar código QR"
+                  className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl shadow-xl flex items-center justify-center">
+                {qrDataUrl ? (
+                  <img
+                    src={qrDataUrl}
+                    alt={`Código QR de ${member.username}`}
+                    className="w-60 h-60 object-contain"
+                  />
+                ) : (
+                  <div className="w-60 h-60 flex items-center justify-center">
+                    <div className="spinner" />
+                  </div>
+                )}
+              </div>
+
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">ID de Usuario</p>
+                <p className="text-2xl font-black font-mono text-accent tracking-wider mt-0.5">
+                  {member.username}
+                </p>
+                <p className="text-sm font-medium text-white/90 mt-1">{member.name}</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCloseQrModal}
+                className="btn btn-ghost w-full min-h-12 rounded-2xl text-sm font-semibold"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
 import { useDebouncedCallback } from 'use-debounce'
-import { manualCheckinAction, searchMembersAction } from '@/app/actions/checkin'
+import { manualCheckinAction, qrCheckinAction, searchMembersAction } from '@/app/actions/checkin'
 import { UserDropdown } from '@/components/UserDropdown'
 
 type Props = {
@@ -22,6 +22,14 @@ export function CheckinClient({ canQR, canManual, staffName }: Props) {
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
 
+  // QR Scanner states
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const [isCameraActive, setIsCameraActive] = useState(false)
+  const [isProcessingQr, setIsProcessingQr] = useState(false)
+  const scannerRef = useRef<any>(null)
+  const scanLockRef = useRef(false)
+  const lastScannedRef = useRef<{ text: string; time: number }>({ text: '', time: 0 })
+
   // Auto-close feedback screen after 3 seconds for success, 5 for errors/warnings
   useEffect(() => {
     if (result && result.type !== 'needs_selection') {
@@ -31,6 +39,114 @@ export function CheckinClient({ canQR, canManual, staffName }: Props) {
       return () => clearTimeout(timeout)
     }
   }, [result])
+
+  const handleQrScan = useCallback((decodedText: string) => {
+    const now = Date.now()
+    // Prevent duplicate triggers for the same QR within 4 seconds or while a scan is in flight
+    if (
+      scanLockRef.current ||
+      (lastScannedRef.current.text === decodedText && now - lastScannedRef.current.time < 4000)
+    ) {
+      return
+    }
+
+    scanLockRef.current = true
+    lastScannedRef.current = { text: decodedText, time: now }
+    setIsProcessingQr(true)
+
+    qrCheckinAction(decodedText)
+      .then((res) => {
+        setResult(res)
+      })
+      .catch(() => {
+        setResult({
+          type: 'error',
+          message: 'Error inesperado al procesar el código QR.',
+        })
+      })
+      .finally(() => {
+        setIsProcessingQr(false)
+        setTimeout(() => {
+          scanLockRef.current = false
+        }, 1800)
+      })
+  }, [])
+
+  // Start / stop camera when mode === 'qr'
+  useEffect(() => {
+    if (mode !== 'qr' || !canQR) {
+      return
+    }
+
+    let isMounted = true
+    let html5QrCode: any = null
+
+    async function startScanner() {
+      setCameraError(null)
+      try {
+        const { Html5Qrcode } = await import('html5-qrcode')
+        if (!isMounted) return
+
+        html5QrCode = new Html5Qrcode('novafit-qr-reader')
+        scannerRef.current = html5QrCode
+
+        const config = {
+          fps: 10,
+          qrbox: { width: 230, height: 230 },
+          aspectRatio: 1.0,
+        }
+
+        try {
+          await html5QrCode.start(
+            { facingMode: 'environment' },
+            config,
+            (decodedText: string) => {
+              if (isMounted) handleQrScan(decodedText)
+            },
+            () => {
+              // ignore frame parse errors when no QR is in view
+            }
+          )
+        } catch {
+          // Fallback to any available camera (e.g. laptop webcam)
+          await html5QrCode.start(
+            { facingMode: 'user' },
+            config,
+            (decodedText: string) => {
+              if (isMounted) handleQrScan(decodedText)
+            },
+            () => {}
+          )
+        }
+
+        if (isMounted) {
+          setIsCameraActive(true)
+        }
+      } catch (err: any) {
+        console.error('[QRScanner] Failed to start camera:', err)
+        if (isMounted) {
+          setIsCameraActive(false)
+          setCameraError(
+            'No se pudo acceder a la cámara. Verifica los permisos del navegador o usa el modo Manual.'
+          )
+        }
+      }
+    }
+
+    startScanner()
+
+    return () => {
+      isMounted = false
+      setIsCameraActive(false)
+      if (html5QrCode) {
+        Promise.resolve(
+          html5QrCode.isScanning ? html5QrCode.stop() : undefined
+        )
+          .then(() => html5QrCode.clear())
+          .catch(() => {})
+      }
+    }
+  }, [mode, canQR, handleQrScan])
 
   const debouncedSearch = useDebouncedCallback(async (val: string) => {
     const results = await searchMembersAction(val)
@@ -163,13 +279,43 @@ export function CheckinClient({ canQR, canManual, staffName }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center -mt-16">
+      <div className="flex-1 flex flex-col items-center justify-center -mt-12">
         {mode === 'qr' ? (
-          <div className="glass w-full max-w-sm aspect-square flex flex-col items-center justify-center p-6 border-accent/30 relative overflow-hidden">
-            <div className="absolute inset-0 bg-accent/5 animate-pulse"></div>
-            {/* The QR scanner will go here using html5-qrcode */}
-            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-accent mb-4"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>
-            <p className="text-center font-medium relative z-10 text-lg">Muestra tu código QR a la cámara</p>
+          <div className="glass w-full max-w-sm flex flex-col items-center justify-center p-5 border-accent/30 relative overflow-hidden gap-4">
+            <div className="w-full flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${isCameraActive ? 'bg-success animate-pulse' : 'bg-warning'}`} />
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {isProcessingQr
+                    ? 'Registrando visita...'
+                    : isCameraActive
+                      ? 'Cámara activa — Escaneando'
+                      : 'Iniciando cámara...'}
+                </span>
+              </div>
+            </div>
+
+            <div className="w-full aspect-square rounded-2xl overflow-hidden bg-black/60 border border-white/10 relative flex items-center justify-center">
+              <div id="novafit-qr-reader" className="w-full h-full [&_video]:object-cover [&_video]:w-full [&_video]:h-full" />
+
+              {!isCameraActive && !cameraError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center pointer-events-none">
+                  <div className="spinner" />
+                  <p className="text-xs text-muted-foreground">Activando cámara...</p>
+                </div>
+              )}
+
+              {cameraError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center bg-black/80">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-error"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+                  <p className="text-xs text-error font-medium">{cameraError}</p>
+                </div>
+              )}
+            </div>
+
+            <p className="text-center text-sm text-muted-foreground">
+              Coloca el código QR del miembro frente a la cámara para registrar su visita automáticamente.
+            </p>
           </div>
         ) : (
           <div className="glass w-full max-w-sm p-6 flex flex-col gap-6">
