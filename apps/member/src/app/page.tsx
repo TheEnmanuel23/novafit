@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 function MemberAppContent() {
   const searchParams = useSearchParams()
@@ -51,8 +52,14 @@ function MemberAppContent() {
         <div className="app-container">
           <header className="page-header justify-between border-b border-white/10 pb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+              <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center border border-white/20 shadow-lg overflow-hidden">
+                <Image
+                  src="/novafit-logo.jpg"
+                  alt="NovaFit Logo"
+                  width={40}
+                  height={40}
+                  className="w-full h-full object-contain rounded-lg"
+                />
               </div>
               <div>
                 <h1 className="text-lg font-black tracking-tight text-white leading-tight">NovaFit</h1>
@@ -107,10 +114,17 @@ function MemberAppContent() {
       <div className="absolute top-[5%] right-[-10%] w-[60%] h-[40%] bg-accent/20 rounded-full blur-[100px] pointer-events-none"></div>
       <div className="absolute bottom-[10%] left-[-20%] w-[70%] h-[50%] bg-success/10 rounded-full blur-[120px] pointer-events-none"></div>
 
-      <div className="w-full max-w-sm mt-12 animate-in slide-in-from-top-8 fade-in duration-700">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+      <div className="w-full max-w-sm mt-10 animate-in slide-in-from-top-8 fade-in duration-700">
+        <div className="flex items-center gap-3.5 mb-2">
+          <div className="w-12 h-12 rounded-xl bg-white p-1 flex items-center justify-center border border-white/20 shadow-lg overflow-hidden">
+            <Image
+              src="/novafit-logo.jpg"
+              alt="NovaFit Logo"
+              width={48}
+              height={48}
+              className="w-full h-full object-contain rounded-lg"
+              priority
+            />
           </div>
           <h1 className="text-3xl font-black tracking-tight text-white">NovaFit</h1>
         </div>
