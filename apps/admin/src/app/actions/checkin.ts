@@ -44,6 +44,124 @@ async function authorizeManualCheckin() {
   return { staff, error: null } as const
 }
 
+async function authorizeQrCheckin() {
+  const authClient = await createServerClient()
+  const staff = await getCurrentStaff(authClient)
+  if (!staff) {
+    return { staff: null, error: 'Sesión no válida. Inicia sesión nuevamente.' } as const
+  }
+
+  const hasGlobalAdmin = await isGlobalAdmin(staff)
+  const hasProcessCheckin = await hasRole(staff, 'process_checkin')
+  const hasCheckinQr = await hasRole(staff, 'checkin_qr')
+  const hasManageMembers = await hasRole(staff, 'manage_members')
+
+  const canQrCheckin =
+    hasGlobalAdmin ||
+    hasProcessCheckin ||
+    hasCheckinQr ||
+    hasManageMembers
+
+  if (!canQrCheckin) {
+    return { staff: null, error: 'No tienes permisos para registrar visitas por código QR.' } as const
+  }
+  return { staff, error: null } as const
+}
+
+export async function qrCheckinAction(rawPayload: string) {
+  const { staff, error: authError } = await authorizeQrCheckin()
+  if (!staff) {
+    return { type: 'error', message: authError }
+  }
+
+  const cleaned = (rawPayload || '').trim()
+  if (!cleaned) {
+    return { type: 'error', message: 'Código QR vacío o inválido.' }
+  }
+
+  // Extract token if the QR encodes a URL (e.g. ?qr=TYGG-8859 or ?id=TYGG-8859)
+  let token = cleaned
+  try {
+    if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
+      const parsedUrl = new URL(cleaned)
+      token =
+        parsedUrl.searchParams.get('qr') ||
+        parsedUrl.searchParams.get('id') ||
+        parsedUrl.searchParams.get('username') ||
+        cleaned
+    }
+  } catch {
+    token = cleaned
+  }
+
+  // Strip optional NOVA- prefix if present
+  const normalizedUsername = token.toUpperCase().startsWith('NOVA-')
+    ? token.toUpperCase().replace(/^NOVA-/, '').trim()
+    : token.toUpperCase().trim()
+
+  const supabase = createServiceClient()
+
+  try {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token.trim())
+
+    let memberRecord: { member_id: string; name: string; username: string } | null = null
+
+    if (isUuid) {
+      const { data } = await supabase
+        .from('members')
+        .select('member_id, name, username')
+        .eq('member_id', token.trim())
+        .eq('deleted', false)
+        .maybeSingle()
+      memberRecord = data
+    }
+
+    if (!memberRecord) {
+      const { data } = await supabase
+        .from('members')
+        .select('member_id, name, username')
+        .eq('username', normalizedUsername)
+        .eq('deleted', false)
+        .maybeSingle()
+      memberRecord = data
+    }
+
+    if (!memberRecord) {
+      return {
+        type: 'error',
+        message: `No se encontró ningún miembro activo para el código "${normalizedUsername}".`,
+      }
+    }
+
+    const result = await processCheckIn(
+      supabase,
+      { type: 'member_id', value: memberRecord.member_id },
+      { staff, checkinType: 'qr' }
+    )
+
+    if (result.type !== 'success') {
+      return {
+        type: result.type === 'no_visits' ? 'no_visits' : 'error',
+        message: result.message || 'Error al registrar la visita por QR.',
+        member: { name: memberRecord.name, username: memberRecord.username },
+      }
+    }
+
+    return {
+      type: 'success',
+      member: { name: memberRecord.name, username: memberRecord.username },
+      balance_after: result.balance_after,
+      message: result.message || 'Visita por QR registrada correctamente',
+    }
+  } catch (error: any) {
+    console.error('[CheckinAction:qrCheckinAction] Error:', error)
+    return {
+      type: 'error',
+      message: error.message || 'Ocurrió un error al procesar el código QR.',
+    }
+  }
+}
+
 export async function manualCheckinAction(query: string, specificMemberId?: string) {
   console.info('[CheckinAction:manualCheckinAction] Called with query:', query, 'specificMemberId:', specificMemberId);
   const { staff, error: authError } = await authorizeManualCheckin()
