@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
+import { registerMemberAccount } from '../actions/auth'
 
 function RegisterForm() {
   const searchParams = useSearchParams()
@@ -21,6 +22,7 @@ function RegisterForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     const paramName = searchParams.get('name')
@@ -29,7 +31,7 @@ function RegisterForm() {
     if (paramPhone !== null) setPhone(paramPhone)
   }, [searchParams])
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
 
@@ -48,7 +50,26 @@ function RegisterForm() {
       return
     }
 
-    setSuccess(true)
+    setIsSubmitting(true)
+    try {
+      const formData = new FormData()
+      formData.set('username', id)
+      formData.set('name', name)
+      formData.set('phone', phone)
+      formData.set('password', password)
+      formData.set('confirmPassword', confirmPassword)
+
+      const result = await registerMemberAccount(formData)
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setSuccess(true)
+      }
+    } catch {
+      setError('Ocurrió un error inesperado al registrar tu cuenta.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const loginHref = id ? `/?id=${encodeURIComponent(id)}` : '/'
@@ -285,10 +306,13 @@ function RegisterForm() {
 
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className="btn h-14 rounded-2xl mt-2 text-base font-bold text-white bg-gradient-to-r from-accent to-[#818cf8] border-none shadow-[0_0_30px_-5px_rgba(99,102,241,0.6)] hover:shadow-[0_0_50px_-5px_rgba(99,102,241,0.8)] hover:scale-[1.02] transition-all flex items-center justify-center gap-2 group"
               >
-                Registrarme
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                {isSubmitting ? 'Activando cuenta...' : 'Registrarme'}
+                {!isSubmitting && (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                )}
               </button>
             </form>
           )}

@@ -3,6 +3,12 @@
 import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
+import {
+  signInMember,
+  signOutMember,
+  getAuthenticatedMember,
+  type AuthenticatedMember,
+} from './actions/auth'
 
 function MemberAppContent() {
   const searchParams = useSearchParams()
@@ -13,7 +19,9 @@ function MemberAppContent() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [loggedInUser, setLoggedInUser] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCheckingSession, setIsCheckingSession] = useState(true)
+  const [loggedInMember, setLoggedInMember] = useState<AuthenticatedMember | null>(null)
 
   useEffect(() => {
     const paramUser = searchParams.get('id') || searchParams.get('username')
@@ -22,7 +30,23 @@ function MemberAppContent() {
     }
   }, [searchParams, username])
 
-  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    let active = true
+    getAuthenticatedMember()
+      .then((member) => {
+        if (active && member) {
+          setLoggedInMember(member)
+        }
+      })
+      .finally(() => {
+        if (active) setIsCheckingSession(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
 
@@ -32,21 +56,46 @@ function MemberAppContent() {
       return
     }
 
-    // Clear query params like ?username=... from URL on login
-    if (searchParams.toString()) {
-      router.replace('/')
-    }
+    setIsSubmitting(true)
+    try {
+      const formData = new FormData()
+      formData.set('username', cleanUsername)
+      formData.set('password', password)
 
-    setLoggedInUser(cleanUsername)
+      const result = await signInMember(formData)
+      if (result.error || !result.member) {
+        setError(result.error || 'Credenciales inválidas.')
+        return
+      }
+
+      if (searchParams.toString()) {
+        router.replace('/')
+      }
+
+      setLoggedInMember(result.member)
+    } catch {
+      setError('Ocurrió un error al iniciar sesión. Intenta nuevamente.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handleLogout = () => {
-    setLoggedInUser(null)
+  const handleLogout = async () => {
+    await signOutMember()
+    setLoggedInMember(null)
     setPassword('')
     setShowPassword(false)
   }
 
-  if (loggedInUser) {
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen bg-gradient-radial flex items-center justify-center">
+        <div className="spinner" />
+      </div>
+    )
+  }
+
+  if (loggedInMember) {
     return (
       <div className="min-h-screen bg-gradient-radial relative overflow-hidden">
         <div className="app-container">
@@ -62,8 +111,12 @@ function MemberAppContent() {
                 />
               </div>
               <div>
-                <h1 className="text-lg font-black tracking-tight text-white leading-tight">NovaFit</h1>
-                <p className="text-xs text-muted-foreground font-mono">{loggedInUser}</p>
+                <h1 className="text-lg font-black tracking-tight text-white leading-tight">
+                  {loggedInMember.name}
+                </h1>
+                <p className="text-xs text-accent font-mono font-semibold">
+                  {loggedInMember.username}
+                </p>
               </div>
             </div>
 
@@ -79,7 +132,7 @@ function MemberAppContent() {
           <main className="page-content flex flex-col gap-5 mt-4">
             <div className="glass-strong p-6 rounded-3xl border border-white/10 flex flex-col items-center text-center gap-4">
               <span className="badge badge-active">Sesión Iniciada (Placeholder)</span>
-              <h2 className="text-2xl font-bold text-white">¡Hola, {loggedInUser}!</h2>
+              <h2 className="text-2xl font-bold text-white">¡Hola, {loggedInMember.name}!</h2>
               <p className="text-sm text-muted-foreground max-w-xs">
                 Esta es la vista principal de miembro (en construcción). Aquí se mostrará la información de tu cuenta conectada a NovaFit.
               </p>
@@ -219,10 +272,13 @@ function MemberAppContent() {
 
             <button
               type="submit"
+              disabled={isSubmitting}
               className="btn h-14 rounded-2xl mt-4 text-base font-bold text-white bg-gradient-to-r from-accent to-[#818cf8] border-none shadow-[0_0_30px_-5px_rgba(99,102,241,0.6)] hover:shadow-[0_0_50px_-5px_rgba(99,102,241,0.8)] hover:scale-[1.02] transition-all flex items-center justify-center gap-2 group"
             >
-              Iniciar Sesión
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              {isSubmitting ? 'Verificando...' : 'Iniciar Sesión'}
+              {!isSubmitting && (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              )}
             </button>
           </form>
         </div>
