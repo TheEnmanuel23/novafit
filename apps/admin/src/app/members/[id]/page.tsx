@@ -155,9 +155,9 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Fechas</p>
                 <div className="text-sm flex flex-col gap-1">
-                  <p><span className="text-muted-foreground w-16 inline-block">Inicio:</span> <span className="font-medium">{formatDateOnly((member.active_plan as any).starts_at)}</span></p>
-                  <p><span className="text-muted-foreground w-16 inline-block">Vence:</span> <span className="font-medium">{formatDateOnly(activePlanBaseEndDate)}</span></p>
-                  <p><span className="text-muted-foreground w-16 inline-block">Expira:</span> <span className="font-medium">{formatDateOnly(member.active_plan.expiration_date)}</span></p>
+                  <p><span className="text-muted-foreground w-28 inline-block">Inicio:</span> <span className="font-medium">{formatDateOnly((member.active_plan as any).starts_at)}</span></p>
+                  <p><span className="text-muted-foreground w-28 inline-block">Fecha de corte:</span> <span className="font-medium">{formatDateOnly(activePlanBaseEndDate)}</span></p>
+                  <p><span className="text-muted-foreground w-28 inline-block">Expira:</span> <span className="font-medium">{formatDateOnly(member.active_plan.expiration_date)}</span></p>
                 </div>
               </div>
             </div>

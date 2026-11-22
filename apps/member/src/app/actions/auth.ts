@@ -2,6 +2,10 @@
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getAppDate } from '@novafit/supabase/src/utils/date'
+import { getMemberById } from '@novafit/supabase/src/queries/members'
+import { getMemberPlanHistory } from '@novafit/supabase/src/queries/member-plans'
+import { getMemberAttendances } from '@novafit/supabase/src/queries/checkin'
+import type { MemberWithStatus } from '@novafit/types'
 
 export type AuthenticatedMember = {
   id: string
@@ -11,12 +15,41 @@ export type AuthenticatedMember = {
   phone: string | null
 }
 
+export type MemberDashboardData = {
+  member: MemberWithStatus & {
+    creator?: { name: string } | null
+    updater?: { name: string } | null
+  }
+  planHistory: any[]
+  attendances: any[]
+  appDateISO: string
+}
+
 function getMemberAuthEmail(username: string): string {
   const clean = username.trim().toLowerCase().replace(/\s+/g, '')
   return `${clean}@member.novafit.local`
 }
 
-export async function getAuthenticatedMember(): Promise<AuthenticatedMember | null> {
+export async function fetchMemberDashboardData(memberId: string): Promise<MemberDashboardData | null> {
+  const adminClient = createServiceClient()
+  const member = await getMemberById(adminClient, memberId)
+  if (!member) return null
+
+  const [planHistory, attendances, appDate] = await Promise.all([
+    getMemberPlanHistory(adminClient, member.member_id),
+    getMemberAttendances(adminClient, member.member_id),
+    getAppDate(),
+  ])
+
+  return {
+    member: member as MemberDashboardData['member'],
+    planHistory,
+    attendances,
+    appDateISO: appDate.toISOString(),
+  }
+}
+
+export async function getAuthenticatedMemberDashboard(): Promise<MemberDashboardData | null> {
   try {
     const supabase = await createClient()
     const {
@@ -30,17 +63,17 @@ export async function getAuthenticatedMember(): Promise<AuthenticatedMember | nu
     const usernameFromEmail = user.email.replace('@member.novafit.local', '').toUpperCase()
     const adminClient = createServiceClient()
 
-    const { data: member } = await adminClient
+    const { data: memberRow } = await adminClient
       .from('members')
-      .select('id, member_id, username, name, phone')
+      .select('member_id')
       .eq('username', usernameFromEmail)
       .eq('deleted', false)
       .maybeSingle()
 
-    if (!member) return null
-    return member as AuthenticatedMember
+    if (!memberRow) return null
+    return await fetchMemberDashboardData(memberRow.member_id)
   } catch (err) {
-    console.error('[MemberAuth:getAuthenticatedMember] Error:', err)
+    console.error('[MemberAuth:getAuthenticatedMemberDashboard] Error:', err)
     return null
   }
 }
@@ -147,7 +180,7 @@ export async function registerMemberAccount(formData: FormData): Promise<{
 export async function signInMember(formData: FormData): Promise<{
   error?: string
   success?: boolean
-  member?: AuthenticatedMember
+  dashboard?: MemberDashboardData
 }> {
   const rawUsername = (formData.get('username') as string) || ''
   const password = (formData.get('password') as string) || ''
@@ -204,9 +237,14 @@ export async function signInMember(formData: FormData): Promise<{
     console.error('[MemberAuth:signInMember] Failed to log session:', err)
   }
 
+  const dashboard = await fetchMemberDashboardData(member.member_id)
+  if (!dashboard) {
+    return { error: 'No se pudo cargar la información del miembro.' }
+  }
+
   return {
     success: true,
-    member: member as AuthenticatedMember,
+    dashboard,
   }
 }
 
@@ -230,4 +268,3 @@ export async function signOutMember(): Promise<void> {
 
   await supabase.auth.signOut()
 }
-
