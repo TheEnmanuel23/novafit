@@ -15,9 +15,22 @@ export default async function DashboardPage() {
   const canManageMembers = staff ? (await hasRole(staff, 'manage_members')) || isGlobal : false
   const canManageSettings = staff ? (await hasRole(staff, 'manage_settings')) || isGlobal : false
   const canManageStaff = staff ? (await hasRole(staff, 'manage_staff')) || isGlobal : false
+  const canAccessInventory = staff
+    ? isGlobal ||
+      (await hasRole(staff, 'view_products')) ||
+      (await hasRole(staff, 'create_products')) ||
+      (await hasRole(staff, 'edit_products')) ||
+      (await hasRole(staff, 'delete_products'))
+    : false
 
   // Staff with no admin roles are kiosk-only — send them straight to /checkin
-  const isKioskOnly = staff && !isGlobal && !canManageMembers && !canManageSettings && !canManageStaff
+  const isKioskOnly =
+    staff &&
+    !isGlobal &&
+    !canManageMembers &&
+    !canManageSettings &&
+    !canManageStaff &&
+    !canAccessInventory
   if (isKioskOnly) {
     redirect('/checkin')
   }
@@ -45,7 +58,7 @@ export default async function DashboardPage() {
         
         <UserDropdown 
           userName={staff?.name || 'Usuario'} 
-          permissions={{ canManageSettings, canManageMembers }}
+          permissions={{ canManageSettings, canManageMembers, canAccessInventory }}
         />
       </header>
 
@@ -77,6 +90,15 @@ export default async function DashboardPage() {
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
                 </div>
                 <span className="text-sm font-semibold">Nuevo Miembro</span>
+              </Link>
+            )}
+
+            {canAccessInventory && (
+              <Link href="/inventory" className="glass p-4 text-center hover-lift flex flex-col items-center justify-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-warning-subtle text-warning flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>
+                </div>
+                <span className="text-sm font-semibold">Inventario</span>
               </Link>
             )}
             

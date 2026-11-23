@@ -178,6 +178,112 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"product_categories": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"description": string | null,"id": string,"name": string,"updated_at": string,"updated_by": string | null
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"name": string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"name"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "product_categories_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "product_categories_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"product_history": {
+                  Row: {
+                    "action": string,"changed_by": string | null,"created_at": string,"field_name": string | null,"id": string,"new_value": string | null,"old_value": string | null,"product_id": string
+                  }
+                  Insert: {
+                    "action": string,"changed_by"?: string | null,"created_at"?: string,"field_name"?: string | null,"id"?: string,"new_value"?: string | null,"old_value"?: string | null,"product_id": string
+                  }
+                  Update: {
+                    "action"?: string,"changed_by"?: string | null,"created_at"?: string,"field_name"?: string | null,"id"?: string,"new_value"?: string | null,"old_value"?: string | null,"product_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "product_history_changed_by_fkey"
+      columns: ["changed_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "product_history_product_id_fkey"
+      columns: ["product_id"]
+isOneToOne: false
+      referencedRelation: "products"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"product_images": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"display_order": number,"id": string,"image_url": string,"product_id": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"display_order"?: number,"id"?: string,"image_url": string,"product_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"display_order"?: number,"id"?: string,"image_url"?: string,"product_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "product_images_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "product_images_product_id_fkey"
+      columns: ["product_id"]
+isOneToOne: false
+      referencedRelation: "products"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"products": {
+                  Row: {
+                    "barcode": string | null,"category_id": string | null,"cost": number,"created_at": string,"created_by": string | null,"deleted": boolean,"description": string | null,"id": string,"low_stock_threshold": number,"name": string,"price": number,"quantity_available": number,"show_in_catalog": boolean,"sku": string | null,"unit": string,"unit_category": string,"updated_at": string,"updated_by": string | null
+                  }
+                  Insert: {
+                    "barcode"?: string | null,"category_id"?: string | null,"cost"?: number,"created_at"?: string,"created_by"?: string | null,"deleted"?: boolean,"description"?: string | null,"id"?: string,"low_stock_threshold"?: number,"name": string,"price"?: number,"quantity_available"?: number,"show_in_catalog"?: boolean,"sku"?: string | null,"unit"?: string,"unit_category"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "barcode"?: string | null,"category_id"?: string | null,"cost"?: number,"created_at"?: string,"created_by"?: string | null,"deleted"?: boolean,"description"?: string | null,"id"?: string,"low_stock_threshold"?: number,"name"?: string,"price"?: number,"quantity_available"?: number,"show_in_catalog"?: boolean,"sku"?: string | null,"unit"?: string,"unit_category"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "products_category_id_fkey"
+      columns: ["category_id"]
+isOneToOne: false
+      referencedRelation: "product_categories"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "products_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "products_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"profile_roles": {
                   Row: {
                     "created_by": string | null,"id": string,"profile_id": string,"role_id": string,"updated_by": string | null

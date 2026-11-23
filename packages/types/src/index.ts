@@ -84,15 +84,114 @@ export interface Attendance {
 export type RoleName =
   | 'manage_members'
   | 'manage_staff'
+  | 'manage_settings'
   | 'view_reports'
   | 'process_checkin'
-  | 'process_recharge';
+  | 'process_recharge'
+  | 'checkin_qr'
+  | 'checkin_manual'
+  | 'view_products'
+  | 'create_products'
+  | 'edit_products'
+  | 'delete_products';
 
 export interface Role {
   id: string;
   name: RoleName;
   description: string | null;
   created_at: string;
+}
+
+// ─── Inventory ───────────────────────────────────────────────────────────────
+
+export type ProductUnitCategory = 'count' | 'weight' | 'volume' | 'length' | 'area';
+
+export type ProductUnit =
+  | 'unit'
+  | 'box'
+  | 'pack'
+  | 'dozen'
+  | 'pair'
+  | 'kg'
+  | 'lb'
+  | 'g'
+  | 'oz'
+  | 'mg'
+  | 'l'
+  | 'ml'
+  | 'gal'
+  | 'fl_oz'
+  | 'm'
+  | 'cm'
+  | 'mm'
+  | 'in'
+  | 'ft'
+  | 'yd'
+  | 'm2'
+  | 'cm2'
+  | 'ft2';
+
+export interface ProductCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+export interface ProductImage {
+  id: string;
+  product_id: string;
+  image_url: string;
+  display_order: number;
+  created_at: string;
+  created_by: string | null;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string | null;
+  sku: string | null;
+  barcode: string | null;
+  price: number;
+  cost: number;
+  quantity_available: number;
+  low_stock_threshold: number;
+  unit: ProductUnit | string;
+  unit_category: ProductUnitCategory | string;
+  category_id: string | null;
+  show_in_catalog: boolean;
+  deleted: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+export interface ProductWithDetails extends Product {
+  category: ProductCategory | null;
+  images: ProductImage[];
+}
+
+export type ProductHistoryAction = 'created' | 'updated' | 'deleted';
+
+export interface ProductHistory {
+  id: string;
+  product_id: string;
+  action: ProductHistoryAction;
+  field_name: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  changed_by: string | null;
+  created_at: string;
+  staff?: {
+    id: string;
+    name: string;
+    username: string;
+  } | null;
 }
 
 export interface Profile {
