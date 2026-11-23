@@ -41,12 +41,16 @@ export function MemberInfoCard({
           <p className="font-medium capitalize">{member.status}</p>
         </div>
         <div>
+          <p className="text-sm text-muted-foreground">Correo Electrónico</p>
+          <p className="font-medium break-all">{member.email || 'N/A'}</p>
+        </div>
+        <div>
           <p className="text-sm text-muted-foreground">Fecha de Nacimiento</p>
           <p className="font-medium">
             {member.date_of_birth ? formatDateOnly(member.date_of_birth) : 'N/A'}
           </p>
         </div>
-        <div>
+        <div className="col-span-2">
           <p className="text-sm text-muted-foreground">Dirección</p>
           <p className="font-medium break-words">{member.address || 'N/A'}</p>
         </div>

@@ -287,16 +287,22 @@ export async function updateMyMemberProfile(formData: FormData): Promise<{
     const usernameFromEmail = user.email.replace('@member.novafit.local', '').toUpperCase()
     const rawName = (formData.get('name') as string) || ''
     const rawPhone = (formData.get('phone') as string) || ''
+    const rawEmail = (formData.get('email') as string) || ''
     const rawAddress = (formData.get('address') as string) || ''
     const rawDob = (formData.get('date_of_birth') as string) || ''
 
     const cleanName = rawName.trim().replace(/\s+/g, ' ')
     const cleanPhone = rawPhone.trim() || null
+    const cleanEmail = rawEmail.trim().toLowerCase() || null
     const cleanAddress = rawAddress.trim().replace(/\s+/g, ' ') || null
     const cleanDob = rawDob.trim() || null
 
     if (!cleanName) {
       return { error: 'El nombre es obligatorio.' }
+    }
+
+    if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return { error: 'Por favor ingresa un correo electrónico válido.' }
     }
 
     if (cleanDob && !/^\d{4}-\d{2}-\d{2}$/.test(cleanDob)) {
@@ -321,6 +327,7 @@ export async function updateMyMemberProfile(formData: FormData): Promise<{
       .update({
         name: cleanName,
         phone: cleanPhone,
+        email: cleanEmail,
         address: cleanAddress,
         date_of_birth: cleanDob,
         updated_at: appDate.toISOString(),

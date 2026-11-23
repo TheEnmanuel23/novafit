@@ -35,6 +35,7 @@ function MemberAppContent() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editName, setEditName] = useState('')
   const [editPhone, setEditPhone] = useState('')
+  const [editEmail, setEditEmail] = useState('')
   const [editDob, setEditDob] = useState('')
   const [editAddress, setEditAddress] = useState('')
   const [editError, setEditError] = useState<string | null>(null)
@@ -92,6 +93,7 @@ function MemberAppContent() {
     if (!dashboard?.member) return
     setEditName(dashboard.member.name || '')
     setEditPhone(dashboard.member.phone || '')
+    setEditEmail(dashboard.member.email || '')
     setEditDob(
       dashboard.member.date_of_birth
         ? toPeriodYYYYMMDD(dashboard.member.date_of_birth)
@@ -116,6 +118,7 @@ function MemberAppContent() {
       const formData = new FormData()
       formData.set('name', editName)
       formData.set('phone', editPhone)
+      formData.set('email', editEmail)
       formData.set('date_of_birth', editDob)
       formData.set('address', editAddress)
 
@@ -317,6 +320,25 @@ function MemberAppContent() {
                     autoComplete="tel"
                     className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl h-12"
                     placeholder="Ej: 8888-8888"
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label text-[11px]" htmlFor="edit-email">
+                    Correo Electrónico
+                  </label>
+                  <input
+                    id="edit-email"
+                    name="email"
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    autoComplete="email"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl h-12"
+                    placeholder="Ej: correo@ejemplo.com"
                   />
                 </div>
 
