@@ -23,6 +23,8 @@ export async function BottomNav({ currentPath }: { currentPath: string }) {
     (await hasRole(staff, 'view_sales')) ||
     (await hasRole(staff, 'create_sales')) ||
     (await hasRole(staff, 'delete_sales'))
+  const canAccessBalance =
+    canAccessSales || (await hasRole(staff, 'view_reports'))
   const isKioskOnly =
     !isGlobal &&
     !canManageMembers &&
@@ -67,6 +69,13 @@ export async function BottomNav({ currentPath }: { currentPath: string }) {
         <Link href="/sales" className={`bottom-nav-item ${currentPath.startsWith('/sales') ? 'active' : ''}`}>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
           Ventas
+        </Link>
+      )}
+
+      {canAccessBalance && (
+        <Link href="/balance" className={`bottom-nav-item ${currentPath.startsWith('/balance') ? 'active' : ''}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          Balance
         </Link>
       )}
 

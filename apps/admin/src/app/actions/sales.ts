@@ -229,6 +229,7 @@ export async function createSaleAction(input: CreateSaleInput) {
 
     revalidatePath('/sales')
     revalidatePath('/inventory')
+    revalidatePath('/balance')
     revalidatePath('/dashboard')
 
     return { success: true, saleId: sale.id }
@@ -287,10 +288,38 @@ export async function deleteSaleAction(saleId: string, restoreStock: boolean = t
 
     revalidatePath('/sales')
     revalidatePath('/inventory')
+    revalidatePath('/balance')
     revalidatePath('/dashboard')
     return { success: true }
   } catch (err: any) {
     return { error: err.message || 'Error inesperado al eliminar la venta.' }
+  }
+}
+
+export async function markSaleAsPaidAction(saleId: string) {
+  const supabase = await createServerClient()
+
+  try {
+    const currentStaff = await requireSalesPermission(supabase, ['create_sales'])
+
+    const { error } = await supabase
+      .from('sales')
+      .update({
+        payment_status: 'paid',
+        updated_by: currentStaff.id,
+      })
+      .eq('id', saleId)
+
+    if (error) {
+      return { error: 'Error al marcar como pagada: ' + error.message }
+    }
+
+    revalidatePath('/balance')
+    revalidatePath('/sales')
+    revalidatePath('/dashboard')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Error inesperado al actualizar la venta.' }
   }
 }
 
