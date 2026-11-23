@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { getAppDate } from '@novafit/supabase/src/utils/date'
+import { getAppDate, toPeriodYYYYMMDD } from '@novafit/supabase/src/utils/date'
 import { getMemberById } from '@novafit/supabase/src/queries/members'
 import { getMemberPlanHistory } from '@novafit/supabase/src/queries/member-plans'
 import { getMemberAttendances } from '@novafit/supabase/src/queries/checkin'
@@ -85,13 +85,11 @@ export async function registerMemberAccount(formData: FormData): Promise<{
 }> {
   const rawUsername = (formData.get('username') as string) || ''
   const rawName = (formData.get('name') as string) || ''
-  const rawPhone = (formData.get('phone') as string) || ''
   const password = (formData.get('password') as string) || ''
   const confirmPassword = (formData.get('confirmPassword') as string) || ''
 
   const cleanUsername = rawUsername.trim().toUpperCase()
   const cleanName = rawName.trim().replace(/\s+/g, ' ')
-  const cleanPhone = rawPhone.trim() || null
 
   if (!cleanUsername) {
     return { error: 'No se proporcionó un ID de usuario válido en el enlace de registro.' }
@@ -114,7 +112,7 @@ export async function registerMemberAccount(formData: FormData): Promise<{
   // 1. Verify the member exists in the database
   const { data: member, error: memberError } = await adminClient
     .from('members')
-    .select('id, member_id, username, name, phone')
+    .select('id, member_id, username, name, phone, password_reset_allowed')
     .eq('username', cleanUsername)
     .eq('deleted', false)
     .maybeSingle()
@@ -128,7 +126,7 @@ export async function registerMemberAccount(formData: FormData): Promise<{
     return { error: `No se encontró ningún miembro registrado con el ID ${cleanUsername}.` }
   }
 
-  // 2. Create the Supabase Auth account for this member
+  // 2. Create (or update if password_reset_allowed is enabled) the Supabase Auth account
   const email = getMemberAuthEmail(cleanUsername)
   const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
     email,
@@ -142,25 +140,42 @@ export async function registerMemberAccount(formData: FormData): Promise<{
   })
 
   if (authError || !authData?.user) {
-    console.error('[MemberAuth:registerMemberAccount] Auth Create Error:', authError)
-    if (
+    const isAlreadyRegistered =
       authError?.message?.toLowerCase().includes('already') ||
       authError?.message?.toLowerCase().includes('registered')
-    ) {
-      return {
-        error: 'Esta cuenta ya fue activada anteriormente. Por favor inicia sesión con tu contraseña.',
+
+    if (isAlreadyRegistered && member.password_reset_allowed) {
+      const { data: usersList } = await adminClient.auth.admin.listUsers({ perPage: 1000 })
+      const existingAuthUser = usersList?.users?.find(
+        (u: any) => u.email?.toLowerCase() === email.toLowerCase()
+      )
+      if (!existingAuthUser) {
+        return { error: 'No se pudo localizar la cuenta para restablecer la contraseña.' }
       }
+      const { error: updatePassErr } = await adminClient.auth.admin.updateUserById(
+        existingAuthUser.id,
+        { password, email_confirm: true }
+      )
+      if (updatePassErr) {
+        return { error: 'No se pudo actualizar la contraseña.' }
+      }
+    } else if (isAlreadyRegistered) {
+      return {
+        error: 'Esta cuenta ya fue activada anteriormente. Por favor inicia sesión con tu contraseña o usa "¿Olvidaste tu contraseña?".',
+      }
+    } else {
+      console.error('[MemberAuth:registerMemberAccount] Auth Create Error:', authError)
+      return { error: 'No se pudo activar la cuenta. Intenta nuevamente.' }
     }
-    return { error: 'No se pudo activar la cuenta. Intenta nuevamente.' }
   }
 
-  // 3. Update member's name and phone in the members table
+  // 3. Update member's name in the members table (and clear password_reset_allowed if it was set)
   const appDate = await getAppDate()
   const { data: updatedMember, error: updateError } = await adminClient
     .from('members')
     .update({
       name: cleanName,
-      phone: cleanPhone,
+      password_reset_allowed: false,
       updated_at: appDate.toISOString(),
     })
     .eq('member_id', member.member_id)
@@ -173,7 +188,7 @@ export async function registerMemberAccount(formData: FormData): Promise<{
 
   return {
     success: true,
-    member: (updatedMember || { ...member, name: cleanName, phone: cleanPhone }) as AuthenticatedMember,
+    member: (updatedMember || { ...member, name: cleanName }) as AuthenticatedMember,
   }
 }
 
@@ -351,5 +366,207 @@ export async function updateMyMemberProfile(formData: FormData): Promise<{
   } catch (err) {
     console.error('[MemberAuth:updateMyMemberProfile] Unexpected error:', err)
     return { error: 'Ocurrió un error inesperado al actualizar tu perfil.' }
+  }
+}
+
+export async function checkPasswordResetEligibility(rawUsername: string): Promise<{
+  error?: string
+  mode?: 'admin_unlocked' | 'self_service'
+  username?: string
+  name?: string
+}> {
+  const cleanUsername = (rawUsername || '').trim().toUpperCase()
+  if (!cleanUsername) {
+    return { error: 'Por favor ingresa tu ID de usuario NovaFit.' }
+  }
+
+  const adminClient = createServiceClient()
+  const { data: member, error } = await adminClient
+    .from('members')
+    .select('member_id, username, name, phone, date_of_birth, password_reset_allowed')
+    .eq('username', cleanUsername)
+    .eq('deleted', false)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[MemberAuth:checkPasswordResetEligibility] Error:', error)
+    return { error: 'Error al verificar tu cuenta.' }
+  }
+
+  if (!member) {
+    return { error: 'No se encontró ningún miembro activo con ese ID de usuario.' }
+  }
+
+  // Option 2: 1-Click Admin Unlock is active
+  if (member.password_reset_allowed) {
+    return {
+      mode: 'admin_unlocked',
+      username: member.username,
+      name: member.name,
+    }
+  }
+
+  // Option 1: Self-service via Phone + Date of Birth
+  if (member.phone && member.date_of_birth) {
+    return {
+      mode: 'self_service',
+      username: member.username,
+      name: member.name,
+    }
+  }
+
+  return {
+    error:
+      'Tu cuenta aún no tiene Teléfono y Fecha de Nacimiento configurados para recuperación automática. Pide en recepción que autoricen el cambio de tu contraseña con un clic.',
+  }
+}
+
+export async function resetMemberPassword(formData: FormData): Promise<{
+  error?: string
+  success?: boolean
+  dashboard?: MemberDashboardData
+}> {
+  const rawUsername = (formData.get('username') as string) || ''
+  const rawPhone = (formData.get('phone') as string) || ''
+  const rawDob = (formData.get('date_of_birth') as string) || ''
+  const password = (formData.get('password') as string) || ''
+  const confirmPassword = (formData.get('confirmPassword') as string) || ''
+
+  const cleanUsername = rawUsername.trim().toUpperCase()
+
+  if (!cleanUsername) {
+    return { error: 'ID de usuario inválido.' }
+  }
+
+  if (password.length < 6) {
+    return { error: 'La nueva contraseña debe tener al menos 6 caracteres.' }
+  }
+
+  if (password !== confirmPassword) {
+    return { error: 'Las contraseñas no coinciden.' }
+  }
+
+  const adminClient = createServiceClient()
+  const { data: member, error: memberError } = await adminClient
+    .from('members')
+    .select('member_id, username, name, phone, date_of_birth, password_reset_allowed')
+    .eq('username', cleanUsername)
+    .eq('deleted', false)
+    .maybeSingle()
+
+  if (memberError || !member) {
+    return { error: 'No se encontró la cuenta del miembro.' }
+  }
+
+  const isAdminUnlocked = Boolean(member.password_reset_allowed)
+
+  if (!isAdminUnlocked) {
+    if (!member.phone || !member.date_of_birth) {
+      return {
+        error:
+          'No tienes Teléfono y Fecha de Nacimiento registrados. Solicita autorización en recepción.',
+      }
+    }
+
+    const normalizeDigits = (val: string) => val.replace(/\D/g, '')
+    const expectedPhoneDigits = normalizeDigits(member.phone)
+    const providedPhoneDigits = normalizeDigits(rawPhone)
+    const expectedDob = toPeriodYYYYMMDD(member.date_of_birth)
+    const providedDob = rawDob.trim()
+
+    if (
+      !providedPhoneDigits ||
+      providedPhoneDigits !== expectedPhoneDigits ||
+      providedDob !== expectedDob
+    ) {
+      return {
+        error: 'El teléfono o la fecha de nacimiento no coinciden con nuestros registros.',
+      }
+    }
+  }
+
+  // Locate or create the Supabase Auth user for this member
+  const email = getMemberAuthEmail(cleanUsername)
+  const { data: usersList, error: listError } = await adminClient.auth.admin.listUsers({
+    perPage: 1000,
+  })
+
+  if (listError) {
+    console.error('[MemberAuth:resetMemberPassword] listUsers error:', listError)
+    return { error: 'No se pudo actualizar la contraseña. Intenta nuevamente.' }
+  }
+
+  const existingAuthUser = usersList?.users?.find(
+    (u: any) => u.email?.toLowerCase() === email.toLowerCase()
+  )
+
+  if (existingAuthUser) {
+    const { error: updateAuthError } = await adminClient.auth.admin.updateUserById(
+      existingAuthUser.id,
+      {
+        password,
+        email_confirm: true,
+      }
+    )
+    if (updateAuthError) {
+      console.error('[MemberAuth:resetMemberPassword] updateUserById error:', updateAuthError)
+      return { error: 'Error al guardar la nueva contraseña.' }
+    }
+  } else {
+    const { error: createAuthError } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        member_id: member.member_id,
+        username: member.username,
+        role: 'member',
+      },
+    })
+    if (createAuthError) {
+      console.error('[MemberAuth:resetMemberPassword] createUser error:', createAuthError)
+      return { error: 'Error al activar la nueva contraseña.' }
+    }
+  }
+
+  // Consume the 1-click admin unlock flag if it was used
+  if (isAdminUnlocked) {
+    const appDate = await getAppDate()
+    await adminClient
+      .from('members')
+      .update({
+        password_reset_allowed: false,
+        updated_at: appDate.toISOString(),
+      })
+      .eq('member_id', member.member_id)
+  }
+
+  // Automatically sign the member in with their new password
+  const supabase = await createClient()
+  const { data: signInData } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+
+  if (signInData?.user) {
+    try {
+      await adminClient.from('user_sessions').insert({
+        auth_user_id: signInData.user.id,
+        user_type: 'client',
+        action: 'login',
+      })
+    } catch {
+      // ignore session log error
+    }
+  }
+
+  const dashboard = await fetchMemberDashboardData(member.member_id)
+  if (!dashboard) {
+    return { error: 'Contraseña actualizada, pero no se pudo cargar el perfil. Inicia sesión.' }
+  }
+
+  return {
+    success: true,
+    dashboard,
   }
 }

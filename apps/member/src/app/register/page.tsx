@@ -12,10 +12,8 @@ function RegisterForm() {
 
   const id = searchParams.get('id') || ''
   const initialName = searchParams.get('name') || ''
-  const initialPhone = searchParams.get('phone') || ''
 
   const [name, setName] = useState(initialName)
-  const [phone, setPhone] = useState(initialPhone)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -26,9 +24,7 @@ function RegisterForm() {
 
   useEffect(() => {
     const paramName = searchParams.get('name')
-    const paramPhone = searchParams.get('phone')
     if (paramName !== null) setName(paramName)
-    if (paramPhone !== null) setPhone(paramPhone)
   }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -55,7 +51,6 @@ function RegisterForm() {
       const formData = new FormData()
       formData.set('username', id)
       formData.set('name', name)
-      formData.set('phone', phone)
       formData.set('password', password)
       formData.set('confirmPassword', confirmPassword)
 
@@ -104,7 +99,7 @@ function RegisterForm() {
           <div className="relative z-10 mb-6">
             <h2 className="text-2xl font-bold text-white">Activa tu cuenta</h2>
             <p className="text-xs text-muted-foreground mt-1">
-              Confirma o actualiza tus datos y crea tu contraseña para ingresar a la app.
+              Confirma tu nombre y crea tu contraseña para ingresar a la app.
             </p>
           </div>
 
@@ -187,33 +182,6 @@ function RegisterForm() {
                     className="input pl-12 bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 transition-all rounded-2xl h-14 text-white font-medium"
                     placeholder="Tu nombre completo"
                     required
-                  />
-                </div>
-              </div>
-
-              {/* Editable Phone */}
-              <div className="input-group">
-                <label
-                  className="input-label text-[11px] font-bold text-muted-foreground tracking-wider uppercase !mb-1"
-                  htmlFor="register-phone"
-                >
-                  Teléfono
-                </label>
-                <div className="relative flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 text-muted-foreground pointer-events-none"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                  <input
-                    id="register-phone"
-                    name="phone"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => {
-                      setPhone(e.target.value)
-                      if (error) setError(null)
-                    }}
-                    autoComplete="tel"
-                    enterKeyHint="next"
-                    className="input pl-12 bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 transition-all rounded-2xl h-14 text-white font-medium"
-                    placeholder="Ej: 8888-8888"
                   />
                 </div>
               </div>

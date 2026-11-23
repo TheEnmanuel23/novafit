@@ -130,13 +130,13 @@ isOneToOne: false
                   ]
                 },"members": {
                   Row: {
-                    "address": string | null,"created_at": string,"created_by": string | null,"date_of_birth": string | null,"deleted": boolean,"email": string | null,"id": string,"member_id": string,"name": string,"phone": string | null,"qr_code": string | null,"updated_at": string,"updated_by": string | null,"username": string
+                    "address": string | null,"created_at": string,"created_by": string | null,"date_of_birth": string | null,"deleted": boolean,"email": string | null,"id": string,"member_id": string,"name": string,"password_reset_allowed": boolean,"phone": string | null,"qr_code": string | null,"updated_at": string,"updated_by": string | null,"username": string
                   }
                   Insert: {
-                    "address"?: string | null,"created_at"?: string,"created_by"?: string | null,"date_of_birth"?: string | null,"deleted"?: boolean,"email"?: string | null,"id"?: string,"member_id"?: string,"name": string,"phone"?: string | null,"qr_code"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"username": string
+                    "address"?: string | null,"created_at"?: string,"created_by"?: string | null,"date_of_birth"?: string | null,"deleted"?: boolean,"email"?: string | null,"id"?: string,"member_id"?: string,"name": string,"password_reset_allowed"?: boolean,"phone"?: string | null,"qr_code"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"username": string
                   }
                   Update: {
-                    "address"?: string | null,"created_at"?: string,"created_by"?: string | null,"date_of_birth"?: string | null,"deleted"?: boolean,"email"?: string | null,"id"?: string,"member_id"?: string,"name"?: string,"phone"?: string | null,"qr_code"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"username"?: string
+                    "address"?: string | null,"created_at"?: string,"created_by"?: string | null,"date_of_birth"?: string | null,"deleted"?: boolean,"email"?: string | null,"id"?: string,"member_id"?: string,"name"?: string,"password_reset_allowed"?: boolean,"phone"?: string | null,"qr_code"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"username"?: string
                   }
                   Relationships: [
                     {

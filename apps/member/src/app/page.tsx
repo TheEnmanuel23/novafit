@@ -11,6 +11,8 @@ import {
   signOutMember,
   getAuthenticatedMemberDashboard,
   updateMyMemberProfile,
+  checkPasswordResetEligibility,
+  resetMemberPassword,
   type MemberDashboardData,
 } from './actions/auth'
 
@@ -26,6 +28,18 @@ function MemberAppContent() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [dashboard, setDashboard] = useState<MemberDashboardData | null>(null)
+
+  // Forgot / Reset Password flow state
+  const [isResetView, setIsResetView] = useState(false)
+  const [resetMode, setResetMode] = useState<'lookup' | 'admin_unlocked' | 'self_service'>('lookup')
+  const [resetMemberName, setResetMemberName] = useState('')
+  const [resetPhone, setResetPhone] = useState('')
+  const [resetDob, setResetDob] = useState('')
+  const [resetNewPassword, setResetNewPassword] = useState('')
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('')
+  const [showResetPassword, setShowResetPassword] = useState(false)
+  const [resetError, setResetError] = useState<string | null>(null)
+  const [isResetSubmitting, setIsResetSubmitting] = useState(false)
 
   // QR Modal state
   const [isQrModalOpen, setIsQrModalOpen] = useState(false)
@@ -171,6 +185,89 @@ function MemberAppContent() {
     }
   }
 
+  const handleStartReset = () => {
+    setIsResetView(true)
+    setResetMode('lookup')
+    setResetError(null)
+    setResetPhone('')
+    setResetDob('')
+    setResetNewPassword('')
+    setResetConfirmPassword('')
+  }
+
+  const handleBackToLogin = () => {
+    setIsResetView(false)
+    setResetMode('lookup')
+    setResetError(null)
+  }
+
+  const handleCheckResetEligibility = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setResetError(null)
+
+    const cleanUsername = username.trim().toUpperCase()
+    if (!cleanUsername) {
+      setResetError('Por favor ingresa tu ID de usuario NovaFit.')
+      return
+    }
+
+    setIsResetSubmitting(true)
+    try {
+      const res = await checkPasswordResetEligibility(cleanUsername)
+      if (res.error || !res.mode) {
+        setResetError(res.error || 'No se pudo verificar la cuenta.')
+        return
+      }
+
+      setUsername(res.username || cleanUsername)
+      setResetMemberName(res.name || '')
+      setResetMode(res.mode)
+    } catch {
+      setResetError('Error al verificar la cuenta. Intenta nuevamente.')
+    } finally {
+      setIsResetSubmitting(false)
+    }
+  }
+
+  const handleResetPasswordSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setResetError(null)
+
+    if (resetNewPassword.length < 6) {
+      setResetError('La nueva contraseña debe tener al menos 6 caracteres.')
+      return
+    }
+
+    if (resetNewPassword !== resetConfirmPassword) {
+      setResetError('Las contraseñas no coinciden.')
+      return
+    }
+
+    setIsResetSubmitting(true)
+    try {
+      const formData = new FormData()
+      formData.set('username', username.trim().toUpperCase())
+      formData.set('phone', resetPhone)
+      formData.set('date_of_birth', resetDob)
+      formData.set('password', resetNewPassword)
+      formData.set('confirmPassword', resetConfirmPassword)
+
+      const res = await resetMemberPassword(formData)
+      if (res.error || !res.dashboard) {
+        setResetError(res.error || 'No se pudo restablecer la contraseña.')
+        return
+      }
+
+      setIsResetView(false)
+      setResetMode('lookup')
+      setDashboard(res.dashboard)
+    } catch {
+      setResetError('Ocurrió un error al restablecer la contraseña.')
+    } finally {
+      setIsResetSubmitting(false)
+    }
+  }
+
   const handleLogout = async () => {
     await signOutMember()
     setDashboard(null)
@@ -192,6 +289,7 @@ function MemberAppContent() {
     const { member, planHistory, attendances, appDateISO } = dashboard
     const appDate = new Date(appDateISO)
     const scheduledPlans = member.scheduled_plans ?? []
+    const isMissingRecoveryInfo = !member.phone || !member.date_of_birth
 
     return (
       <div className="min-h-screen bg-gradient-radial relative overflow-hidden">
@@ -229,6 +327,39 @@ function MemberAppContent() {
           </header>
 
           <main className="page-content mt-6 flex flex-col gap-6">
+            {/* Warning Banner while Phone or Date of Birth is missing */}
+            {isMissingRecoveryInfo && (
+              <div
+                role="status"
+                className="p-4 rounded-2xl bg-warning/10 border border-warning/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-300"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-warning/20 text-warning flex items-center justify-center shrink-0 mt-0.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                  </div>
+                  <div className="text-xs leading-relaxed">
+                    <p className="font-bold text-warning">Completa tus datos de recuperación</p>
+                    <p className="text-white/80 mt-0.5">
+                      Agrega tu{' '}
+                      {!member.phone && !member.date_of_birth
+                        ? 'Teléfono y Fecha de Nacimiento'
+                        : !member.phone
+                          ? 'Teléfono'
+                          : 'Fecha de Nacimiento'}{' '}
+                      en tu información personal para poder recuperar tu contraseña automáticamente si la olvidas.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenEditModal}
+                  className="btn min-h-9 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-warning text-black hover:bg-warning/90 shrink-0 self-end sm:self-center"
+                >
+                  Completar ahora
+                </button>
+              </div>
+            )}
+
             <MemberProfileCards
               member={member}
               planHistory={planHistory}
@@ -267,7 +398,7 @@ function MemberAppContent() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-bold text-white">Editar Información</h2>
-                  <p className="text-xs text-muted-foreground">Actualiza tus datos personales</p>
+                  <p className="text-xs text-muted-foreground">Actualiza tus datos personales y de recuperación</p>
                 </div>
                 <button
                   type="button"
@@ -309,7 +440,7 @@ function MemberAppContent() {
 
                 <div className="input-group">
                   <label className="input-label text-[11px]" htmlFor="edit-phone">
-                    Teléfono
+                    Teléfono (usado para recuperar contraseña)
                   </label>
                   <input
                     id="edit-phone"
@@ -320,6 +451,21 @@ function MemberAppContent() {
                     autoComplete="tel"
                     className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl h-12"
                     placeholder="Ej: 8888-8888"
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label text-[11px]" htmlFor="edit-dob">
+                    Fecha de Nacimiento (usada para recuperar contraseña)
+                  </label>
+                  <input
+                    id="edit-dob"
+                    name="date_of_birth"
+                    type="date"
+                    value={editDob}
+                    onChange={(e) => setEditDob(e.target.value)}
+                    autoComplete="bday"
+                    className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl h-12"
                   />
                 </div>
 
@@ -339,21 +485,6 @@ function MemberAppContent() {
                     spellCheck={false}
                     className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl h-12"
                     placeholder="Ej: correo@ejemplo.com"
-                  />
-                </div>
-
-                <div className="input-group">
-                  <label className="input-label text-[11px]" htmlFor="edit-dob">
-                    Fecha de Nacimiento
-                  </label>
-                  <input
-                    id="edit-dob"
-                    name="date_of_birth"
-                    type="date"
-                    value={editDob}
-                    onChange={(e) => setEditDob(e.target.value)}
-                    autoComplete="bday"
-                    className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl h-12"
                   />
                 </div>
 
@@ -483,99 +614,320 @@ function MemberAppContent() {
         <div className="glass-strong p-8 rounded-[32px] shadow-2xl relative overflow-hidden border-white/10">
           <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
 
-          <h2 className="text-2xl font-bold mb-6 text-white relative z-10">Ingresa a tu cuenta</h2>
-
-          <form method="POST" onSubmit={handleLogin} className="flex flex-col gap-5 relative z-10">
-            {error && (
-              <div
-                role="alert"
-                className="bg-error/10 border border-error/20 text-error px-4 py-3 rounded-xl text-sm font-medium"
-              >
-                {error}
+          {isResetView ? (
+            <div className="relative z-10 flex flex-col gap-5">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Recuperar contraseña</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {resetMode === 'lookup'
+                    ? 'Ingresa tu ID de usuario para continuar.'
+                    : resetMode === 'admin_unlocked'
+                      ? 'Cambio autorizado en recepción. Crea tu nueva contraseña.'
+                      : 'Confirma tu teléfono y fecha de nacimiento registrados.'}
+                </p>
               </div>
-            )}
 
-            <div className="input-group">
-              <label
-                className="input-label text-[11px] font-bold text-muted-foreground tracking-wider uppercase"
-                htmlFor="username"
-              >
-                Usuario NovaFit
-              </label>
-              <div className="relative flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 text-muted-foreground pointer-events-none"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <input
-                  id="username"
-                  name="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => {
-                    setUsername(e.target.value)
-                    if (error) setError(null)
-                  }}
-                  autoComplete="username"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  enterKeyHint="next"
-                  className="input pl-12 bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 transition-all rounded-2xl h-14 text-white font-medium"
-                  placeholder="Ej: AB12-3456"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="input-group">
-              <label
-                className="input-label text-[11px] font-bold text-muted-foreground tracking-wider uppercase"
-                htmlFor="password"
-              >
-                Contraseña
-              </label>
-              <div className="relative flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 text-muted-foreground pointer-events-none"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value)
-                    if (error) setError(null)
-                  }}
-                  autoComplete="current-password"
-                  enterKeyHint="done"
-                  className="input pl-12 pr-12 bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 transition-all rounded-2xl h-14 text-white font-medium"
-                  placeholder="••••••••"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  aria-pressed={showPassword}
-                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  className="absolute right-3 w-9 h-9 flex items-center justify-center rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-colors"
+              {resetError && (
+                <div
+                  role="alert"
+                  className="bg-error/10 border border-error/20 text-error px-4 py-3 rounded-xl text-sm font-medium"
                 >
-                  {showPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                  {resetError}
+                </div>
+              )}
+
+              {resetMode === 'lookup' ? (
+                <form method="POST" onSubmit={handleCheckResetEligibility} className="flex flex-col gap-4">
+                  <div className="input-group">
+                    <label
+                      className="input-label text-[11px] font-bold text-muted-foreground tracking-wider uppercase"
+                      htmlFor="reset-username"
+                    >
+                      Usuario NovaFit
+                    </label>
+                    <div className="relative flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 text-muted-foreground pointer-events-none"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      <input
+                        id="reset-username"
+                        name="username"
+                        type="text"
+                        value={username}
+                        onChange={(e) => {
+                          setUsername(e.target.value)
+                          if (resetError) setResetError(null)
+                        }}
+                        autoComplete="username"
+                        autoCorrect="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        className="input pl-12 bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 transition-all rounded-2xl h-14 text-white font-medium uppercase"
+                        placeholder="Ej: AB12-3456"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isResetSubmitting}
+                    className="btn h-14 rounded-2xl mt-2 text-base font-bold text-white bg-gradient-to-r from-accent to-[#818cf8] border-none shadow-[0_0_30px_-5px_rgba(99,102,241,0.6)]"
+                  >
+                    {isResetSubmitting ? 'Verificando...' : 'Continuar'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleBackToLogin}
+                    className="btn btn-ghost min-h-11 rounded-2xl text-xs font-semibold"
+                  >
+                    Volver a Iniciar Sesión
+                  </button>
+                </form>
+              ) : (
+                <form method="POST" onSubmit={handleResetPasswordSubmit} className="flex flex-col gap-4">
+                  <div className="px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-muted-foreground block">Cuenta</span>
+                      <span className="text-white font-semibold">{resetMemberName}</span>{' '}
+                      <span className="text-accent font-mono">({username})</span>
+                    </div>
+                    {resetMode === 'admin_unlocked' && (
+                      <span className="badge badge-active text-[10px]">Autorizado</span>
+                    )}
+                  </div>
+
+                  {resetMode === 'self_service' && (
+                    <>
+                      <div className="input-group">
+                        <label
+                          className="input-label text-[11px] font-bold text-muted-foreground tracking-wider uppercase !mb-1"
+                          htmlFor="reset-phone"
+                        >
+                          Teléfono Registrado
+                        </label>
+                        <input
+                          id="reset-phone"
+                          name="phone"
+                          type="tel"
+                          value={resetPhone}
+                          onChange={(e) => {
+                            setResetPhone(e.target.value)
+                            if (resetError) setResetError(null)
+                          }}
+                          autoComplete="tel"
+                          className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-2xl h-12 text-white font-medium"
+                          placeholder="Ej: 8888-8888"
+                          required
+                        />
+                      </div>
+
+                      <div className="input-group">
+                        <label
+                          className="input-label text-[11px] font-bold text-muted-foreground tracking-wider uppercase !mb-1"
+                          htmlFor="reset-dob"
+                        >
+                          Fecha de Nacimiento
+                        </label>
+                        <input
+                          id="reset-dob"
+                          name="date_of_birth"
+                          type="date"
+                          value={resetDob}
+                          onChange={(e) => {
+                            setResetDob(e.target.value)
+                            if (resetError) setResetError(null)
+                          }}
+                          autoComplete="bday"
+                          className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-2xl h-12 text-white font-medium"
+                          required
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="input-group">
+                    <label
+                      className="input-label text-[11px] font-bold text-muted-foreground tracking-wider uppercase !mb-1"
+                      htmlFor="reset-new-password"
+                    >
+                      Nueva Contraseña
+                    </label>
+                    <div className="relative flex items-center">
+                      <input
+                        id="reset-new-password"
+                        name="password"
+                        type={showResetPassword ? 'text' : 'password'}
+                        value={resetNewPassword}
+                        onChange={(e) => {
+                          setResetNewPassword(e.target.value)
+                          if (resetError) setResetError(null)
+                        }}
+                        autoComplete="new-password"
+                        minLength={6}
+                        className="input pr-12 bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-2xl h-12 text-white font-medium"
+                        placeholder="Mínimo 6 caracteres"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowResetPassword((p) => !p)}
+                        aria-pressed={showResetPassword}
+                        aria-label={showResetPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                        className="absolute right-3 w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-white"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="input-group">
+                    <label
+                      className="input-label text-[11px] font-bold text-muted-foreground tracking-wider uppercase !mb-1"
+                      htmlFor="reset-confirm-password"
+                    >
+                      Confirmar Nueva Contraseña
+                    </label>
+                    <input
+                      id="reset-confirm-password"
+                      name="confirmPassword"
+                      type={showResetPassword ? 'text' : 'password'}
+                      value={resetConfirmPassword}
+                      onChange={(e) => {
+                        setResetConfirmPassword(e.target.value)
+                        if (resetError) setResetError(null)
+                      }}
+                      autoComplete="new-password"
+                      minLength={6}
+                      className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-2xl h-12 text-white font-medium"
+                      placeholder="Repite tu contraseña"
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isResetSubmitting}
+                    className="btn h-14 rounded-2xl mt-2 text-base font-bold text-white bg-gradient-to-r from-accent to-[#818cf8] border-none shadow-[0_0_30px_-5px_rgba(99,102,241,0.6)]"
+                  >
+                    {isResetSubmitting ? 'Guardando...' : 'Actualizar Contraseña'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleBackToLogin}
+                    className="btn btn-ghost min-h-11 rounded-2xl text-xs font-semibold"
+                  >
+                    Cancelar
+                  </button>
+                </form>
+              )}
+            </div>
+          ) : (
+            <>
+              <h2 className="text-2xl font-bold mb-6 text-white relative z-10">Ingresa a tu cuenta</h2>
+
+              <form method="POST" onSubmit={handleLogin} className="flex flex-col gap-5 relative z-10">
+                {error && (
+                  <div
+                    role="alert"
+                    className="bg-error/10 border border-error/20 text-error px-4 py-3 rounded-xl text-sm font-medium"
+                  >
+                    {error}
+                  </div>
+                )}
+
+                <div className="input-group">
+                  <label
+                    className="input-label text-[11px] font-bold text-muted-foreground tracking-wider uppercase"
+                    htmlFor="username"
+                  >
+                    Usuario NovaFit
+                  </label>
+                  <div className="relative flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 text-muted-foreground pointer-events-none"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <input
+                      id="username"
+                      name="username"
+                      type="text"
+                      value={username}
+                      onChange={(e) => {
+                        setUsername(e.target.value)
+                        if (error) setError(null)
+                      }}
+                      autoComplete="username"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      enterKeyHint="next"
+                      className="input pl-12 bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 transition-all rounded-2xl h-14 text-white font-medium"
+                      placeholder="Ej: AB12-3456"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <div className="flex justify-between items-center mb-1">
+                    <label
+                      className="input-label !mb-0 text-[11px] font-bold text-muted-foreground tracking-wider uppercase"
+                      htmlFor="password"
+                    >
+                      Contraseña
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleStartReset}
+                      className="text-xs font-semibold text-accent hover:text-accent-hover transition-colors"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </button>
+                  </div>
+                  <div className="relative flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-4 text-muted-foreground pointer-events-none"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value)
+                        if (error) setError(null)
+                      }}
+                      autoComplete="current-password"
+                      enterKeyHint="done"
+                      className="input pl-12 pr-12 bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 transition-all rounded-2xl h-14 text-white font-medium"
+                      placeholder="••••••••"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      aria-pressed={showPassword}
+                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      className="absolute right-3 w-9 h-9 flex items-center justify-center rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-colors"
+                    >
+                      {showPassword ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="btn h-14 rounded-2xl mt-4 text-base font-bold text-white bg-gradient-to-r from-accent to-[#818cf8] border-none shadow-[0_0_30px_-5px_rgba(99,102,241,0.6)] hover:shadow-[0_0_50px_-5px_rgba(99,102,241,0.8)] hover:scale-[1.02] transition-all flex items-center justify-center gap-2 group"
+                >
+                  {isSubmitting ? 'Verificando...' : 'Iniciar Sesión'}
+                  {!isSubmitting && (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                   )}
                 </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="btn h-14 rounded-2xl mt-4 text-base font-bold text-white bg-gradient-to-r from-accent to-[#818cf8] border-none shadow-[0_0_30px_-5px_rgba(99,102,241,0.6)] hover:shadow-[0_0_50px_-5px_rgba(99,102,241,0.8)] hover:scale-[1.02] transition-all flex items-center justify-center gap-2 group"
-            >
-              {isSubmitting ? 'Verificando...' : 'Iniciar Sesión'}
-              {!isSubmitting && (
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-              )}
-            </button>
-          </form>
+              </form>
+            </>
+          )}
         </div>
       </div>
 

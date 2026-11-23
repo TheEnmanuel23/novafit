@@ -14,6 +14,7 @@ import { isPlanExpired } from '@novafit/supabase/src/utils/member'
 import { getAppDate } from '@novafit/supabase/src/utils/date'
 import { EditPlanModal } from '@/components/EditPlanModal'
 import { ShareMemberAppModal } from '@/components/ShareMemberAppModal'
+import { AuthorizePasswordResetButton } from '@/components/AuthorizePasswordResetButton'
 import { MemberProfileCards } from '@novafit/ui'
 
 export default async function MemberDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -67,6 +68,10 @@ export default async function MemberDetailsPage({ params }: { params: Promise<{ 
           <p className="text-muted-foreground text-xs">{member.username}</p>
         </div>
         <div className="flex items-center gap-2 ml-auto">
+          <AuthorizePasswordResetButton
+            memberId={member.member_id}
+            isAllowed={Boolean((member as any).password_reset_allowed)}
+          />
           <ShareMemberAppModal member={member as any} />
           <EditMemberModal member={member} />
           <DeactivateMemberButton memberId={member.member_id} />
