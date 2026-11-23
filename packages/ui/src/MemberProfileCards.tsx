@@ -11,13 +11,18 @@ export type MemberWithAudit = MemberWithStatus & {
 export function MemberInfoCard({
   member,
   showAuditInfo = true,
+  headerActions,
 }: {
   member: MemberWithAudit
   showAuditInfo?: boolean | undefined
+  headerActions?: ReactNode | undefined
 }) {
   return (
     <div className="glass p-6 rounded-xl flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">Información del Miembro</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg font-semibold">Información del Miembro</h2>
+        {headerActions && <div className="flex items-center gap-2">{headerActions}</div>}
+      </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <p className="text-sm text-muted-foreground">Nombre</p>
@@ -34,6 +39,16 @@ export function MemberInfoCard({
         <div>
           <p className="text-sm text-muted-foreground">Estado</p>
           <p className="font-medium capitalize">{member.status}</p>
+        </div>
+        <div>
+          <p className="text-sm text-muted-foreground">Fecha de Nacimiento</p>
+          <p className="font-medium">
+            {member.date_of_birth ? formatDateOnly(member.date_of_birth) : 'N/A'}
+          </p>
+        </div>
+        <div>
+          <p className="text-sm text-muted-foreground">Dirección</p>
+          <p className="font-medium break-words">{member.address || 'N/A'}</p>
         </div>
       </div>
       {showAuditInfo && (
@@ -388,6 +403,7 @@ export function MemberProfileCards({
   planHistory,
   attendances,
   appDate,
+  infoCardHeaderActions,
   activePlanHeaderActions,
   emptyPlanActions,
   emptyPlanDescription,
@@ -399,6 +415,7 @@ export function MemberProfileCards({
   planHistory: any[]
   attendances: any[]
   appDate: Date
+  infoCardHeaderActions?: ReactNode | undefined
   activePlanHeaderActions?: ReactNode | undefined
   emptyPlanActions?: ReactNode | undefined
   emptyPlanDescription?: string | undefined
@@ -410,7 +427,11 @@ export function MemberProfileCards({
 
   return (
     <>
-      <MemberInfoCard member={member} showAuditInfo={showPlanAuditInfo} />
+      <MemberInfoCard
+        member={member}
+        showAuditInfo={showPlanAuditInfo}
+        headerActions={infoCardHeaderActions}
+      />
       <MemberActivePlanCard
         member={member}
         headerActions={activePlanHeaderActions}

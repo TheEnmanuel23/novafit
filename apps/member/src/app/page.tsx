@@ -5,10 +5,12 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import QRCode from 'qrcode'
 import { MemberProfileCards } from '@novafit/ui'
+import { toPeriodYYYYMMDD } from '@novafit/supabase/src/utils/date'
 import {
   signInMember,
   signOutMember,
   getAuthenticatedMemberDashboard,
+  updateMyMemberProfile,
   type MemberDashboardData,
 } from './actions/auth'
 
@@ -28,6 +30,15 @@ function MemberAppContent() {
   // QR Modal state
   const [isQrModalOpen, setIsQrModalOpen] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
+
+  // Edit Profile Modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editDob, setEditDob] = useState('')
+  const [editAddress, setEditAddress] = useState('')
+  const [editError, setEditError] = useState<string | null>(null)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
 
   useEffect(() => {
     const paramUser = searchParams.get('id') || searchParams.get('username')
@@ -77,6 +88,52 @@ function MemberAppContent() {
     }
   }
 
+  const handleOpenEditModal = () => {
+    if (!dashboard?.member) return
+    setEditName(dashboard.member.name || '')
+    setEditPhone(dashboard.member.phone || '')
+    setEditDob(
+      dashboard.member.date_of_birth
+        ? toPeriodYYYYMMDD(dashboard.member.date_of_birth)
+        : ''
+    )
+    setEditAddress(dashboard.member.address || '')
+    setEditError(null)
+    setIsEditModalOpen(true)
+  }
+
+  const handleSaveProfile = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setEditError(null)
+
+    if (!editName.trim()) {
+      setEditError('El nombre es obligatorio.')
+      return
+    }
+
+    setIsSavingProfile(true)
+    try {
+      const formData = new FormData()
+      formData.set('name', editName)
+      formData.set('phone', editPhone)
+      formData.set('date_of_birth', editDob)
+      formData.set('address', editAddress)
+
+      const result = await updateMyMemberProfile(formData)
+      if (result.error || !result.dashboard) {
+        setEditError(result.error || 'No se pudieron guardar los cambios.')
+        return
+      }
+
+      setDashboard(result.dashboard)
+      setIsEditModalOpen(false)
+    } catch {
+      setEditError('Ocurrió un error al actualizar tu información.')
+    } finally {
+      setIsSavingProfile(false)
+    }
+  }
+
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
@@ -117,6 +174,7 @@ function MemberAppContent() {
     setPassword('')
     setShowPassword(false)
     setIsQrModalOpen(false)
+    setIsEditModalOpen(false)
   }
 
   if (isCheckingSession) {
@@ -135,7 +193,7 @@ function MemberAppContent() {
     return (
       <div className="min-h-screen bg-gradient-radial relative overflow-hidden">
         <div className="app-container">
-          <header className="page-header items-center gap-4 border-b border-border pb-4">
+          <header className="page-header items-center gap-3 border-b border-border pb-4">
             <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center border border-white/20 shadow-lg overflow-hidden">
               <Image
                 src="/novafit-logo.jpg"
@@ -146,8 +204,7 @@ function MemberAppContent() {
               />
             </div>
             <div className="flex-1">
-              <h1 className="text-xl font-bold">{member.name}</h1>
-              <p className="text-muted-foreground text-xs">{member.username}</p>
+              <h1 className="text-xl font-black tracking-tight text-white">NovaFit</h1>
             </div>
             <div className="flex items-center gap-2 ml-auto">
               <button
@@ -175,6 +232,16 @@ function MemberAppContent() {
               attendances={attendances}
               appDate={appDate}
               showPlanAuditInfo={false}
+              infoCardHeaderActions={
+                <button
+                  type="button"
+                  onClick={handleOpenEditModal}
+                  className="btn btn-ghost min-h-9 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                  Editar
+                </button>
+              }
               emptyPlanDescription={
                 scheduledPlans.length > 0
                   ? 'Tienes un plan programado para iniciar próximamente.'
@@ -183,6 +250,128 @@ function MemberAppContent() {
             />
           </main>
         </div>
+
+        {/* Edit Member Information Modal */}
+        {isEditModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => !isSavingProfile && setIsEditModalOpen(false)}
+          >
+            <div
+              className="bg-[#12141c] border border-white/15 w-full max-w-md rounded-3xl shadow-2xl p-6 flex flex-col gap-5 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-white">Editar Información</h2>
+                  <p className="text-xs text-muted-foreground">Actualiza tus datos personales</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  disabled={isSavingProfile}
+                  aria-label="Cerrar edición de perfil"
+                  className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+              </div>
+
+              <form method="POST" onSubmit={handleSaveProfile} className="flex flex-col gap-4">
+                {editError && (
+                  <div
+                    role="alert"
+                    className="bg-error/10 border border-error/20 text-error px-4 py-3 rounded-xl text-sm font-medium"
+                  >
+                    {editError}
+                  </div>
+                )}
+
+                <div className="input-group">
+                  <label className="input-label text-[11px]" htmlFor="edit-name">
+                    Nombre Completo *
+                  </label>
+                  <input
+                    id="edit-name"
+                    name="name"
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    autoComplete="name"
+                    className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl h-12"
+                    placeholder="Tu nombre completo"
+                    required
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label text-[11px]" htmlFor="edit-phone">
+                    Teléfono
+                  </label>
+                  <input
+                    id="edit-phone"
+                    name="phone"
+                    type="tel"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    autoComplete="tel"
+                    className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl h-12"
+                    placeholder="Ej: 8888-8888"
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label text-[11px]" htmlFor="edit-dob">
+                    Fecha de Nacimiento
+                  </label>
+                  <input
+                    id="edit-dob"
+                    name="date_of_birth"
+                    type="date"
+                    value={editDob}
+                    onChange={(e) => setEditDob(e.target.value)}
+                    autoComplete="bday"
+                    className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl h-12"
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label text-[11px]" htmlFor="edit-address">
+                    Dirección
+                  </label>
+                  <textarea
+                    id="edit-address"
+                    name="address"
+                    rows={2}
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    autoComplete="street-address"
+                    className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl py-3 min-h-[76px] resize-y"
+                    placeholder="Tu dirección o barrio"
+                  />
+                </div>
+
+                <div className="flex gap-3 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    disabled={isSavingProfile}
+                    className="btn btn-ghost flex-1 min-h-12 rounded-xl text-sm font-semibold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingProfile}
+                    className="btn btn-primary flex-1 min-h-12 rounded-xl text-sm font-bold"
+                  >
+                    {isSavingProfile ? 'Guardando...' : 'Guardar cambios'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Member QR Check-in Modal */}
         {isQrModalOpen && (

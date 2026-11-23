@@ -130,13 +130,13 @@ isOneToOne: false
                   ]
                 },"members": {
                   Row: {
-                    "created_at": string,"created_by": string | null,"deleted": boolean,"id": string,"member_id": string,"name": string,"phone": string | null,"qr_code": string | null,"updated_at": string,"updated_by": string | null,"username": string
+                    "address": string | null,"created_at": string,"created_by": string | null,"date_of_birth": string | null,"deleted": boolean,"id": string,"member_id": string,"name": string,"phone": string | null,"qr_code": string | null,"updated_at": string,"updated_by": string | null,"username": string
                   }
                   Insert: {
-                    "created_at"?: string,"created_by"?: string | null,"deleted"?: boolean,"id"?: string,"member_id"?: string,"name": string,"phone"?: string | null,"qr_code"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"username": string
+                    "address"?: string | null,"created_at"?: string,"created_by"?: string | null,"date_of_birth"?: string | null,"deleted"?: boolean,"id"?: string,"member_id"?: string,"name": string,"phone"?: string | null,"qr_code"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"username": string
                   }
                   Update: {
-                    "created_at"?: string,"created_by"?: string | null,"deleted"?: boolean,"id"?: string,"member_id"?: string,"name"?: string,"phone"?: string | null,"qr_code"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"username"?: string
+                    "address"?: string | null,"created_at"?: string,"created_by"?: string | null,"date_of_birth"?: string | null,"deleted"?: boolean,"id"?: string,"member_id"?: string,"name"?: string,"phone"?: string | null,"qr_code"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"username"?: string
                   }
                   Relationships: [
                     {

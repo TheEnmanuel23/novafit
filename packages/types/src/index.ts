@@ -19,6 +19,8 @@ export interface Member {
   member_id: string;
   name: string;
   phone: string | null;
+  address?: string | null;
+  date_of_birth?: string | null;
   username: string; // short unique human-readable ID e.g. "ABCD-1234"
   qr_code: string | null;
   deleted: boolean;

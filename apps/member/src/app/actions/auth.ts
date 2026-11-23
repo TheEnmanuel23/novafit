@@ -268,3 +268,81 @@ export async function signOutMember(): Promise<void> {
 
   await supabase.auth.signOut()
 }
+
+export async function updateMyMemberProfile(formData: FormData): Promise<{
+  error?: string
+  success?: boolean
+  dashboard?: MemberDashboardData
+}> {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user || !user.email?.endsWith('@member.novafit.local')) {
+      return { error: 'Sesión no válida. Por favor inicia sesión nuevamente.' }
+    }
+
+    const usernameFromEmail = user.email.replace('@member.novafit.local', '').toUpperCase()
+    const rawName = (formData.get('name') as string) || ''
+    const rawPhone = (formData.get('phone') as string) || ''
+    const rawAddress = (formData.get('address') as string) || ''
+    const rawDob = (formData.get('date_of_birth') as string) || ''
+
+    const cleanName = rawName.trim().replace(/\s+/g, ' ')
+    const cleanPhone = rawPhone.trim() || null
+    const cleanAddress = rawAddress.trim().replace(/\s+/g, ' ') || null
+    const cleanDob = rawDob.trim() || null
+
+    if (!cleanName) {
+      return { error: 'El nombre es obligatorio.' }
+    }
+
+    if (cleanDob && !/^\d{4}-\d{2}-\d{2}$/.test(cleanDob)) {
+      return { error: 'Formato de fecha de nacimiento inválido.' }
+    }
+
+    const adminClient = createServiceClient()
+    const { data: memberRow, error: lookupError } = await adminClient
+      .from('members')
+      .select('member_id')
+      .eq('username', usernameFromEmail)
+      .eq('deleted', false)
+      .maybeSingle()
+
+    if (lookupError || !memberRow) {
+      return { error: 'No se encontró tu perfil de miembro.' }
+    }
+
+    const appDate = await getAppDate()
+    const { error: updateError } = await adminClient
+      .from('members')
+      .update({
+        name: cleanName,
+        phone: cleanPhone,
+        address: cleanAddress,
+        date_of_birth: cleanDob,
+        updated_at: appDate.toISOString(),
+      })
+      .eq('member_id', memberRow.member_id)
+
+    if (updateError) {
+      console.error('[MemberAuth:updateMyMemberProfile] Update error:', updateError)
+      return { error: 'No se pudieron guardar los cambios. Intenta nuevamente.' }
+    }
+
+    const dashboard = await fetchMemberDashboardData(memberRow.member_id)
+    if (!dashboard) {
+      return { error: 'Error al recargar la información actualizada.' }
+    }
+
+    return {
+      success: true,
+      dashboard,
+    }
+  } catch (err) {
+    console.error('[MemberAuth:updateMyMemberProfile] Unexpected error:', err)
+    return { error: 'Ocurrió un error inesperado al actualizar tu perfil.' }
+  }
+}
