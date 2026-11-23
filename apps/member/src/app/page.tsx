@@ -13,6 +13,7 @@ import {
   updateMyMemberProfile,
   checkPasswordResetEligibility,
   resetMemberPassword,
+  changeMyMemberPassword,
   type MemberDashboardData,
 } from './actions/auth'
 
@@ -54,6 +55,16 @@ function MemberAppContent() {
   const [editAddress, setEditAddress] = useState('')
   const [editError, setEditError] = useState<string | null>(null)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
+
+  // Change Password Modal state (when already logged in)
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [showChangePasswords, setShowChangePasswords] = useState(false)
+  const [changePasswordError, setChangePasswordError] = useState<string | null>(null)
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
 
   useEffect(() => {
     const paramUser = searchParams.get('id') || searchParams.get('username')
@@ -275,6 +286,52 @@ function MemberAppContent() {
     setShowPassword(false)
     setIsQrModalOpen(false)
     setIsEditModalOpen(false)
+    setIsChangePasswordModalOpen(false)
+  }
+
+  const handleOpenChangePasswordModal = () => {
+    setCurrentPassword('')
+    setNewPassword('')
+    setConfirmNewPassword('')
+    setShowChangePasswords(false)
+    setChangePasswordError(null)
+    setChangePasswordSuccess(false)
+    setIsChangePasswordModalOpen(true)
+  }
+
+  const handleChangePasswordSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setChangePasswordError(null)
+
+    if (newPassword.length < 6) {
+      setChangePasswordError('La nueva contraseña debe tener al menos 6 caracteres.')
+      return
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setChangePasswordError('Las contraseñas nuevas no coinciden.')
+      return
+    }
+
+    setIsChangingPassword(true)
+    try {
+      const formData = new FormData()
+      formData.set('currentPassword', currentPassword)
+      formData.set('newPassword', newPassword)
+      formData.set('confirmPassword', confirmNewPassword)
+
+      const res = await changeMyMemberPassword(formData)
+      if (res.error) {
+        setChangePasswordError(res.error)
+        return
+      }
+
+      setChangePasswordSuccess(true)
+    } catch {
+      setChangePasswordError('Ocurrió un error al cambiar la contraseña.')
+    } finally {
+      setIsChangingPassword(false)
+    }
   }
 
   if (isCheckingSession) {
@@ -367,14 +424,24 @@ function MemberAppContent() {
               appDate={appDate}
               showPlanAuditInfo={false}
               infoCardHeaderActions={
-                <button
-                  type="button"
-                  onClick={handleOpenEditModal}
-                  className="btn btn-ghost min-h-9 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-                  Editar
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleOpenChangePasswordModal}
+                    className="btn btn-ghost min-h-9 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    Cambiar clave
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenEditModal}
+                    className="btn btn-ghost min-h-9 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    Editar
+                  </button>
+                </>
               }
               emptyPlanDescription={
                 scheduledPlans.length > 0
@@ -522,6 +589,158 @@ function MemberAppContent() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Change Password Modal (when logged in) */}
+        {isChangePasswordModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => !isChangingPassword && setIsChangePasswordModalOpen(false)}
+          >
+            <div
+              className="bg-[#12141c] border border-white/15 w-full max-w-md rounded-3xl shadow-2xl p-6 flex flex-col gap-5 animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-white">Cambiar Contraseña</h2>
+                  <p className="text-xs text-muted-foreground">Actualiza tu contraseña de acceso</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsChangePasswordModalOpen(false)}
+                  disabled={isChangingPassword}
+                  aria-label="Cerrar cambio de contraseña"
+                  className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+              </div>
+
+              {changePasswordSuccess ? (
+                <div className="flex flex-col items-center text-center gap-4 py-4">
+                  <div className="w-14 h-14 rounded-full bg-success/15 border border-success/30 text-success flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">¡Contraseña actualizada!</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Tu nueva contraseña ha sido guardada correctamente.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsChangePasswordModalOpen(false)}
+                    className="btn btn-primary w-full min-h-12 rounded-xl text-sm font-bold mt-2"
+                  >
+                    Listo
+                  </button>
+                </div>
+              ) : (
+                <form method="POST" onSubmit={handleChangePasswordSubmit} className="flex flex-col gap-4">
+                  {changePasswordError && (
+                    <div
+                      role="alert"
+                      className="bg-error/10 border border-error/20 text-error px-4 py-3 rounded-xl text-sm font-medium"
+                    >
+                      {changePasswordError}
+                    </div>
+                  )}
+
+                  <div className="input-group">
+                    <label className="input-label text-[11px]" htmlFor="current-password">
+                      Contraseña Actual *
+                    </label>
+                    <div className="relative flex items-center">
+                      <input
+                        id="current-password"
+                        name="currentPassword"
+                        type={showChangePasswords ? 'text' : 'password'}
+                        value={currentPassword}
+                        onChange={(e) => {
+                          setCurrentPassword(e.target.value)
+                          if (changePasswordError) setChangePasswordError(null)
+                        }}
+                        autoComplete="current-password"
+                        className="input pr-12 bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl h-12"
+                        placeholder="••••••••"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowChangePasswords((p) => !p)}
+                        aria-pressed={showChangePasswords}
+                        aria-label={showChangePasswords ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
+                        className="absolute right-3 w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-white"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="input-group">
+                    <label className="input-label text-[11px]" htmlFor="change-new-password">
+                      Nueva Contraseña *
+                    </label>
+                    <input
+                      id="change-new-password"
+                      name="newPassword"
+                      type={showChangePasswords ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value)
+                        if (changePasswordError) setChangePasswordError(null)
+                      }}
+                      autoComplete="new-password"
+                      minLength={6}
+                      className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl h-12"
+                      placeholder="Mínimo 6 caracteres"
+                      required
+                    />
+                  </div>
+
+                  <div className="input-group">
+                    <label className="input-label text-[11px]" htmlFor="change-confirm-password">
+                      Confirmar Nueva Contraseña *
+                    </label>
+                    <input
+                      id="change-confirm-password"
+                      name="confirmPassword"
+                      type={showChangePasswords ? 'text' : 'password'}
+                      value={confirmNewPassword}
+                      onChange={(e) => {
+                        setConfirmNewPassword(e.target.value)
+                        if (changePasswordError) setChangePasswordError(null)
+                      }}
+                      autoComplete="new-password"
+                      minLength={6}
+                      className="input bg-black/40 border-white/10 focus:border-accent focus:bg-black/60 rounded-xl h-12"
+                      placeholder="Repite tu nueva contraseña"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex gap-3 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsChangePasswordModalOpen(false)}
+                      disabled={isChangingPassword}
+                      className="btn btn-ghost flex-1 min-h-12 rounded-xl text-sm font-semibold"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isChangingPassword}
+                      className="btn btn-primary flex-1 min-h-12 rounded-xl text-sm font-bold"
+                    >
+                      {isChangingPassword ? 'Actualizando...' : 'Actualizar clave'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         )}
@@ -820,6 +1039,15 @@ function MemberAppContent() {
                     Cancelar
                   </button>
                 </form>
+              )}
+
+              {resetMode !== 'admin_unlocked' && (
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-xs text-muted-foreground leading-relaxed text-center">
+                  ¿No configuraste o no recuerdas tu teléfono y fecha de nacimiento?{' '}
+                  <span className="text-white font-semibold">
+                    Solicita en recepción que autoricen el restablecimiento de tu contraseña.
+                  </span>
+                </div>
               )}
             </div>
           ) : (

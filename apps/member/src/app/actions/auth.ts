@@ -570,3 +570,60 @@ export async function resetMemberPassword(formData: FormData): Promise<{
     dashboard,
   }
 }
+
+export async function changeMyMemberPassword(formData: FormData): Promise<{
+  error?: string
+  success?: boolean
+}> {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user || !user.email?.endsWith('@member.novafit.local')) {
+      return { error: 'Sesión no válida. Por favor inicia sesión nuevamente.' }
+    }
+
+    const currentPassword = (formData.get('currentPassword') as string) || ''
+    const newPassword = (formData.get('newPassword') as string) || ''
+    const confirmPassword = (formData.get('confirmPassword') as string) || ''
+
+    if (!currentPassword) {
+      return { error: 'Por favor ingresa tu contraseña actual.' }
+    }
+
+    if (newPassword.length < 6) {
+      return { error: 'La nueva contraseña debe tener al menos 6 caracteres.' }
+    }
+
+    if (newPassword !== confirmPassword) {
+      return { error: 'Las contraseñas nuevas no coinciden.' }
+    }
+
+    // Verify current password first
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    })
+
+    if (verifyError) {
+      return { error: 'Tu contraseña actual es incorrecta.' }
+    }
+
+    // Update to the new password
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    })
+
+    if (updateError) {
+      console.error('[MemberAuth:changeMyMemberPassword] Update error:', updateError)
+      return { error: 'No se pudo actualizar la contraseña. Intenta nuevamente.' }
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('[MemberAuth:changeMyMemberPassword] Unexpected error:', err)
+    return { error: 'Ocurrió un error inesperado al cambiar la contraseña.' }
+  }
+}
