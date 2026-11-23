@@ -15,6 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "NovaFit — App de Miembros",
   description: "Tu gimnasio, en tu bolsillo.",
+  icons: {
+    icon: "/novafit-logo.jpg",
+    shortcut: "/novafit-logo.jpg",
+    apple: "/novafit-logo.jpg",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
