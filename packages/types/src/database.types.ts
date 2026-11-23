@@ -91,6 +91,43 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"cash_register_sessions": {
+                  Row: {
+                    "cash_sales_total": number,"closed_at": string | null,"closed_by": string | null,"counted_cash_amount": number | null,"created_at": string,"created_by": string | null,"difference_amount": number | null,"expected_cash_amount": number,"id": string,"notes": string | null,"opened_at": string,"opened_by": string | null,"opening_amount": number,"other_sales_total": number,"status": string,"total_sales": number,"updated_at": string,"updated_by": string | null
+                  }
+                  Insert: {
+                    "cash_sales_total"?: number,"closed_at"?: string | null,"closed_by"?: string | null,"counted_cash_amount"?: number | null,"created_at"?: string,"created_by"?: string | null,"difference_amount"?: number | null,"expected_cash_amount"?: number,"id"?: string,"notes"?: string | null,"opened_at"?: string,"opened_by"?: string | null,"opening_amount"?: number,"other_sales_total"?: number,"status"?: string,"total_sales"?: number,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "cash_sales_total"?: number,"closed_at"?: string | null,"closed_by"?: string | null,"counted_cash_amount"?: number | null,"created_at"?: string,"created_by"?: string | null,"difference_amount"?: number | null,"expected_cash_amount"?: number,"id"?: string,"notes"?: string | null,"opened_at"?: string,"opened_by"?: string | null,"opening_amount"?: number,"other_sales_total"?: number,"status"?: string,"total_sales"?: number,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "cash_register_sessions_closed_by_fkey"
+      columns: ["closed_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "cash_register_sessions_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "cash_register_sessions_opened_by_fkey"
+      columns: ["opened_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "cash_register_sessions_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"member_plans": {
                   Row: {
                     "created_at": string,"created_by": string | null,"expiration_date": string,"id": string,"member_id": string,"plan_id": string,"starts_at": string,"status": string,"updated_at": string,"updated_by": string | null,"visits_purchased": number,"visits_used": number

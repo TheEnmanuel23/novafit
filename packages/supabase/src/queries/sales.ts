@@ -1,5 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { PaymentMethod, SaleWithDetails } from '@novafit/types'
+import type {
+  CashRegisterSessionWithDetails,
+  PaymentMethod,
+  SaleWithDetails,
+} from '@novafit/types'
 import { getManaguaDayRange } from '../utils/date'
 
 export async function getPaymentMethods(
@@ -111,5 +115,88 @@ export async function getSales(
     creator: row.creator || null,
     member: row.member || null,
   })) as SaleWithDetails[]
+}
+
+export async function getCashRegisterSessions(
+  supabase: SupabaseClient,
+  limit: number = 200
+): Promise<CashRegisterSessionWithDetails[]> {
+  const { data, error } = await supabase
+    .from('cash_register_sessions')
+    .select(
+      `
+      *,
+      opened_by_staff:staff!cash_register_sessions_opened_by_fkey (id, name, username),
+      closed_by_staff:staff!cash_register_sessions_closed_by_fkey (id, name, username)
+    `
+    )
+    .order('opened_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    // Graceful fallback if migration hasn't been applied yet
+    console.warn('[getCashRegisterSessions] Could not fetch sessions:', error.message)
+    return []
+  }
+
+  return (data || []).map((row: any) => ({
+    ...row,
+    opening_amount: Number(row.opening_amount ?? 0),
+    cash_sales_total: Number(row.cash_sales_total ?? 0),
+    other_sales_total: Number(row.other_sales_total ?? 0),
+    total_sales: Number(row.total_sales ?? 0),
+    expected_cash_amount: Number(row.expected_cash_amount ?? 0),
+    counted_cash_amount:
+      row.counted_cash_amount !== null && row.counted_cash_amount !== undefined
+        ? Number(row.counted_cash_amount)
+        : null,
+    difference_amount:
+      row.difference_amount !== null && row.difference_amount !== undefined
+        ? Number(row.difference_amount)
+        : null,
+    opened_by_staff: row.opened_by_staff || null,
+    closed_by_staff: row.closed_by_staff || null,
+  })) as CashRegisterSessionWithDetails[]
+}
+
+export async function getOpenCashRegisterSession(
+  supabase: SupabaseClient
+): Promise<CashRegisterSessionWithDetails | null> {
+  const { data, error } = await supabase
+    .from('cash_register_sessions')
+    .select(
+      `
+      *,
+      opened_by_staff:staff!cash_register_sessions_opened_by_fkey (id, name, username),
+      closed_by_staff:staff!cash_register_sessions_closed_by_fkey (id, name, username)
+    `
+    )
+    .eq('status', 'open')
+    .order('opened_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !data) {
+    return null
+  }
+
+  return {
+    ...data,
+    opening_amount: Number(data.opening_amount ?? 0),
+    cash_sales_total: Number(data.cash_sales_total ?? 0),
+    other_sales_total: Number(data.other_sales_total ?? 0),
+    total_sales: Number(data.total_sales ?? 0),
+    expected_cash_amount: Number(data.expected_cash_amount ?? 0),
+    counted_cash_amount:
+      data.counted_cash_amount !== null && data.counted_cash_amount !== undefined
+        ? Number(data.counted_cash_amount)
+        : null,
+    difference_amount:
+      data.difference_amount !== null && data.difference_amount !== undefined
+        ? Number(data.difference_amount)
+        : null,
+    opened_by_staff: (data as any).opened_by_staff || null,
+    closed_by_staff: (data as any).closed_by_staff || null,
+  } as CashRegisterSessionWithDetails
 }
 

@@ -96,7 +96,8 @@ export type RoleName =
   | 'delete_products'
   | 'view_sales'
   | 'create_sales'
-  | 'delete_sales';
+  | 'delete_sales'
+  | 'manage_cash_register';
 
 export interface Role {
   id: string;
@@ -311,6 +312,36 @@ export interface SaleWithDetails extends Sale {
   assigned_staff: { id: string; name: string; username: string } | null;
   creator: { id: string; name: string; username: string } | null;
   member: { id: string; member_id: string; name: string; username: string } | null;
+}
+
+// ─── Cash Register Sessions (Cierres de caja) ────────────────────────────────
+
+export type CashRegisterStatus = 'open' | 'closed';
+
+export interface CashRegisterSession {
+  id: string;
+  status: CashRegisterStatus;
+  opening_amount: number;
+  cash_sales_total: number;
+  other_sales_total: number;
+  total_sales: number;
+  expected_cash_amount: number;
+  counted_cash_amount: number | null;
+  difference_amount: number | null;
+  notes: string | null;
+  opened_at: string;
+  closed_at: string | null;
+  opened_by: string | null;
+  closed_by: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+export interface CashRegisterSessionWithDetails extends CashRegisterSession {
+  opened_by_staff: { id: string; name: string; username: string } | null;
+  closed_by_staff: { id: string; name: string; username: string } | null;
 }
 
 // ─── Database Gen Types ───────────────────────────────────────────────────────

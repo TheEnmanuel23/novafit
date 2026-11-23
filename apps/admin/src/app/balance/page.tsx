@@ -6,6 +6,8 @@ import {
   isGlobalAdmin,
   getSales,
   getPaymentMethods,
+  getCashRegisterSessions,
+  getOpenCashRegisterSession,
 } from '@novafit/supabase'
 import { getTodayYYYYMMDD } from '@novafit/supabase/src/utils/date'
 import { BottomNav } from '@/components/BottomNav'
@@ -24,6 +26,7 @@ export default async function BalancePage() {
     isGlobal ||
     (await hasRole(staff, 'view_sales')) ||
     (await hasRole(staff, 'create_sales')) ||
+    (await hasRole(staff, 'manage_cash_register')) ||
     (await hasRole(staff, 'view_reports'))
 
   if (!canView) {
@@ -31,11 +34,18 @@ export default async function BalancePage() {
   }
 
   const canEditSales = isGlobal || (await hasRole(staff, 'create_sales'))
+  const canManageCash =
+    isGlobal ||
+    (await hasRole(staff, 'manage_cash_register')) ||
+    (await hasRole(staff, 'create_sales'))
+
   const todayYMD = getTodayYYYYMMDD()
 
-  const [sales, paymentMethods] = await Promise.all([
+  const [sales, paymentMethods, cashSessions, openSession] = await Promise.all([
     getSales(supabase, { limit: 1000 }),
     getPaymentMethods(supabase),
+    getCashRegisterSessions(supabase, 200),
+    getOpenCashRegisterSession(supabase),
   ])
 
   return (
@@ -44,8 +54,11 @@ export default async function BalancePage() {
         <BalanceView
           initialSales={sales}
           paymentMethods={paymentMethods}
+          initialCashSessions={cashSessions}
+          openCashSession={openSession}
           defaultTodayYMD={todayYMD}
           canEditSales={canEditSales}
+          canManageCash={canManageCash}
         />
       </div>
 
@@ -53,4 +66,3 @@ export default async function BalancePage() {
     </div>
   )
 }
-

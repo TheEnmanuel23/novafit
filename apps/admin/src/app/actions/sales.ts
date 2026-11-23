@@ -323,3 +323,152 @@ export async function markSaleAsPaidAction(saleId: string) {
   }
 }
 
+export async function openCashRegisterAction(openingAmount: number, notes?: string) {
+  const supabase = await createServerClient()
+
+  try {
+    const currentStaff = await requireSalesPermission(supabase, [
+      'manage_cash_register',
+      'create_sales',
+    ])
+
+    const safeOpening = Number(openingAmount)
+    if (isNaN(safeOpening) || safeOpening < 0) {
+      return { error: 'La base inicial debe ser un monto mayor o igual a 0.' }
+    }
+
+    // Check if there is already an open session
+    const { data: existingOpen } = await supabase
+      .from('cash_register_sessions')
+      .select('id')
+      .eq('status', 'open')
+      .maybeSingle()
+
+    if (existingOpen) {
+      return { error: 'Ya existe una caja abierta actualmente. Ciérrala antes de abrir una nueva.' }
+    }
+
+    const nowISO = (await getAppDate()).toISOString()
+
+    const { data, error } = await supabase
+      .from('cash_register_sessions')
+      .insert({
+        status: 'open',
+        opening_amount: Number(safeOpening.toFixed(2)),
+        expected_cash_amount: Number(safeOpening.toFixed(2)),
+        notes: notes?.trim() || null,
+        opened_at: nowISO,
+        opened_by: currentStaff.id,
+        created_by: currentStaff.id,
+        updated_by: currentStaff.id,
+      })
+      .select('*')
+      .single()
+
+    if (error) {
+      return { error: 'Error al abrir caja: ' + error.message }
+    }
+
+    revalidatePath('/balance')
+    return { success: true, session: data }
+  } catch (err: any) {
+    return { error: err.message || 'Error inesperado al abrir la caja.' }
+  }
+}
+
+export async function closeCashRegisterAction(input: {
+  sessionId: string
+  countedCashAmount: number
+  notes?: string
+}) {
+  const supabase = await createServerClient()
+
+  try {
+    const currentStaff = await requireSalesPermission(supabase, [
+      'manage_cash_register',
+      'create_sales',
+    ])
+
+    const counted = Number(input.countedCashAmount)
+    if (isNaN(counted) || counted < 0) {
+      return { error: 'El efectivo contado en caja debe ser un número mayor o igual a 0.' }
+    }
+
+    const { data: session, error: fetchErr } = await supabase
+      .from('cash_register_sessions')
+      .select('*')
+      .eq('id', input.sessionId)
+      .eq('status', 'open')
+      .maybeSingle()
+
+    if (fetchErr || !session) {
+      return { error: 'No se encontró la sesión de caja abierta.' }
+    }
+
+    const nowISO = (await getAppDate()).toISOString()
+
+    // Calculate paid sales registered during this cash session window (opened_at -> now)
+    const { data: sessionSales } = await supabase
+      .from('sales')
+      .select(
+        `
+        id,
+        total,
+        payment_status,
+        payment_method:payment_methods (key)
+      `
+      )
+      .eq('deleted', false)
+      .eq('payment_status', 'paid')
+      .gte('sale_date', session.opened_at)
+      .lte('sale_date', nowISO)
+
+    let cashSalesTotal = 0
+    let otherSalesTotal = 0
+
+    for (const s of sessionSales || []) {
+      const amt = Number(s.total ?? 0)
+      const pmKey = (s.payment_method as any)?.key || 'cash'
+      if (pmKey === 'cash') {
+        cashSalesTotal += amt
+      } else {
+        otherSalesTotal += amt
+      }
+    }
+
+    cashSalesTotal = Number(cashSalesTotal.toFixed(2))
+    otherSalesTotal = Number(otherSalesTotal.toFixed(2))
+    const totalSales = Number((cashSalesTotal + otherSalesTotal).toFixed(2))
+    const openingAmount = Number(session.opening_amount ?? 0)
+    const expectedCashAmount = Number((openingAmount + cashSalesTotal).toFixed(2))
+    const countedCashAmount = Number(counted.toFixed(2))
+    const differenceAmount = Number((countedCashAmount - expectedCashAmount).toFixed(2))
+
+    const { error: updateErr } = await supabase
+      .from('cash_register_sessions')
+      .update({
+        status: 'closed',
+        cash_sales_total: cashSalesTotal,
+        other_sales_total: otherSalesTotal,
+        total_sales: totalSales,
+        expected_cash_amount: expectedCashAmount,
+        counted_cash_amount: countedCashAmount,
+        difference_amount: differenceAmount,
+        notes: input.notes?.trim() || session.notes || null,
+        closed_at: nowISO,
+        closed_by: currentStaff.id,
+        updated_by: currentStaff.id,
+      })
+      .eq('id', session.id)
+
+    if (updateErr) {
+      return { error: 'Error al cerrar la caja: ' + updateErr.message }
+    }
+
+    revalidatePath('/balance')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Error inesperado al cerrar la caja.' }
+  }
+}
+
