@@ -153,6 +153,31 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"payment_methods": {
+                  Row: {
+                    "active": boolean,"created_at": string,"created_by": string | null,"id": string,"key": string,"name": string,"sort_order": number,"updated_at": string,"updated_by": string | null
+                  }
+                  Insert: {
+                    "active"?: boolean,"created_at"?: string,"created_by"?: string | null,"id"?: string,"key": string,"name": string,"sort_order"?: number,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "active"?: boolean,"created_at"?: string,"created_by"?: string | null,"id"?: string,"key"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "payment_methods_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "payment_methods_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"plans": {
                   Row: {
                     "active": boolean,"created_at": string,"created_by": string | null,"description": string,"expiration_days": number,"id": string,"key": string,"max_balance": number,"price": number,"updated_by": string | null,"visits_included": number
@@ -365,6 +390,80 @@ isOneToOne: false
       referencedColumns: ["id"]
     },{
       foreignKeyName: "roles_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"sale_items": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"id": string,"product_id": string | null,"product_name": string,"quantity": number,"sale_id": string,"subtotal": number,"unit_cost": number,"unit_price": number
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"product_id"?: string | null,"product_name": string,"quantity"?: number,"sale_id": string,"subtotal"?: number,"unit_cost"?: number,"unit_price"?: number
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"product_id"?: string | null,"product_name"?: string,"quantity"?: number,"sale_id"?: string,"subtotal"?: number,"unit_cost"?: number,"unit_price"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "sale_items_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sale_items_product_id_fkey"
+      columns: ["product_id"]
+isOneToOne: false
+      referencedRelation: "products"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sale_items_sale_id_fkey"
+      columns: ["sale_id"]
+isOneToOne: false
+      referencedRelation: "sales"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"sales": {
+                  Row: {
+                    "assigned_staff_id": string | null,"created_at": string,"created_by": string | null,"custom_payment_method": string | null,"deleted": boolean,"discount": number,"id": string,"installments_count": number,"member_id": string | null,"payment_method_id": string | null,"payment_status": string,"receipt_details": string | null,"receipt_name": string | null,"sale_date": string,"sale_type": string,"subtotal": number,"total": number,"updated_at": string,"updated_by": string | null
+                  }
+                  Insert: {
+                    "assigned_staff_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"custom_payment_method"?: string | null,"deleted"?: boolean,"discount"?: number,"id"?: string,"installments_count"?: number,"member_id"?: string | null,"payment_method_id"?: string | null,"payment_status"?: string,"receipt_details"?: string | null,"receipt_name"?: string | null,"sale_date"?: string,"sale_type"?: string,"subtotal"?: number,"total"?: number,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "assigned_staff_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"custom_payment_method"?: string | null,"deleted"?: boolean,"discount"?: number,"id"?: string,"installments_count"?: number,"member_id"?: string | null,"payment_method_id"?: string | null,"payment_status"?: string,"receipt_details"?: string | null,"receipt_name"?: string | null,"sale_date"?: string,"sale_type"?: string,"subtotal"?: number,"total"?: number,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "sales_assigned_staff_id_fkey"
+      columns: ["assigned_staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sales_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sales_member_id_fkey"
+      columns: ["member_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["member_id"]
+    },{
+      foreignKeyName: "sales_payment_method_id_fkey"
+      columns: ["payment_method_id"]
+isOneToOne: false
+      referencedRelation: "payment_methods"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sales_updated_by_fkey"
       columns: ["updated_by"]
 isOneToOne: false
       referencedRelation: "staff"

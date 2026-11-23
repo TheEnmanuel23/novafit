@@ -22,6 +22,12 @@ export default async function DashboardPage() {
       (await hasRole(staff, 'edit_products')) ||
       (await hasRole(staff, 'delete_products'))
     : false
+  const canAccessSales = staff
+    ? isGlobal ||
+      (await hasRole(staff, 'view_sales')) ||
+      (await hasRole(staff, 'create_sales')) ||
+      (await hasRole(staff, 'delete_sales'))
+    : false
 
   // Staff with no admin roles are kiosk-only — send them straight to /checkin
   const isKioskOnly =
@@ -30,7 +36,8 @@ export default async function DashboardPage() {
     !canManageMembers &&
     !canManageSettings &&
     !canManageStaff &&
-    !canAccessInventory
+    !canAccessInventory &&
+    !canAccessSales
   if (isKioskOnly) {
     redirect('/checkin')
   }
@@ -58,7 +65,7 @@ export default async function DashboardPage() {
         
         <UserDropdown 
           userName={staff?.name || 'Usuario'} 
-          permissions={{ canManageSettings, canManageMembers, canAccessInventory }}
+          permissions={{ canManageSettings, canManageMembers, canAccessInventory, canAccessSales }}
         />
       </header>
 
@@ -90,6 +97,15 @@ export default async function DashboardPage() {
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
                 </div>
                 <span className="text-sm font-semibold">Nuevo Miembro</span>
+              </Link>
+            )}
+
+            {canAccessSales && (
+              <Link href="/sales" className="glass p-4 text-center hover-lift flex flex-col items-center justify-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-success-subtle text-success flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                </div>
+                <span className="text-sm font-semibold">Nueva Venta</span>
               </Link>
             )}
 

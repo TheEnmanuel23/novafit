@@ -18,12 +18,18 @@ export async function BottomNav({ currentPath }: { currentPath: string }) {
     (await hasRole(staff, 'create_products')) ||
     (await hasRole(staff, 'edit_products')) ||
     (await hasRole(staff, 'delete_products'))
+  const canAccessSales =
+    isGlobal ||
+    (await hasRole(staff, 'view_sales')) ||
+    (await hasRole(staff, 'create_sales')) ||
+    (await hasRole(staff, 'delete_sales'))
   const isKioskOnly =
     !isGlobal &&
     !canManageMembers &&
     !canManageStaff &&
     !canManageSettings &&
-    !canAccessInventory
+    !canAccessInventory &&
+    !canAccessSales
 
   // Kiosk-only users get a stripped-down nav with just the checkin link
   if (isKioskOnly) {
@@ -55,6 +61,13 @@ export async function BottomNav({ currentPath }: { currentPath: string }) {
             Asistencias
           </Link>
         </>
+      )}
+
+      {canAccessSales && (
+        <Link href="/sales" className={`bottom-nav-item ${currentPath.startsWith('/sales') ? 'active' : ''}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+          Ventas
+        </Link>
       )}
 
       {canAccessInventory && (
