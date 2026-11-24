@@ -15,9 +15,29 @@ export default async function DashboardPage() {
   const canManageMembers = staff ? (await hasRole(staff, 'manage_members')) || isGlobal : false
   const canManageSettings = staff ? (await hasRole(staff, 'manage_settings')) || isGlobal : false
   const canManageStaff = staff ? (await hasRole(staff, 'manage_staff')) || isGlobal : false
+  const canAccessInventory = staff
+    ? isGlobal ||
+      (await hasRole(staff, 'view_products')) ||
+      (await hasRole(staff, 'create_products')) ||
+      (await hasRole(staff, 'edit_products')) ||
+      (await hasRole(staff, 'delete_products'))
+    : false
+  const canAccessSales = staff
+    ? isGlobal ||
+      (await hasRole(staff, 'view_sales')) ||
+      (await hasRole(staff, 'create_sales')) ||
+      (await hasRole(staff, 'delete_sales'))
+    : false
 
   // Staff with no admin roles are kiosk-only — send them straight to /checkin
-  const isKioskOnly = staff && !isGlobal && !canManageMembers && !canManageSettings && !canManageStaff
+  const isKioskOnly =
+    staff &&
+    !isGlobal &&
+    !canManageMembers &&
+    !canManageSettings &&
+    !canManageStaff &&
+    !canAccessInventory &&
+    !canAccessSales
   if (isKioskOnly) {
     redirect('/checkin')
   }
@@ -26,6 +46,21 @@ export default async function DashboardPage() {
   
   const { getTodayVisitsCount } = await import('@novafit/supabase/src/queries/checkin')
   const visitsToday = await getTodayVisitsCount(supabaseAdmin)
+
+  const { getTodayYYYYMMDD } = await import('@novafit/supabase/src/utils/date')
+  const { getSales } = await import('@novafit/supabase/src/queries/sales')
+  const todayYMD = getTodayYYYYMMDD()
+  const todayPaidSales = canAccessSales
+    ? await getSales(supabase, {
+        startDate: todayYMD,
+        endDate: todayYMD,
+        paymentStatus: 'paid',
+      })
+    : []
+  const incomeToday = todayPaidSales.reduce(
+    (sum, s) => sum + Number(s.total || 0),
+    0
+  )
 
 
   return (
@@ -45,7 +80,7 @@ export default async function DashboardPage() {
         
         <UserDropdown 
           userName={staff?.name || 'Usuario'} 
-          permissions={{ canManageSettings, canManageMembers }}
+          permissions={{ canManageSettings, canManageMembers, canAccessInventory, canAccessSales }}
         />
       </header>
 
@@ -59,12 +94,14 @@ export default async function DashboardPage() {
             </span>
             <span className="text-3xl font-black">{visitsToday}</span>
           </Link>
-          <div className="glass p-5 flex flex-col gap-1">
-            <span className="text-muted-foreground text-xs uppercase font-bold tracking-wider">
+          <Link href="/balance" className="glass p-5 flex flex-col gap-1 hover:bg-white/5 transition-colors group">
+            <span className="text-muted-foreground text-xs uppercase font-bold tracking-wider group-hover:text-white transition-colors">
               Ingresos Hoy
             </span>
-            <span className="text-3xl font-black text-success">C$ 0</span>
-          </div>
+            <span className="text-3xl font-black text-success">
+              C$ {incomeToday.toLocaleString('es-NI', { minimumFractionDigits: incomeToday % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}
+            </span>
+          </Link>
         </div>
 
         {/* Quick Actions */}
@@ -79,7 +116,34 @@ export default async function DashboardPage() {
                 <span className="text-sm font-semibold">Nuevo Miembro</span>
               </Link>
             )}
+
+            {canAccessSales && (
+              <Link href="/sales" className="glass p-4 text-center hover-lift flex flex-col items-center justify-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-success-subtle text-success flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                </div>
+                <span className="text-sm font-semibold">Nueva Venta</span>
+              </Link>
+            )}
+
+            {canAccessInventory && (
+              <Link href="/inventory" className="glass p-4 text-center hover-lift flex flex-col items-center justify-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-warning-subtle text-warning flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>
+                </div>
+                <span className="text-sm font-semibold">Inventario</span>
+              </Link>
+            )}
             
+            {canAccessSales && (
+              <Link href="/balance" className="glass p-4 text-center hover-lift flex flex-col items-center justify-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-accent-subtle text-accent flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                </div>
+                <span className="text-sm font-semibold">Balance</span>
+              </Link>
+            )}
+
             <Link href="/checkin" className="glass p-4 text-center hover-lift flex flex-col items-center justify-center gap-2">
               <div className="w-10 h-10 rounded-full bg-success-subtle text-success flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="5" height="5" x="7" y="7"/><rect width="5" height="5" x="12" y="12"/></svg>

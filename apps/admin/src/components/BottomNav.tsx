@@ -12,7 +12,26 @@ export async function BottomNav({ currentPath }: { currentPath: string }) {
   const canManageMembers = (await hasRole(staff, 'manage_members')) || isGlobal
   const canManageStaff = (await hasRole(staff, 'manage_staff')) || isGlobal
   const canManageSettings = (await hasRole(staff, 'manage_settings')) || isGlobal
-  const isKioskOnly = !isGlobal && !canManageMembers && !canManageStaff && !canManageSettings
+  const canAccessInventory =
+    isGlobal ||
+    (await hasRole(staff, 'view_products')) ||
+    (await hasRole(staff, 'create_products')) ||
+    (await hasRole(staff, 'edit_products')) ||
+    (await hasRole(staff, 'delete_products'))
+  const canAccessSales =
+    isGlobal ||
+    (await hasRole(staff, 'view_sales')) ||
+    (await hasRole(staff, 'create_sales')) ||
+    (await hasRole(staff, 'delete_sales'))
+  const canAccessBalance =
+    canAccessSales || (await hasRole(staff, 'view_reports'))
+  const isKioskOnly =
+    !isGlobal &&
+    !canManageMembers &&
+    !canManageStaff &&
+    !canManageSettings &&
+    !canAccessInventory &&
+    !canAccessSales
 
   // Kiosk-only users get a stripped-down nav with just the checkin link
   if (isKioskOnly) {
@@ -44,6 +63,27 @@ export async function BottomNav({ currentPath }: { currentPath: string }) {
             Asistencias
           </Link>
         </>
+      )}
+
+      {canAccessSales && (
+        <Link href="/sales" className={`bottom-nav-item ${currentPath.startsWith('/sales') ? 'active' : ''}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+          Ventas
+        </Link>
+      )}
+
+      {canAccessBalance && (
+        <Link href="/balance" className={`bottom-nav-item ${currentPath.startsWith('/balance') ? 'active' : ''}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          Balance
+        </Link>
+      )}
+
+      {canAccessInventory && (
+        <Link href="/inventory" className={`bottom-nav-item ${currentPath.startsWith('/inventory') ? 'active' : ''}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>
+          Inventario
+        </Link>
       )}
 
       {canManageStaff && (
