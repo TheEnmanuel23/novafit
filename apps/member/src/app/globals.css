@@ -171,7 +171,7 @@
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    font-size: 15px;
+    font-size: max(1rem, 15px);
     font-family: var(--font-sans);
     color: var(--color-foreground);
     transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
@@ -442,6 +442,188 @@
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border-width: 0;
+  }
+
+  .visually-hidden:where(:not(:focus-within, :active)) {
+    position: absolute !important;
+    clip-path: inset(50%) !important;
+    overflow: hidden !important;
+    width: 1px !important;
+    height: 1px !important;
+    margin: -1px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    white-space: nowrap !important;
+  }
+}
+
+/* ─── Native Top-Layer Dialogs & Navigation Drawer ─────────────────────────── */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.modal-dialog {
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  width: min(calc(100dvw - 2rem), var(--modal-max-w, 28rem));
+  max-height: calc(100dvh - 2rem);
+  opacity: 0;
+  transition-property: opacity, transform, display, overlay;
+  transition-duration: 0.2s;
+  transition-timing-function: ease-out;
+  transition-behavior: allow-discrete;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .modal-dialog {
+    transform: scale(0.96);
+  }
+}
+
+.modal-dialog::backdrop {
+  background-color: transparent;
+  backdrop-filter: blur(0);
+  -webkit-backdrop-filter: blur(0);
+  transition-property: background-color, backdrop-filter, -webkit-backdrop-filter, display, overlay;
+  transition-duration: 0.2s;
+  transition-timing-function: ease-out;
+  transition-behavior: allow-discrete;
+}
+
+.modal-dialog[open]:where(:not([data-closing])) {
+  opacity: 1;
+
+  @starting-style {
+    opacity: 0;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transform: scale(1);
+
+    @starting-style {
+      transform: scale(0.96);
+    }
+  }
+
+  &::backdrop {
+    background-color: rgb(0 0 0 / 0.78);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+
+    @starting-style {
+      background-color: transparent;
+      backdrop-filter: blur(0);
+      -webkit-backdrop-filter: blur(0);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-dialog,
+  .modal-dialog::backdrop {
+    transition-duration: 0.08s;
+  }
+}
+
+.nav-drawer {
+  --drawer-width: min(22rem, 82dvw, calc(100dvw - 24px));
+  --drawer-backdrop: 0;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  overflow: visible;
+}
+
+.nav-drawer::backdrop {
+  background: #000;
+  opacity: calc(var(--drawer-backdrop) * 0.72);
+  backdrop-filter: blur(calc(var(--drawer-backdrop) * 4px));
+  -webkit-backdrop-filter: blur(calc(var(--drawer-backdrop) * 4px));
+}
+
+.nav-drawer-scroller {
+  position: relative;
+  display: grid;
+  grid-template-columns: 100% var(--drawer-width);
+  width: 100%;
+  height: 100svh;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  overscroll-behavior: none;
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+}
+
+.nav-drawer-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nav-drawer-scroller {
+    scroll-behavior: smooth;
+  }
+}
+
+.nav-drawer-scroller::before {
+  content: '';
+  scroll-snap-align: start;
+  scroll-initial-target: nearest;
+}
+
+.nav-drawer-sheet {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100svh;
+  background: #11131c;
+  border-inline-start: 1px solid var(--color-border);
+  box-shadow: -20px 0 50px rgba(0, 0, 0, 0.55);
+  color: var(--color-foreground);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-align: end;
+  scrollbar-width: none;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+}
+
+@property --drawer-backdrop {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@supports (animation-timeline: scroll()) {
+  .nav-drawer {
+    timeline-scope: --drawer-fade;
+    animation: fade-drawer-backdrop linear both;
+    animation-timeline: --drawer-fade;
+  }
+
+  .nav-drawer-scroller {
+    scroll-timeline: --drawer-fade x;
+  }
+
+  @keyframes fade-drawer-backdrop {
+    0% {
+      --drawer-backdrop: 0;
+    }
+    100% {
+      --drawer-backdrop: 1;
+    }
   }
 }
 

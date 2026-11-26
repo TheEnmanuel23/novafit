@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getAppDate, toPeriodYYYYMMDD } from '@novafit/supabase/src/utils/date'
 import { getMemberById } from '@novafit/supabase/src/queries/members'
@@ -257,6 +258,8 @@ export async function signInMember(formData: FormData): Promise<{
     return { error: 'No se pudo cargar la información del miembro.' }
   }
 
+  revalidatePath('/', 'layout')
+
   return {
     success: true,
     dashboard,
@@ -282,6 +285,7 @@ export async function signOutMember(): Promise<void> {
   }
 
   await supabase.auth.signOut()
+  revalidatePath('/', 'layout')
 }
 
 export async function updateMyMemberProfile(formData: FormData): Promise<{
@@ -358,6 +362,8 @@ export async function updateMyMemberProfile(formData: FormData): Promise<{
     if (!dashboard) {
       return { error: 'Error al recargar la información actualizada.' }
     }
+
+    revalidatePath('/', 'layout')
 
     return {
       success: true,
@@ -564,6 +570,8 @@ export async function resetMemberPassword(formData: FormData): Promise<{
   if (!dashboard) {
     return { error: 'Contraseña actualizada, pero no se pudo cargar el perfil. Inicia sesión.' }
   }
+
+  revalidatePath('/', 'layout')
 
   return {
     success: true,
