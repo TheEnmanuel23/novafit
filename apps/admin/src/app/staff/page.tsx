@@ -47,25 +47,37 @@ export default async function StaffPage() {
         </div>
 
         <div className="flex flex-col gap-3">
-          {staffList.map((staff) => (
-            <Link key={staff.id} href={`/staff/${staff.id}`} className="glass p-4 flex justify-between items-center hover-lift group">
-              <div>
-                <div className="font-semibold group-hover:text-accent transition-colors flex items-center gap-2">
-                  {staff.name}
-                  {staff.is_online && (
-                    <span className="flex h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" title="Online" />
-                  )}
+          {staffList.map((staff) => {
+            const isActive = staff.is_active !== false
+            return (
+              <Link
+                key={staff.id}
+                href={`/staff/${staff.id}`}
+                className={`glass p-4 flex justify-between items-center hover-lift group ${
+                  !isActive ? 'opacity-65' : ''
+                }`}
+              >
+                <div>
+                  <div className="font-semibold group-hover:text-accent transition-colors flex items-center gap-2">
+                    {staff.name}
+                    {isActive && staff.is_online && (
+                      <span className="flex h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" title="Online" />
+                    )}
+                    {!isActive && (
+                      <span className="badge badge-expired !text-[10px]">Inactivo</span>
+                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-0.5">{staff.username}</div>
                 </div>
-                <div className="text-sm text-muted-foreground mt-0.5">{staff.username}</div>
-              </div>
-              <div className="text-right">
-                <span className="badge badge-active">{staff.profile.name}</span>
-                <div className="text-sm text-muted-foreground mt-1">
-                  {staff.email}
+                <div className="text-right">
+                  <span className="badge badge-active">{staff.profile.name}</span>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    {staff.email}
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            )
+          })}
           
           {staffList.length === 0 && (
             <div className="text-center p-8 text-muted-foreground">

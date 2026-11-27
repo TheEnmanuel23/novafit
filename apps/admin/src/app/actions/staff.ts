@@ -168,3 +168,109 @@ export async function resetStaffPassword(staffId: string) {
   console.info(`[StaffAction:resetStaffPassword] Password reset successful for staff ${staffId}`)
   return { success: true, newPassword }
 }
+
+export async function toggleStaffActiveStatus(staffId: string, nextIsActive: boolean) {
+  console.info(
+    `[StaffAction:toggleStaffActiveStatus] Setting staff ${staffId} is_active=${nextIsActive}`
+  )
+  const supabase = await createServerClient()
+  const { data: isGlobalAdmin } = await supabase.rpc('is_global_admin')
+
+  if (!isGlobalAdmin) {
+    return { error: 'Acceso denegado. Solo un Administrador Global puede realizar esta acción.' }
+  }
+
+  const {
+    data: { user: currentAuthUser },
+  } = await supabase.auth.getUser()
+
+  const supabaseAdmin = createServiceClient()
+
+  const { data: targetStaff, error: fetchError } = await supabaseAdmin
+    .from('staff')
+    .select('id, auth_user_id, name, profile:profiles(name)')
+    .eq('id', staffId)
+    .eq('deleted', false)
+    .single()
+
+  if (fetchError || !targetStaff) {
+    return { error: 'No se encontró al empleado.' }
+  }
+
+  if (currentAuthUser && targetStaff.auth_user_id === currentAuthUser.id) {
+    return { error: 'No puedes desactivar tu propia cuenta.' }
+  }
+
+  const targetProfile = targetStaff.profile as { name?: string } | { name?: string }[] | null
+  const targetProfileName = Array.isArray(targetProfile)
+    ? targetProfile[0]?.name
+    : targetProfile?.name
+
+  if (targetProfileName === 'Global Admin') {
+    return { error: 'No se puede desactivar a un Administrador Global.' }
+  }
+
+  // 1. Update staff.is_active (and clear online indicator when deactivating)
+  const updatePayload: { is_active: boolean; is_online?: boolean } = {
+    is_active: nextIsActive,
+  }
+  if (!nextIsActive) {
+    updatePayload.is_online = false
+  }
+
+  const { error: updateStaffError } = await supabaseAdmin
+    .from('staff')
+    .update(updatePayload)
+    .eq('id', staffId)
+
+  if (updateStaffError) {
+    console.error('[StaffAction:toggleStaffActiveStatus] Staff update error:', updateStaffError)
+    return { error: 'Error al actualizar el estado del empleado.' }
+  }
+
+  // 2. Ban or unban the Supabase Auth account so login & token refresh are blocked at the Auth layer
+  const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(
+    targetStaff.auth_user_id,
+    { ban_duration: nextIsActive ? 'none' : '876000h' }
+  )
+
+  if (banError) {
+    console.error('[StaffAction:toggleStaffActiveStatus] Auth ban/unban error:', banError)
+    // Roll back staff.is_active so DB and Auth stay in sync
+    await supabaseAdmin
+      .from('staff')
+      .update({ is_active: !nextIsActive })
+      .eq('id', staffId)
+    return { error: 'Error al actualizar el acceso de autenticación del empleado.' }
+  }
+
+  // 3. When deactivating, revoke all active sessions globally & log forced logout
+  if (!nextIsActive) {
+    try {
+      const adminAuth = supabaseAdmin.auth.admin as unknown as {
+        signOut?: (jwtOrUserId: string, scope?: 'global' | 'local' | 'others') => Promise<unknown>
+      }
+      if (typeof adminAuth.signOut === 'function') {
+        await adminAuth.signOut(targetStaff.auth_user_id, 'global')
+      }
+    } catch (err) {
+      // Ban + middleware active check still enforce immediate lockout on next request
+      console.warn('[StaffAction:toggleStaffActiveStatus] Global signOut warning:', err)
+    }
+
+    try {
+      await supabaseAdmin.from('user_sessions').insert({
+        auth_user_id: targetStaff.auth_user_id,
+        user_type: 'staff',
+        action: 'logout',
+      })
+    } catch {
+      // Non-blocking audit log
+    }
+  }
+
+  revalidatePath('/staff')
+  revalidatePath(`/staff/${staffId}`)
+
+  return { success: true, is_active: nextIsActive }
+}

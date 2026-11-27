@@ -20,6 +20,7 @@ export async function getStaffByAuthId(
     )
     .eq('auth_user_id', authUserId)
     .eq('deleted', false)
+    .eq('is_active', true)
     .maybeSingle()
 
   if (error) throw new Error(`Failed to fetch staff: ${error.message}`)

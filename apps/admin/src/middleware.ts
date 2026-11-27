@@ -49,6 +49,27 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  // If signed in, verify the staff account is still active (immediately kicks out deactivated staff on any device)
+  if (user && pathname !== '/login' && pathname !== '/signup' && !pathname.startsWith('/auth/')) {
+    const { data: staffRow } = await supabase
+      .from('staff')
+      .select('is_active, deleted')
+      .eq('auth_user_id', user.id)
+      .maybeSingle()
+
+    if (!staffRow || staffRow.deleted || staffRow.is_active === false) {
+      await supabase.auth.signOut()
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = '/login'
+      loginUrl.searchParams.set('deactivated', '1')
+      const redirectResponse = NextResponse.redirect(loginUrl)
+      supabaseResponse.cookies.getAll().forEach((cookie) => {
+        redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
+      })
+      return redirectResponse
+    }
+  }
+
   // If logged in and hitting /login or /signup, redirect to dashboard
   if (user && (pathname === '/login' || pathname === '/signup')) {
     const dashboardUrl = request.nextUrl.clone()

@@ -29,12 +29,26 @@ export async function signIn(formData: FormData) {
 
   if (error) {
     console.error(`[AuthAction:signIn] Sign in failed:`, error)
+    if (error.message?.toLowerCase().includes('banned')) {
+      return { error: 'Tu cuenta está desactivada. Contacta a un administrador.' }
+    }
     return { error: 'Credenciales inválidas' }
   }
 
   if (data?.user) {
+    const adminClient = createServiceClient()
+    const { data: staffRow } = await adminClient
+      .from('staff')
+      .select('is_active, deleted')
+      .eq('auth_user_id', data.user.id)
+      .maybeSingle()
+
+    if (!staffRow || staffRow.deleted || staffRow.is_active === false) {
+      await supabase.auth.signOut()
+      return { error: 'Tu cuenta está desactivada. Contacta a un administrador.' }
+    }
+
     try {
-      const adminClient = createServiceClient()
       await Promise.all([
         adminClient.from('staff').update({ is_online: true }).eq('auth_user_id', data.user.id),
         adminClient.from('user_sessions').insert({ auth_user_id: data.user.id, user_type: 'staff', action: 'login' })
