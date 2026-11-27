@@ -18,7 +18,7 @@ export const MEMBER_NAV_ITEMS: readonly MemberNavItem[] = [
   },
   {
     href: '/profile',
-    label: 'Información del Miembro',
+    label: 'Información personal',
     description: 'Datos personales y contraseña',
     icon: 'profile',
   },

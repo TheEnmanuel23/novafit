@@ -1,23 +1,65 @@
 'use client'
 
-import { useActionState, useState, useRef } from 'react'
+import { useState, useRef, useTransition, type FormEvent } from 'react'
 import { updateBusinessSettings } from '@/app/actions/settings'
+import { compressImageFile } from '@/lib/image-compression'
 
-export function BusinessSettingsForm({ initialData }: { initialData: any }) {
-  const [state, formAction, pending] = useActionState(updateBusinessSettings, null)
+type BusinessSettingsData = {
+  name?: string | null
+  phone?: string | null
+  address?: string | null
+  logo_url?: string | null
+} | null
+
+export function BusinessSettingsForm({ initialData }: { initialData: BusinessSettingsData }) {
+  const [state, setState] = useState<{ error?: string; success?: boolean } | null>(null)
+  const [pending, startTransition] = useTransition()
+  const [isCompressing, setIsCompressing] = useState(false)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialData?.logo_url || null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const url = URL.createObjectURL(file)
-      setPreviewUrl(url)
+    e.target.value = ''
+    if (!file) return
+
+    setIsCompressing(true)
+    try {
+      const compressed = await compressImageFile(file, 800)
+      setLogoFile(compressed)
+      setPreviewUrl((prev) => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+        return URL.createObjectURL(compressed)
+      })
+    } finally {
+      setIsCompressing(false)
     }
   }
 
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (pending || isCompressing) return
+
+    const formData = new FormData(e.currentTarget)
+    if (logoFile) {
+      formData.set('logo', logoFile)
+    } else {
+      formData.delete('logo')
+    }
+
+    startTransition(async () => {
+      try {
+        const res = await updateBusinessSettings(null, formData)
+        setState(res)
+      } catch {
+        setState({ error: 'No se pudo guardar la configuración. Intenta de nuevo.' })
+      }
+    })
+  }
+
   return (
-    <form action={formAction} className="flex flex-col gap-5">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       {state?.error && (
         <div className="bg-error/10 border border-error/20 text-error px-4 py-3 rounded-xl text-sm font-medium">
           {state.error}
@@ -53,14 +95,13 @@ export function BusinessSettingsForm({ initialData }: { initialData: any }) {
             >
               Cambiar Imagen
             </button>
-            <span className="text-xs text-muted-foreground">PNG, JPG (Max. 5MB)</span>
+            <span className="text-xs text-muted-foreground">WebP, PNG, JPG (Max. 2MB)</span>
           </div>
           <input 
             type="file" 
-            name="logo" 
             ref={fileInputRef} 
             className="hidden" 
-            accept="image/png, image/jpeg, image/webp"
+            accept="image/*"
             onChange={handleImageChange}
           />
         </div>
@@ -102,10 +143,10 @@ export function BusinessSettingsForm({ initialData }: { initialData: any }) {
       <div className="flex gap-3 mt-4">
         <button 
           type="submit" 
-          disabled={pending}
+          disabled={pending || isCompressing}
           className="btn flex-1 h-12 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-accent to-[#818cf8] border-none shadow-[0_0_30px_-5px_rgba(99,102,241,0.6)] hover:shadow-[0_0_50px_-5px_rgba(99,102,241,0.8)] hover:scale-[1.02] transition-all"
         >
-          {pending ? 'Guardando...' : 'Guardar Cambios'}
+          {isCompressing ? 'Procesando imagen...' : pending ? 'Guardando...' : 'Guardar Cambios'}
         </button>
         <a 
           href="/dashboard"

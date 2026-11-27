@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useActionState, useTransition } from 'react'
+import { useState, useRef, useEffect, useTransition, type FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type {
@@ -18,6 +18,20 @@ import {
   createProductCategoryAction,
   deleteProductAction,
 } from '@/app/actions/inventory'
+import { compressImageFile } from '@/lib/image-compression'
+
+const MAX_INPUT_IMAGE_BYTES = 15 * 1024 * 1024 // 15MB before client-side compression
+const MAX_COMPRESSED_TOTAL_BYTES = 3.5 * 1024 * 1024 // Stay safely under Vercel's 4.5MB limit
+
+function isNextRedirectError(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'digest' in err &&
+    typeof (err as { digest?: unknown }).digest === 'string' &&
+    (err as { digest: string }).digest.startsWith('NEXT_REDIRECT')
+  )
+}
 
 interface ImageSlot {
   id: string
@@ -42,11 +56,9 @@ export function ProductForm({
   const router = useRouter()
   const isEditing = !!initialData
 
-  const boundAction = isEditing
-    ? updateProductAction.bind(null, initialData.id)
-    : createProductAction
-
-  const [state, formAction, pending] = useActionState(boundAction, null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isCompressingImages, setIsCompressingImages] = useState(false)
+  const [pending, startSubmitTransition] = useTransition()
 
   // Categories state
   const [categories, setCategories] = useState<ProductCategory[]>(initialCategories)
@@ -113,61 +125,76 @@ export function ProductForm({
     PRODUCT_UNIT_GROUPS.find((g) => g.category === activeUnitGroup)?.units ||
     PRODUCT_UNIT_GROUPS[0].units
 
-  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setImageError(null)
     const files = Array.from(e.target.files || [])
+    e.target.value = ''
     if (files.length === 0) return
 
-    const maxBytes = 2 * 1024 * 1024 // 2MB recommendation in screenshot, allow up to 5MB hard limit
-    const hardLimitBytes = 5 * 1024 * 1024
-
     for (const file of files) {
-      if (file.size > hardLimitBytes) {
-        setImageError(`La imagen "${file.name}" supera el límite máximo permitido (5MB).`)
-        e.target.value = ''
+      if (file.size > MAX_INPUT_IMAGE_BYTES) {
+        setImageError(`La imagen "${file.name}" supera el límite máximo permitido (15MB).`)
         return
-      }
-      if (file.size > maxBytes) {
-        // Non-blocking warning or allow up to 5MB
       }
     }
 
-    if (replaceIndex !== null) {
-      const file = files[0]
-      const previewUrl = URL.createObjectURL(file)
-      setImages((prev) =>
-        prev.map((slot, idx) =>
-          idx === replaceIndex
-            ? {
+    const targetReplaceIndex = replaceIndex
+    const remainingSlots = targetReplaceIndex !== null ? 1 : 3 - images.length
+    if (remainingSlots <= 0) {
+      setImageError('Solo se permiten hasta 3 imágenes por producto.')
+      return
+    }
+
+    const filesToProcess = files.slice(0, remainingSlots)
+    setIsCompressingImages(true)
+
+    try {
+      const compressedFiles = await Promise.all(
+        filesToProcess.map((file) => compressImageFile(file))
+      )
+
+      if (targetReplaceIndex !== null) {
+        const compressed = compressedFiles[0]
+        const previewUrl = URL.createObjectURL(compressed)
+        setImages((prev) =>
+          prev.map((slot, idx) => {
+            if (idx === targetReplaceIndex) {
+              if (!slot.existingUrl && slot.previewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(slot.previewUrl)
+              }
+              return {
                 id: `new-${Date.now()}-${idx}`,
                 previewUrl,
-                file,
+                file: compressed,
               }
-            : slot
+            }
+            return slot
+          })
         )
-      )
-      setReplaceIndex(null)
-    } else {
-      const remainingSlots = 3 - images.length
-      if (remainingSlots <= 0) {
-        setImageError('Solo se permiten hasta 3 imágenes por producto.')
-        e.target.value = ''
-        return
+        setReplaceIndex(null)
+      } else {
+        const newSlots: ImageSlot[] = compressedFiles.map((file, i) => ({
+          id: `new-${Date.now()}-${i}`,
+          previewUrl: URL.createObjectURL(file),
+          file,
+        }))
+        setImages((prev) => [...prev, ...newSlots].slice(0, 3))
       }
-      const filesToAdd = files.slice(0, remainingSlots)
-      const newSlots: ImageSlot[] = filesToAdd.map((file, i) => ({
-        id: `new-${Date.now()}-${i}`,
-        previewUrl: URL.createObjectURL(file),
-        file,
-      }))
-      setImages((prev) => [...prev, ...newSlots].slice(0, 3))
+    } catch {
+      setImageError('No se pudo procesar la imagen seleccionada. Intenta con otra.')
+    } finally {
+      setIsCompressingImages(false)
     }
-
-    e.target.value = ''
   }
 
   const handleRemoveImage = (index: number) => {
-    setImages((prev) => prev.filter((_, idx) => idx !== index))
+    setImages((prev) => {
+      const target = prev[index]
+      if (target && !target.existingUrl && target.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(target.previewUrl)
+      }
+      return prev.filter((_, idx) => idx !== index)
+    })
   }
 
   const handleTriggerAddImage = () => {
@@ -218,27 +245,61 @@ export function ProductForm({
     })
   }
 
-  // Client-side submission handler so we can append our File objects into FormData
-  const handleFormAction = (formData: FormData) => {
+  // Client-side submission handler with payload size guard and graceful error recovery
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (pending || isCompressingImages) return
+
+    setSubmitError(null)
+    const formData = new FormData(e.currentTarget)
+
     let fileIdx = 0
+    let totalUploadBytes = 0
     for (const slot of images) {
       if (slot.existingUrl) {
         formData.append('existing_images', slot.existingUrl)
       } else if (slot.file) {
+        totalUploadBytes += slot.file.size
         formData.set(`image_file_${fileIdx}`, slot.file)
         fileIdx++
       }
     }
-    formAction(formData)
+
+    if (totalUploadBytes > MAX_COMPRESSED_TOTAL_BYTES) {
+      setSubmitError(
+        'Las imágenes seleccionadas son demasiado pesadas. Intenta subir menos imágenes o de menor tamaño.'
+      )
+      return
+    }
+
+    startSubmitTransition(async () => {
+      try {
+        const res = isEditing && initialData
+          ? await updateProductAction(initialData.id, null, formData)
+          : await createProductAction(null, formData)
+
+        if (res?.error) {
+          setSubmitError(res.error)
+        }
+      } catch (err) {
+        if (isNextRedirectError(err)) {
+          throw err
+        }
+        console.error('[ProductForm] Submit failed:', err)
+        setSubmitError(
+          'No se pudo guardar el producto. Verifica tu conexión o intenta con imágenes más pequeñas.'
+        )
+      }
+    })
   }
 
   const isReadOnly = isEditing ? !permissions.canEdit : !permissions.canCreate
 
   return (
-    <form action={handleFormAction} className="flex flex-col gap-6">
-      {(state?.error || deleteError) && (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      {(submitError || deleteError) && (
         <div className="bg-error/15 border border-error/30 text-error px-4 py-3 rounded-xl text-sm font-medium">
-          {state?.error || deleteError}
+          {submitError || deleteError}
         </div>
       )}
 
@@ -254,7 +315,7 @@ export function ProductForm({
       <input
         ref={filePickerRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp"
+        accept="image/*"
         multiple={replaceIndex === null}
         onChange={handleFilesSelected}
         className="hidden"
@@ -295,7 +356,7 @@ export function ProductForm({
                   Carga hasta 3 imagenes
                 </span>
                 <span className="text-xs text-accent/80">
-                  Recomendamos: Tamaño de 500 x 500 px, formato PNG y peso máximo 2MB.
+                  Recomendamos: Tamaño de 500 x 500 px, formato WebP y peso máximo 2MB.
                 </span>
               </button>
             ) : (
@@ -820,10 +881,12 @@ export function ProductForm({
             {!isReadOnly && (
               <button
                 type="submit"
-                disabled={pending}
+                disabled={pending || isCompressingImages}
                 className="btn btn-primary w-full rounded-xl shadow-lg shadow-accent/25"
               >
-                {pending
+                {isCompressingImages
+                  ? 'Procesando imágenes...'
+                  : pending
                   ? 'Guardando...'
                   : isEditing
                   ? 'Guardar cambios'
