@@ -28,6 +28,9 @@ export default async function DashboardPage() {
       (await hasRole(staff, 'create_sales')) ||
       (await hasRole(staff, 'delete_sales'))
     : false
+  const canViewBalance = staff ? isGlobal || (await hasRole(staff, 'view_balance')) : false
+  const canManageCash = staff ? isGlobal || (await hasRole(staff, 'manage_cash_register')) : false
+  const canAccessBalance = canViewBalance || canManageCash
 
   // Staff with no admin roles are kiosk-only — send them straight to /checkin
   const isKioskOnly =
@@ -37,7 +40,8 @@ export default async function DashboardPage() {
     !canManageSettings &&
     !canManageStaff &&
     !canAccessInventory &&
-    !canAccessSales
+    !canAccessSales &&
+    !canAccessBalance
   if (isKioskOnly) {
     redirect('/checkin')
   }
@@ -80,7 +84,14 @@ export default async function DashboardPage() {
         
         <UserDropdown 
           userName={staff?.name || 'Usuario'} 
-          permissions={{ canManageSettings, canManageMembers, canAccessInventory, canAccessSales }}
+          permissions={{
+            canManageSettings,
+            canManageMembers,
+            canAccessInventory,
+            canAccessSales,
+            canViewBalance,
+            canManageCash,
+          }}
         />
       </header>
 

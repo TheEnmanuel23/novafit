@@ -15,6 +15,8 @@ export function UserDropdown({
     canManageMembers: boolean
     canAccessInventory?: boolean
     canAccessSales?: boolean
+    canViewBalance?: boolean
+    canManageCash?: boolean
   }
   hideChangePassword?: boolean
 }) {
@@ -75,24 +77,25 @@ export function UserDropdown({
           )}
 
           {permissions?.canAccessSales && (
-            <>
-              <Link 
-                href="/sales" 
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm font-medium transition-colors"
-                onClick={() => setIsOpen(false)}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
-                Ventas
-              </Link>
-              <Link 
-                href="/balance" 
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm font-medium transition-colors"
-                onClick={() => setIsOpen(false)}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-                Balance
-              </Link>
-            </>
+            <Link 
+              href="/sales" 
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm font-medium transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+              Ventas
+            </Link>
+          )}
+
+          {(permissions?.canViewBalance || permissions?.canManageCash) && (
+            <Link 
+              href="/balance" 
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 text-sm font-medium transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+              {permissions?.canViewBalance ? 'Balance' : 'Mi Caja'}
+            </Link>
           )}
 
           {permissions?.canAccessInventory && (
