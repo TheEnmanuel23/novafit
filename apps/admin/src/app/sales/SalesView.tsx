@@ -1060,7 +1060,7 @@ export function SalesView({
           {/* Mobile Bottom Sheet Drawer when user taps "Ver X productos" */}
           {isCartDrawerOpen && (
             <div
-              className="lg:hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex flex-col justify-end"
+              className="lg:hidden fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex flex-col justify-end"
               role="dialog"
               aria-modal="true"
             >
@@ -1400,12 +1400,12 @@ export function SalesView({
       {/* ─── CHECKOUT MODAL ("Continuar" Step) ─── */}
       {isCheckoutOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="checkout-modal-title"
         >
-          <div className="bg-[#12131c] border border-border w-full max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 max-h-[92dvh] overflow-y-auto flex flex-col gap-5">
+          <div className="bg-[#12131c] border border-border w-full max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-6 max-h-[90dvh] overflow-y-auto overscroll-contain flex flex-col gap-5">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div>
                 <h2 id="checkout-modal-title" className="text-lg font-bold">
@@ -1853,7 +1853,7 @@ export function SalesView({
       {/* Delete Sale Confirmation Modal */}
       {saleToDelete && (
         <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
         >

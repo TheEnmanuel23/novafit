@@ -584,7 +584,7 @@ export function InventoryView({
       {/* Categories Management Modal */}
       {isCategoriesModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="categories-modal-title"
@@ -696,7 +696,7 @@ export function InventoryView({
       {/* Product History Modal */}
       {historyProduct && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="history-modal-title"
@@ -819,7 +819,7 @@ export function InventoryView({
       {/* Delete Confirmation Modal */}
       {productToDelete && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-modal-title"

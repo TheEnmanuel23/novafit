@@ -1326,7 +1326,7 @@ export function BalanceView({
       {/* ─── MODAL: ABRIR CAJA ─── */}
       {isOpenCashModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="open-cash-title"
@@ -1411,7 +1411,7 @@ export function BalanceView({
       {/* ─── MODAL: CERRAR CAJA ─── */}
       {isCloseCashModalOpen && openCashSession && (
         <div
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="close-cash-title"
@@ -1562,7 +1562,7 @@ export function BalanceView({
       {/* ─── MODAL: DETALLE DE CIERRE DE CAJA ─── */}
       {selectedCashSessionDetail && (
         <div
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
         >
@@ -1696,7 +1696,7 @@ export function BalanceView({
       {/* Sale Detail / Edit / Delete Modal when a transaction row is clicked */}
       {selectedSaleDetail && (
         <div
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
         >
