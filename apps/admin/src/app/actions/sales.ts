@@ -3,7 +3,7 @@
 import { createServerClient } from '@novafit/supabase/src/server'
 import { getCurrentStaff, hasRole, isGlobalAdmin } from '@novafit/supabase'
 import { APP_TIMEZONE, getAppDate } from '@novafit/supabase/src/utils/date'
-import { fromZonedTime } from 'date-fns-tz'
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { revalidatePath } from 'next/cache'
 import type { RoleName, SalePaymentStatus, SaleType } from '@novafit/types'
 
@@ -236,6 +236,229 @@ export async function createSaleAction(input: CreateSaleInput) {
   } catch (err: any) {
     console.error('[SalesAction:createSale] Unexpected error:', err)
     return { error: err.message || 'Error inesperado al registrar la venta.' }
+  }
+}
+
+export interface UpdateSaleInput {
+  saleId: string
+  saleDateYMD: string // YYYY-MM-DD in Managua timezone
+  paymentStatus: SalePaymentStatus // 'paid' | 'credit'
+  installmentsCount: number
+  paymentMethodId: string
+  customPaymentMethod?: string
+  assignedStaffId?: string | null
+  discount: number
+  receiptName?: string
+  receiptDetails?: string
+  items: {
+    productId: string | null
+    productName: string
+    quantity: number
+    unitPrice: number
+    unitCost?: number
+  }[]
+}
+
+export async function updateSaleAction(input: UpdateSaleInput) {
+  const supabase = await createServerClient()
+
+  try {
+    const currentStaff = await requireSalesPermission(supabase, ['create_sales'])
+
+    if (!input.saleId) {
+      return { error: 'Venta no especificada.' }
+    }
+
+    const { data: existingSale, error: fetchSaleError } = await supabase
+      .from('sales')
+      .select('id, sale_type, sale_date, assigned_staff_id, deleted')
+      .eq('id', input.saleId)
+      .maybeSingle()
+
+    if (fetchSaleError || !existingSale || existingSale.deleted) {
+      return { error: 'No se encontró la venta a editar.' }
+    }
+
+    const installments = Math.max(1, Math.floor(Number(input.installmentsCount) || 1))
+    if (isNaN(installments) || installments < 1) {
+      return { error: 'La cantidad de pagos debe ser al menos 1.' }
+    }
+
+    if (!input.paymentMethodId) {
+      return { error: 'Selecciona un método de pago.' }
+    }
+
+    if (!input.items || input.items.length === 0) {
+      return { error: 'La venta debe tener al menos un ítem.' }
+    }
+
+    const lineItems: {
+      product_id: string | null
+      product_name: string
+      quantity: number
+      unit_price: number
+      unit_cost: number
+      subtotal: number
+    }[] = []
+
+    for (const item of input.items) {
+      const productName = (item.productName || '').trim()
+      const qty = Number(item.quantity)
+      const price = Number(item.unitPrice)
+      if (!productName) {
+        return { error: 'Todos los ítems deben tener un nombre o concepto.' }
+      }
+      if (isNaN(qty) || qty <= 0) {
+        return { error: `La cantidad para "${productName}" debe ser mayor a 0.` }
+      }
+      if (isNaN(price) || price < 0) {
+        return { error: `El precio para "${productName}" no puede ser negativo.` }
+      }
+
+      lineItems.push({
+        product_id: item.productId || null,
+        product_name: productName,
+        quantity: qty,
+        unit_price: price,
+        unit_cost: Number(item.unitCost || 0),
+        subtotal: Number((qty * price).toFixed(2)),
+      })
+    }
+
+    // Preserve original Managua time-of-day when changing the date
+    let saleDateISO = existingSale.sale_date
+    if (input.saleDateYMD && /^\d{4}-\d{2}-\d{2}$/.test(input.saleDateYMD)) {
+      const timePart = formatInTimeZone(existingSale.sale_date, APP_TIMEZONE, 'HH:mm:ss')
+      saleDateISO = fromZonedTime(
+        `${input.saleDateYMD}T${timePart}`,
+        APP_TIMEZONE
+      ).toISOString()
+    }
+
+    const subtotal = Number(
+      lineItems.reduce((acc, item) => acc + item.subtotal, 0).toFixed(2)
+    )
+    const rawDiscount = Math.max(0, Number(input.discount) || 0)
+    const discount = Math.min(subtotal, Number(rawDiscount.toFixed(2)))
+    const total = Number(Math.max(0, subtotal - discount).toFixed(2))
+
+    // Fetch existing sale items before replacing so we can compute exact inventory stock deltas
+    const { data: oldItems } = await supabase
+      .from('sale_items')
+      .select('product_id, quantity')
+      .eq('sale_id', input.saleId)
+
+    // 1. Update sale header
+    const { error: updateSaleError } = await supabase
+      .from('sales')
+      .update({
+        sale_date: saleDateISO,
+        payment_status: input.paymentStatus === 'credit' ? 'credit' : 'paid',
+        installments_count: installments,
+        payment_method_id: input.paymentMethodId,
+        custom_payment_method: input.customPaymentMethod?.trim() || null,
+        assigned_staff_id: input.assignedStaffId || existingSale.assigned_staff_id || currentStaff.id,
+        subtotal,
+        discount,
+        total,
+        receipt_name: input.receiptName?.trim() || null,
+        receipt_details: input.receiptDetails?.trim() || null,
+        updated_by: currentStaff.id,
+      })
+      .eq('id', input.saleId)
+
+    if (updateSaleError) {
+      console.error('[SalesAction:updateSale] Error updating sale:', updateSaleError)
+      return { error: 'Error al actualizar la venta: ' + updateSaleError.message }
+    }
+
+    // 2. Replace sale items
+    const { error: deleteItemsError } = await supabase
+      .from('sale_items')
+      .delete()
+      .eq('sale_id', input.saleId)
+
+    if (deleteItemsError) {
+      console.error('[SalesAction:updateSale] Error replacing sale items:', deleteItemsError)
+      return { error: 'Error al actualizar los ítems de la venta: ' + deleteItemsError.message }
+    }
+
+    const itemsToInsert = lineItems.map((li) => ({
+      ...li,
+      sale_id: input.saleId,
+      created_by: currentStaff.id,
+    }))
+
+    const { error: insertItemsError } = await supabase
+      .from('sale_items')
+      .insert(itemsToInsert)
+
+    if (insertItemsError) {
+      console.error('[SalesAction:updateSale] Error inserting updated sale items:', insertItemsError)
+      return { error: 'Error al guardar los ítems actualizados: ' + insertItemsError.message }
+    }
+
+    // 3. Reconcile inventory stock for product sales (oldQty - newQty)
+    if (existingSale.sale_type === 'products') {
+      const oldQtyByProduct = new Map<string, number>()
+      for (const item of oldItems || []) {
+        if (!item.product_id) continue
+        oldQtyByProduct.set(
+          item.product_id,
+          (oldQtyByProduct.get(item.product_id) ?? 0) + Number(item.quantity ?? 0)
+        )
+      }
+
+      const newQtyByProduct = new Map<string, number>()
+      for (const item of lineItems) {
+        if (!item.product_id) continue
+        newQtyByProduct.set(
+          item.product_id,
+          (newQtyByProduct.get(item.product_id) ?? 0) + Number(item.quantity ?? 0)
+        )
+      }
+
+      const affectedProductIds = new Set<string>([
+        ...oldQtyByProduct.keys(),
+        ...newQtyByProduct.keys(),
+      ])
+
+      for (const productId of affectedProductIds) {
+        const oldQty = oldQtyByProduct.get(productId) ?? 0
+        const newQty = newQtyByProduct.get(productId) ?? 0
+        const delta = Number((oldQty - newQty).toFixed(2))
+        if (delta === 0) continue
+
+        const { data: prod } = await supabase
+          .from('products')
+          .select('id, quantity_available')
+          .eq('id', productId)
+          .maybeSingle()
+
+        if (prod) {
+          const nextQty = Number((Number(prod.quantity_available ?? 0) + delta).toFixed(2))
+          await supabase
+            .from('products')
+            .update({
+              quantity_available: nextQty,
+              updated_by: currentStaff.id,
+            })
+            .eq('id', productId)
+        }
+      }
+    }
+
+    revalidatePath('/sales')
+    revalidatePath('/inventory')
+    revalidatePath('/balance')
+    revalidatePath('/dashboard')
+    return { success: true }
+  } catch (err: unknown) {
+    console.error('[SalesAction:updateSale] Unexpected error:', err)
+    return {
+      error:
+        err instanceof Error ? err.message : 'Error inesperado al actualizar la venta.',
+    }
   }
 }
 

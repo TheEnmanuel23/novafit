@@ -9,14 +9,32 @@ import { es } from 'date-fns/locale'
 import type {
   CashRegisterSessionWithDetails,
   PaymentMethod,
+  SalePaymentStatus,
   SaleWithDetails,
 } from '@novafit/types'
 import { APP_TIMEZONE, toTimezoneYYYYMMDD } from '@novafit/supabase/src/utils/date'
 import {
   markSaleAsPaidAction,
+  updateSaleAction,
+  deleteSaleAction,
   openCashRegisterAction,
   closeCashRegisterAction,
 } from '@/app/actions/sales'
+
+type EditableSaleItem = {
+  id: string
+  productId: string | null
+  productName: string
+  quantity: string
+  unitPrice: string
+  unitCost: number
+}
+
+type StaffOption = {
+  id: string
+  name: string
+  username: string
+}
 
 type TopBalanceSection = 'transactions' | 'cash_closures'
 type PeriodFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom'
@@ -49,16 +67,20 @@ export function BalanceView({
   paymentMethods,
   initialCashSessions,
   openCashSession,
+  staffList,
   defaultTodayYMD,
   canEditSales,
+  canDeleteSales,
   canManageCash,
 }: {
   initialSales: SaleWithDetails[]
   paymentMethods: PaymentMethod[]
   initialCashSessions: CashRegisterSessionWithDetails[]
   openCashSession: CashRegisterSessionWithDetails | null
+  staffList: StaffOption[]
   defaultTodayYMD: string
   canEditSales: boolean
+  canDeleteSales: boolean
   canManageCash: boolean
 }) {
   const router = useRouter()
@@ -95,6 +117,26 @@ export function BalanceView({
   const [selectedSaleDetail, setSelectedSaleDetail] = useState<SaleWithDetails | null>(
     null
   )
+
+  // Sale Edit & Delete state inside Sale Detail modal
+  const [isEditingSale, setIsEditingSale] = useState(false)
+  const [isConfirmingDeleteSale, setIsConfirmingDeleteSale] = useState(false)
+  const [restoreStockOnDelete, setRestoreStockOnDelete] = useState(true)
+  const [saleModalError, setSaleModalError] = useState<string | null>(null)
+  const [isSavingSale, startSaveSaleTransition] = useTransition()
+  const [isDeletingSale, startDeleteSaleTransition] = useTransition()
+
+  // Edit form fields
+  const [editSaleDateYMD, setEditSaleDateYMD] = useState('')
+  const [editPaymentStatus, setEditPaymentStatus] = useState<SalePaymentStatus>('paid')
+  const [editPaymentMethodId, setEditPaymentMethodId] = useState('')
+  const [editCustomPaymentMethod, setEditCustomPaymentMethod] = useState('')
+  const [editInstallmentsCount, setEditInstallmentsCount] = useState('1')
+  const [editAssignedStaffId, setEditAssignedStaffId] = useState('')
+  const [editReceiptName, setEditReceiptName] = useState('')
+  const [editReceiptDetails, setEditReceiptDetails] = useState('')
+  const [editDiscount, setEditDiscount] = useState('0')
+  const [editItems, setEditItems] = useState<EditableSaleItem[]>([])
 
   // Cash Register ("Abrir caja" / "Cerrar caja") modals state
   const [isOpenCashModalOpen, setIsOpenCashModalOpen] = useState(false)
@@ -249,6 +291,148 @@ export function BalanceView({
     [receivableSales]
   )
 
+  const closeSaleDetailModal = () => {
+    setSelectedSaleDetail(null)
+    setIsEditingSale(false)
+    setIsConfirmingDeleteSale(false)
+    setSaleModalError(null)
+  }
+
+  const startEditingSale = (sale: SaleWithDetails) => {
+    setSaleModalError(null)
+    setIsConfirmingDeleteSale(false)
+    setEditSaleDateYMD(toTimezoneYYYYMMDD(sale.sale_date, APP_TIMEZONE))
+    setEditPaymentStatus(sale.payment_status)
+    setEditPaymentMethodId(
+      sale.payment_method_id || paymentMethods[0]?.id || ''
+    )
+    setEditCustomPaymentMethod(sale.custom_payment_method || '')
+    setEditInstallmentsCount(String(sale.installments_count || 1))
+    setEditAssignedStaffId(sale.assigned_staff_id || '')
+    setEditReceiptName(sale.receipt_name || '')
+    setEditReceiptDetails(sale.receipt_details || '')
+    setEditDiscount(String(sale.discount ?? 0))
+    setEditItems(
+      sale.items.map((item) => ({
+        id: item.id,
+        productId: item.product_id,
+        productName: item.product_name,
+        quantity: String(item.quantity),
+        unitPrice: String(item.unit_price),
+        unitCost: Number(item.unit_cost || 0),
+      }))
+    )
+    setIsEditingSale(true)
+  }
+
+  const editComputedSubtotal = useMemo(() => {
+    return Number(
+      editItems
+        .reduce((acc, item) => {
+          const q = parseFloat(item.quantity) || 0
+          const p = parseFloat(item.unitPrice) || 0
+          return acc + Math.max(0, q) * Math.max(0, p)
+        }, 0)
+        .toFixed(2)
+    )
+  }, [editItems])
+
+  const editComputedDiscount = Math.min(
+    editComputedSubtotal,
+    Math.max(0, parseFloat(editDiscount) || 0)
+  )
+  const editComputedTotal = Number(
+    Math.max(0, editComputedSubtotal - editComputedDiscount).toFixed(2)
+  )
+  const editSelectedPaymentMethod = paymentMethods.find(
+    (pm) => pm.id === editPaymentMethodId
+  )
+
+  const handleSaveSaleEdit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedSaleDetail) return
+    setSaleModalError(null)
+
+    if (editItems.length === 0) {
+      setSaleModalError('La venta debe tener al menos un ítem.')
+      return
+    }
+
+    const parsedItems = editItems.map((item) => ({
+      productId: item.productId,
+      productName: item.productName.trim(),
+      quantity: parseFloat(item.quantity),
+      unitPrice: parseFloat(item.unitPrice),
+      unitCost: item.unitCost,
+    }))
+
+    for (const item of parsedItems) {
+      if (!item.productName) {
+        setSaleModalError('Todos los ítems deben tener un nombre o concepto.')
+        return
+      }
+      if (isNaN(item.quantity) || item.quantity <= 0) {
+        setSaleModalError(`La cantidad para "${item.productName}" debe ser mayor a 0.`)
+        return
+      }
+      if (isNaN(item.unitPrice) || item.unitPrice < 0) {
+        setSaleModalError(`El precio para "${item.productName}" no puede ser negativo.`)
+        return
+      }
+    }
+
+    startSaveSaleTransition(async () => {
+      const res = await updateSaleAction({
+        saleId: selectedSaleDetail.id,
+        saleDateYMD: editSaleDateYMD,
+        paymentStatus: editPaymentStatus,
+        installmentsCount: Math.max(1, parseInt(editInstallmentsCount, 10) || 1),
+        paymentMethodId: editPaymentMethodId,
+        customPaymentMethod:
+          editSelectedPaymentMethod?.key === 'other'
+            ? editCustomPaymentMethod.trim()
+            : undefined,
+        assignedStaffId: editAssignedStaffId || null,
+        discount: Math.max(0, parseFloat(editDiscount) || 0),
+        receiptName: editReceiptName.trim() || undefined,
+        receiptDetails: editReceiptDetails.trim() || undefined,
+        items: parsedItems,
+      })
+
+      if (res.error) {
+        setSaleModalError(res.error)
+      } else {
+        closeSaleDetailModal()
+        setFeedbackMessage('Venta actualizada correctamente.')
+        setTimeout(() => setFeedbackMessage(null), 3500)
+        router.refresh()
+      }
+    })
+  }
+
+  const handleDeleteSale = () => {
+    if (!selectedSaleDetail) return
+    setSaleModalError(null)
+    const shouldRestoreStock =
+      selectedSaleDetail.sale_type === 'products' ? restoreStockOnDelete : false
+
+    startDeleteSaleTransition(async () => {
+      const res = await deleteSaleAction(selectedSaleDetail.id, shouldRestoreStock)
+      if (res.error) {
+        setSaleModalError(res.error)
+      } else {
+        closeSaleDetailModal()
+        setFeedbackMessage(
+          shouldRestoreStock
+            ? 'Venta eliminada y stock restaurado al inventario.'
+            : 'Venta eliminada correctamente.'
+        )
+        setTimeout(() => setFeedbackMessage(null), 3500)
+        router.refresh()
+      }
+    })
+  }
+
   const handleMarkAsPaid = (saleId: string) => {
     setFeedbackError(null)
     startMarkPaidTransition(async () => {
@@ -258,7 +442,7 @@ export function BalanceView({
       } else {
         setFeedbackMessage('Venta marcada como Pagada y movida a Ingresos.')
         setTimeout(() => setFeedbackMessage(null), 3500)
-        setSelectedSaleDetail(null)
+        closeSaleDetailModal()
         router.refresh()
       }
     })
@@ -1458,25 +1642,28 @@ export function BalanceView({
         </div>
       )}
 
-      {/* Sale Detail / Credit Collection Modal when a transaction row is clicked */}
+      {/* Sale Detail / Edit / Delete Modal when a transaction row is clicked */}
       {selectedSaleDetail && (
         <div
           className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
         >
-          <div className="bg-[#12131c] border border-border w-full max-w-md rounded-2xl shadow-2xl p-6 flex flex-col gap-4">
+          <div className="bg-[#12131c] border border-border w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-2xl shadow-2xl p-6 flex flex-col gap-4">
             <div className="flex items-start justify-between border-b border-border pb-3">
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-bold">
-                    {getSaleConceptTitle(selectedSaleDetail)}
+                    {isEditingSale
+                      ? 'Editar venta'
+                      : getSaleConceptTitle(selectedSaleDetail)}
                   </h3>
-                  {selectedSaleDetail.payment_status === 'credit' ? (
-                    <span className="badge badge-warning !text-[10px]">Por cobrar</span>
-                  ) : (
-                    <span className="badge badge-active !text-[10px]">Pagada</span>
-                  )}
+                  {!isEditingSale &&
+                    (selectedSaleDetail.payment_status === 'credit' ? (
+                      <span className="badge badge-warning !text-[10px]">Por cobrar</span>
+                    ) : (
+                      <span className="badge badge-active !text-[10px]">Pagada</span>
+                    ))}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {formatTreintaDateTime(selectedSaleDetail.sale_date)}
@@ -1484,107 +1671,461 @@ export function BalanceView({
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedSaleDetail(null)}
+                onClick={closeSaleDetailModal}
+                disabled={isSavingSale || isDeletingSale}
+                aria-label="Cerrar"
                 className="text-muted-foreground hover:text-white p-1"
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex flex-col gap-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Cliente:</span>
-                <span className="font-semibold text-foreground">
-                  {selectedSaleDetail.member
-                    ? `${selectedSaleDetail.member.name} (${selectedSaleDetail.member.username})`
-                    : 'Cliente general'}
-                </span>
+            {saleModalError && (
+              <div className="bg-error/15 border border-error/30 text-error px-3.5 py-2.5 rounded-xl text-xs font-medium">
+                {saleModalError}
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Medio de pago:</span>
-                <span className="font-semibold text-foreground">
-                  {selectedSaleDetail.payment_method?.name || 'Efectivo'}
-                  {selectedSaleDetail.custom_payment_method
-                    ? ` (${selectedSaleDetail.custom_payment_method})`
-                    : ''}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Cantidad de pagos:</span>
-                <span className="font-semibold text-foreground">
-                  {selectedSaleDetail.installments_count}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Vendedor asignado:</span>
-                <span className="font-semibold text-foreground">
-                  {selectedSaleDetail.assigned_staff?.name || 'Staff'}
-                </span>
-              </div>
-              {selectedSaleDetail.receipt_details && (
-                <div className="flex flex-col gap-0.5 pt-1">
-                  <span className="text-muted-foreground">Detalle del comprobante:</span>
-                  <span className="text-foreground bg-surface p-2 rounded-lg border border-border">
-                    {selectedSaleDetail.receipt_details}
-                  </span>
-                </div>
-              )}
-            </div>
+            )}
 
-            <div className="border-t border-border pt-3 flex flex-col gap-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Detalle de venta
-              </span>
-              <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
-                {selectedSaleDetail.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between text-xs py-1"
-                  >
-                    <span>
-                      <strong>{item.quantity}x</strong> {item.product_name}
+            {isEditingSale ? (
+              <form onSubmit={handleSaveSaleEdit} className="flex flex-col gap-3.5 text-xs">
+                <div className="flex flex-col gap-1">
+                  <label className="text-muted-foreground font-semibold">
+                    Nombre del comprobante (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={editReceiptName}
+                    onChange={(e) => setEditReceiptName(e.target.value)}
+                    placeholder={getSaleConceptTitle(selectedSaleDetail)}
+                    className="input !min-h-10 py-1.5 text-xs"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-muted-foreground font-semibold">Fecha</label>
+                    <input
+                      type="date"
+                      value={editSaleDateYMD}
+                      onChange={(e) => setEditSaleDateYMD(e.target.value)}
+                      required
+                      className="input !min-h-10 py-1.5 text-xs"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-muted-foreground font-semibold">Estado</label>
+                    <select
+                      value={editPaymentStatus}
+                      onChange={(e) =>
+                        setEditPaymentStatus(e.target.value as SalePaymentStatus)
+                      }
+                      className="input !min-h-10 py-1.5 text-xs"
+                    >
+                      <option value="paid">Pagada</option>
+                      <option value="credit">Por cobrar (Crédito)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-muted-foreground font-semibold">
+                      Medio de pago
+                    </label>
+                    <select
+                      value={editPaymentMethodId}
+                      onChange={(e) => setEditPaymentMethodId(e.target.value)}
+                      required
+                      className="input !min-h-10 py-1.5 text-xs"
+                    >
+                      {paymentMethods.map((pm) => (
+                        <option key={pm.id} value={pm.id}>
+                          {pm.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-muted-foreground font-semibold">
+                      Cantidad de pagos
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={editInstallmentsCount}
+                      onChange={(e) => setEditInstallmentsCount(e.target.value)}
+                      className="input !min-h-10 py-1.5 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {editSelectedPaymentMethod?.key === 'other' && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-muted-foreground font-semibold">
+                      Especificar medio de pago
+                    </label>
+                    <input
+                      type="text"
+                      value={editCustomPaymentMethod}
+                      onChange={(e) => setEditCustomPaymentMethod(e.target.value)}
+                      placeholder="Ej. Cheque, transferencia..."
+                      className="input !min-h-10 py-1.5 text-xs"
+                    />
+                  </div>
+                )}
+
+                {staffList.length > 0 && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-muted-foreground font-semibold">
+                      Vendedor asignado
+                    </label>
+                    <select
+                      value={editAssignedStaffId}
+                      onChange={(e) => setEditAssignedStaffId(e.target.value)}
+                      className="input !min-h-10 py-1.5 text-xs"
+                    >
+                      {staffList.map((st) => (
+                        <option key={st.id} value={st.id}>
+                          {st.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="border-t border-border pt-3 flex flex-col gap-2">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    Ítems de la venta
+                  </span>
+                  <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-0.5">
+                    {editItems.map((item, idx) => {
+                      const lineTotal =
+                        Math.max(0, parseFloat(item.quantity) || 0) *
+                        Math.max(0, parseFloat(item.unitPrice) || 0)
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-2.5 rounded-xl bg-surface border border-border flex flex-col gap-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            {selectedSaleDetail.sale_type === 'free' ? (
+                              <input
+                                type="text"
+                                value={item.productName}
+                                onChange={(e) =>
+                                  setEditItems((prev) =>
+                                    prev.map((it, i) =>
+                                      i === idx
+                                        ? { ...it, productName: e.target.value }
+                                        : it
+                                    )
+                                  )
+                                }
+                                placeholder="Concepto"
+                                className="input !min-h-8 py-1 text-xs flex-1"
+                              />
+                            ) : (
+                              <span className="font-semibold text-foreground truncate">
+                                {item.productName}
+                              </span>
+                            )}
+                            {editItems.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditItems((prev) =>
+                                    prev.filter((_, i) => i !== idx)
+                                  )
+                                }
+                                title="Quitar ítem"
+                                className="text-muted-foreground hover:text-error px-1.5 py-0.5 rounded transition-colors"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 items-end">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] text-muted-foreground">
+                                Cantidad
+                              </span>
+                              <input
+                                type="number"
+                                step="any"
+                                min="0.01"
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  setEditItems((prev) =>
+                                    prev.map((it, i) =>
+                                      i === idx
+                                        ? { ...it, quantity: e.target.value }
+                                        : it
+                                    )
+                                  )
+                                }
+                                className="input !min-h-8 py-1 text-xs"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] text-muted-foreground">
+                                Precio (C$)
+                              </span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.unitPrice}
+                                onChange={(e) =>
+                                  setEditItems((prev) =>
+                                    prev.map((it, i) =>
+                                      i === idx
+                                        ? { ...it, unitPrice: e.target.value }
+                                        : it
+                                    )
+                                  )
+                                }
+                                className="input !min-h-8 py-1 text-xs"
+                              />
+                            </div>
+                            <div className="text-right pb-1.5">
+                              <span className="text-[10px] text-muted-foreground block">
+                                Subtotal
+                              </span>
+                              <span className="font-bold text-foreground">
+                                C${formatMoney(lineTotal)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 items-end border-t border-border pt-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-muted-foreground font-semibold">
+                      Descuento (C$)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editDiscount}
+                      onChange={(e) => setEditDiscount(e.target.value)}
+                      className="input !min-h-10 py-1.5 text-xs"
+                    />
+                  </div>
+                  <div className="text-right pb-1">
+                    <span className="text-[11px] text-muted-foreground block">
+                      Total actualizado
                     </span>
-                    <span className="font-semibold">
-                      C${formatMoney(item.subtotal)}
+                    <span className="text-lg font-black text-success">
+                      C${formatMoney(editComputedTotal)}
                     </span>
                   </div>
-                ))}
-              </div>
-
-              {selectedSaleDetail.discount > 0 && (
-                <div className="flex justify-between text-xs text-warning pt-1 border-t border-white/5">
-                  <span>Descuento</span>
-                  <span>-C${formatMoney(selectedSaleDetail.discount)}</span>
                 </div>
-              )}
 
-              <div className="flex justify-between text-base font-black pt-2 border-t border-border">
-                <span>Total</span>
-                <span className="text-success">
-                  C${formatMoney(selectedSaleDetail.total)}
-                </span>
-              </div>
-            </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-muted-foreground font-semibold">
+                    Detalle del comprobante (opcional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editReceiptDetails}
+                    onChange={(e) => setEditReceiptDetails(e.target.value)}
+                    placeholder="Notas adicionales..."
+                    className="input !min-h-[60px] py-2 text-xs resize-none"
+                  />
+                </div>
 
-            <div className="flex justify-end gap-2.5 pt-2">
-              {selectedSaleDetail.payment_status === 'credit' && canEditSales && (
-                <button
-                  type="button"
-                  disabled={isMarkingPaid}
-                  onClick={() => handleMarkAsPaid(selectedSaleDetail.id)}
-                  className="btn btn-success !min-h-10 px-4 text-xs rounded-xl flex-1"
-                >
-                  {isMarkingPaid ? 'Procesando...' : '✓ Marcar como cobrada (Pagada)'}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setSelectedSaleDetail(null)}
-                className="btn btn-ghost !min-h-10 px-5 text-xs rounded-xl"
-              >
-                Cerrar
-              </button>
-            </div>
+                <div className="flex justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    disabled={isSavingSale}
+                    onClick={() => {
+                      setIsEditingSale(false)
+                      setSaleModalError(null)
+                    }}
+                    className="btn btn-ghost !min-h-10 px-4 text-xs rounded-xl"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingSale}
+                    className="btn btn-primary !min-h-10 px-5 text-xs rounded-xl"
+                  >
+                    {isSavingSale ? 'Guardando...' : 'Guardar cambios'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div className="flex flex-col gap-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Cliente:</span>
+                    <span className="font-semibold text-foreground">
+                      {selectedSaleDetail.member
+                        ? `${selectedSaleDetail.member.name} (${selectedSaleDetail.member.username})`
+                        : 'Cliente general'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Medio de pago:</span>
+                    <span className="font-semibold text-foreground">
+                      {selectedSaleDetail.payment_method?.name || 'Efectivo'}
+                      {selectedSaleDetail.custom_payment_method
+                        ? ` (${selectedSaleDetail.custom_payment_method})`
+                        : ''}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Cantidad de pagos:</span>
+                    <span className="font-semibold text-foreground">
+                      {selectedSaleDetail.installments_count}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Vendedor asignado:</span>
+                    <span className="font-semibold text-foreground">
+                      {selectedSaleDetail.assigned_staff?.name || 'Staff'}
+                    </span>
+                  </div>
+                  {selectedSaleDetail.receipt_details && (
+                    <div className="flex flex-col gap-0.5 pt-1">
+                      <span className="text-muted-foreground">Detalle del comprobante:</span>
+                      <span className="text-foreground bg-surface p-2 rounded-lg border border-border">
+                        {selectedSaleDetail.receipt_details}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-border pt-3 flex flex-col gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Detalle de venta
+                  </span>
+                  <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
+                    {selectedSaleDetail.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between text-xs py-1"
+                      >
+                        <span>
+                          <strong>{item.quantity}x</strong> {item.product_name}
+                        </span>
+                        <span className="font-semibold">
+                          C${formatMoney(item.subtotal)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {selectedSaleDetail.discount > 0 && (
+                    <div className="flex justify-between text-xs text-warning pt-1 border-t border-white/5">
+                      <span>Descuento</span>
+                      <span>-C${formatMoney(selectedSaleDetail.discount)}</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between text-base font-black pt-2 border-t border-border">
+                    <span>Total</span>
+                    <span className="text-success">
+                      C${formatMoney(selectedSaleDetail.total)}
+                    </span>
+                  </div>
+                </div>
+
+                {isConfirmingDeleteSale ? (
+                  <div className="rounded-xl bg-error/10 border border-error/30 p-3.5 flex flex-col gap-3">
+                    <p className="text-xs font-semibold text-error">
+                      ¿Estás seguro de que deseas eliminar esta venta?
+                    </p>
+                    {selectedSaleDetail.sale_type === 'products' && (
+                      <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={restoreStockOnDelete}
+                          onChange={(e) => setRestoreStockOnDelete(e.target.checked)}
+                          className="w-4 h-4 accent-accent rounded cursor-pointer"
+                        />
+                        <span>Restaurar stock de productos al inventario</span>
+                      </label>
+                    )}
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        disabled={isDeletingSale}
+                        onClick={() => {
+                          setIsConfirmingDeleteSale(false)
+                          setSaleModalError(null)
+                        }}
+                        className="btn btn-ghost !min-h-9 px-3.5 text-xs rounded-xl"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isDeletingSale}
+                        onClick={handleDeleteSale}
+                        className="btn btn-error !min-h-9 px-4 text-xs rounded-xl"
+                      >
+                        {isDeletingSale ? 'Eliminando...' : 'Sí, eliminar'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2.5 pt-2">
+                    {selectedSaleDetail.payment_status === 'credit' && canEditSales && (
+                      <button
+                        type="button"
+                        disabled={isMarkingPaid}
+                        onClick={() => handleMarkAsPaid(selectedSaleDetail.id)}
+                        className="btn btn-success !min-h-10 px-4 text-xs rounded-xl w-full"
+                      >
+                        {isMarkingPaid ? 'Procesando...' : '✓ Marcar como cobrada (Pagada)'}
+                      </button>
+                    )}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {canEditSales && (
+                          <button
+                            type="button"
+                            onClick={() => startEditingSale(selectedSaleDetail)}
+                            className="btn btn-primary !min-h-10 px-4 text-xs rounded-xl"
+                          >
+                            Editar
+                          </button>
+                        )}
+                        {canDeleteSales && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRestoreStockOnDelete(true)
+                              setSaleModalError(null)
+                              setIsConfirmingDeleteSale(true)
+                            }}
+                            className="btn !min-h-10 px-4 text-xs rounded-xl bg-error/15 text-error border border-error/30 hover:bg-error/25"
+                          >
+                            Eliminar
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={closeSaleDetailModal}
+                        className="btn btn-ghost !min-h-10 px-5 text-xs rounded-xl"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
