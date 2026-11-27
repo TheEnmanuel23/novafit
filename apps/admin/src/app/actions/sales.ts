@@ -636,12 +636,22 @@ export async function closeCashRegisterAction(input: {
       return { error: 'No se encontró la sesión de caja abierta.' }
     }
 
+    const canCloseAnyShift =
+      (await isGlobalAdmin(currentStaff)) || (await hasRole(currentStaff, 'view_balance'))
+    if (!canCloseAnyShift && session.opened_by && session.opened_by !== currentStaff.id) {
+      return {
+        error:
+          'Esta caja fue abierta por otro recepcionista. Debe cerrarla quien la abrió o un administrador.',
+      }
+    }
+
     const nowISO = (await getAppDate()).toISOString()
     const openedAtTime = new Date(session.opened_at).getTime()
     const nowTime = new Date(nowISO).getTime()
     const openedYMD = toTimezoneYYYYMMDD(session.opened_at, APP_TIMEZONE)
 
     // Calculate paid sales registered during this cash session window (opened_at -> now)
+    // Scoped to the shift owner so each receptionist's cash count matches their own sales.
     const { data: candidateSales } = await supabase
       .from('sales')
       .select(
@@ -650,6 +660,8 @@ export async function closeCashRegisterAction(input: {
         total,
         sale_date,
         created_at,
+        assigned_staff_id,
+        created_by,
         payment_status,
         payment_method:payment_methods (key)
       `
@@ -658,7 +670,15 @@ export async function closeCashRegisterAction(input: {
       .eq('payment_status', 'paid')
       .or(`sale_date.gte.${session.opened_at},created_at.gte.${session.opened_at}`)
 
+    const shiftOwnerId = session.opened_by as string | null
     const sessionSales = (candidateSales || []).filter((s) => {
+      if (
+        shiftOwnerId &&
+        s.assigned_staff_id !== shiftOwnerId &&
+        s.created_by !== shiftOwnerId
+      ) {
+        return false
+      }
       const saleTime = new Date(s.sale_date).getTime()
       const createdTime = new Date(s.created_at).getTime()
       if (saleTime >= openedAtTime && saleTime <= nowTime) return true

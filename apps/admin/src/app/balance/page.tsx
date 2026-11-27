@@ -59,15 +59,31 @@ export default async function BalancePage() {
         return isToday && isOwnSale
       })
 
+  const isOtherStaffOpenShift = Boolean(
+    !canViewFullBalance &&
+      openSession &&
+      openSession.opened_by &&
+      openSession.opened_by !== staff.id
+  )
+
+  const visibleOpenSession = isOtherStaffOpenShift ? null : openSession
+  const otherStaffOpenShift =
+    isOtherStaffOpenShift && openSession
+      ? {
+          openedByName: openSession.opened_by_staff?.name || 'otro recepcionista',
+          openedAt: openSession.opened_at,
+        }
+      : null
+
   const cashSessions = canViewFullBalance
     ? allCashSessions
     : allCashSessions.filter((session) => {
-        if (session.status === 'open') return true
-        const refDate = session.closed_at || session.opened_at
-        const isToday = toTimezoneYYYYMMDD(refDate, APP_TIMEZONE) === todayYMD
         const isOwnSession =
           session.opened_by === staff.id || session.closed_by === staff.id
-        return isToday && isOwnSession
+        if (!isOwnSession) return false
+        if (session.status === 'open') return true
+        const refDate = session.closed_at || session.opened_at
+        return toTimezoneYYYYMMDD(refDate, APP_TIMEZONE) === todayYMD
       })
 
   return (
@@ -77,7 +93,8 @@ export default async function BalancePage() {
           initialSales={sales}
           paymentMethods={paymentMethods}
           initialCashSessions={cashSessions}
-          openCashSession={openSession}
+          openCashSession={visibleOpenSession}
+          otherStaffOpenShift={otherStaffOpenShift}
           staffList={staffList}
           defaultTodayYMD={todayYMD}
           canViewFullBalance={canViewFullBalance}

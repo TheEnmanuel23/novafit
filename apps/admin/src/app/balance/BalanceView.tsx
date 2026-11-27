@@ -67,6 +67,7 @@ export function BalanceView({
   paymentMethods,
   initialCashSessions,
   openCashSession,
+  otherStaffOpenShift,
   staffList,
   defaultTodayYMD,
   canViewFullBalance,
@@ -78,6 +79,7 @@ export function BalanceView({
   paymentMethods: PaymentMethod[]
   initialCashSessions: CashRegisterSessionWithDetails[]
   openCashSession: CashRegisterSessionWithDetails | null
+  otherStaffOpenShift?: { openedByName: string; openedAt: string } | null
   staffList: StaffOption[]
   defaultTodayYMD: string
   canViewFullBalance: boolean
@@ -247,11 +249,19 @@ export function BalanceView({
 
     const openedAtTime = new Date(openCashSession.opened_at).getTime()
     const openedYMD = toTimezoneYYYYMMDD(openCashSession.opened_at, APP_TIMEZONE)
+    const shiftOwnerId = openCashSession.opened_by
     let cashSales = 0
     let otherSales = 0
 
     for (const s of initialSales) {
       if (s.payment_status !== 'paid') continue
+      if (
+        shiftOwnerId &&
+        s.assigned_staff_id !== shiftOwnerId &&
+        s.created_by !== shiftOwnerId
+      ) {
+        continue
+      }
       const saleTime = new Date(s.sale_date).getTime()
       const createdTime = new Date(s.created_at).getTime()
       const belongsToShift =
@@ -542,6 +552,10 @@ export function BalanceView({
                 <span className="badge badge-active !text-[10px]">
                   ● Caja abierta
                 </span>
+              ) : otherStaffOpenShift ? (
+                <span className="badge badge-warning !text-[10px]">
+                  ● Caja ocupada
+                </span>
               ) : (
                 <span className="badge badge-no-plan !text-[10px]">
                   Caja cerrada
@@ -585,7 +599,7 @@ export function BalanceView({
                   </svg>
                   Cerrar caja
                 </button>
-              ) : (
+              ) : !otherStaffOpenShift ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -598,7 +612,7 @@ export function BalanceView({
                   <span className="text-warning">👑</span>
                   Abrir caja
                 </button>
-              )}
+              ) : null}
             </>
           )}
 
@@ -610,6 +624,21 @@ export function BalanceView({
           </Link>
         </div>
       </header>
+
+      {otherStaffOpenShift && (
+        <div className="rounded-2xl bg-warning/10 border border-warning/35 px-4 py-3.5 flex items-start gap-3 text-xs sm:text-sm">
+          <span className="text-warning text-base leading-none mt-0.5">⚠️</span>
+          <div className="flex flex-col gap-0.5">
+            <span className="font-bold text-warning">
+              Caja abierta por {otherStaffOpenShift.openedByName}
+            </span>
+            <span className="text-muted-foreground text-xs">
+              Turno abierto el {formatTreintaDateTime(otherStaffOpenShift.openedAt)}. Debe
+              cerrarse antes de abrir un nuevo turno.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Top Segmented Bar matching Screenshot 2: [Transacciones] | [Cierres de caja] */}
       <div className="grid grid-cols-2 p-1.5 rounded-xl bg-surface border border-border">
@@ -1182,7 +1211,7 @@ export function BalanceView({
                 </strong>{' '}
                 Intenta buscar usando otros criterios
               </p>
-              {canManageCash && !openCashSession && (
+              {canManageCash && !openCashSession && !otherStaffOpenShift && (
                 <button
                   type="button"
                   onClick={() => {
