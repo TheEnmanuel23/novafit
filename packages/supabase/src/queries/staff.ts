@@ -36,8 +36,11 @@ export async function getStaffByAuthId(
   return { ...data, profile: flattenedProfile } as StaffWithProfile
 }
 
-export async function getStaffList(supabase: SupabaseClient): Promise<StaffWithProfile[]> {
-  const { data, error } = await supabase
+export async function getStaffList(
+  supabase: SupabaseClient,
+  options?: { includeDeleted?: boolean }
+): Promise<StaffWithProfile[]> {
+  let query = supabase
     .from('staff')
     .select(
       `
@@ -48,8 +51,13 @@ export async function getStaffList(supabase: SupabaseClient): Promise<StaffWithP
       )
     `
     )
-    .eq('deleted', false)
     .order('created_at', { ascending: false })
+
+  if (!options?.includeDeleted) {
+    query = query.eq('deleted', false)
+  }
+
+  const { data, error } = await query
 
   if (error) throw new Error(`Failed to fetch staff list: ${error.message}`)
 
