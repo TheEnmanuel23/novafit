@@ -242,13 +242,20 @@ export function BalanceView({
     }
 
     const openedAtTime = new Date(openCashSession.opened_at).getTime()
+    const openedYMD = toTimezoneYYYYMMDD(openCashSession.opened_at, APP_TIMEZONE)
     let cashSales = 0
     let otherSales = 0
 
     for (const s of initialSales) {
       if (s.payment_status !== 'paid') continue
       const saleTime = new Date(s.sale_date).getTime()
-      if (saleTime >= openedAtTime) {
+      const createdTime = new Date(s.created_at).getTime()
+      const belongsToShift =
+        saleTime >= openedAtTime ||
+        (createdTime >= openedAtTime &&
+          toTimezoneYYYYMMDD(s.sale_date, APP_TIMEZONE) >= openedYMD)
+
+      if (belongsToShift) {
         const amt = Number(s.total || 0)
         if (s.payment_method?.key === 'cash' || !s.payment_method) {
           cashSales += amt

@@ -2,7 +2,11 @@
 
 import { createServerClient } from '@novafit/supabase/src/server'
 import { getCurrentStaff, hasRole, isGlobalAdmin } from '@novafit/supabase'
-import { APP_TIMEZONE, getAppDate } from '@novafit/supabase/src/utils/date'
+import {
+  APP_TIMEZONE,
+  getAppDate,
+  toTimezoneYYYYMMDD,
+} from '@novafit/supabase/src/utils/date'
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { revalidatePath } from 'next/cache'
 import type { RoleName, SalePaymentStatus, SaleType } from '@novafit/types'
@@ -63,11 +67,17 @@ export async function createSaleAction(input: CreateSaleInput) {
       return { error: 'Selecciona un método de pago.' }
     }
 
-    // Build sale timestamp in Managua timezone preserving current time of day if today, or noon Managua for selected date
+    // Build sale timestamp in Managua timezone: use exact `now` for today,
+    // or preserve Managua time-of-day (not server UTC time) for another selected date
     const now = await getAppDate()
+    const todayYMD = toTimezoneYYYYMMDD(now, APP_TIMEZONE)
     let saleDateISO = now.toISOString()
-    if (input.saleDateYMD && /^\d{4}-\d{2}-\d{2}$/.test(input.saleDateYMD)) {
-      const timePart = now.toTimeString().slice(0, 8)
+    if (
+      input.saleDateYMD &&
+      /^\d{4}-\d{2}-\d{2}$/.test(input.saleDateYMD) &&
+      input.saleDateYMD !== todayYMD
+    ) {
+      const timePart = formatInTimeZone(now, APP_TIMEZONE, 'HH:mm:ss')
       saleDateISO = fromZonedTime(
         `${input.saleDateYMD}T${timePart}`,
         APP_TIMEZONE
@@ -629,22 +639,37 @@ export async function closeCashRegisterAction(input: {
     }
 
     const nowISO = (await getAppDate()).toISOString()
+    const openedAtTime = new Date(session.opened_at).getTime()
+    const nowTime = new Date(nowISO).getTime()
+    const openedYMD = toTimezoneYYYYMMDD(session.opened_at, APP_TIMEZONE)
 
     // Calculate paid sales registered during this cash session window (opened_at -> now)
-    const { data: sessionSales } = await supabase
+    const { data: candidateSales } = await supabase
       .from('sales')
       .select(
         `
         id,
         total,
+        sale_date,
+        created_at,
         payment_status,
         payment_method:payment_methods (key)
       `
       )
       .eq('deleted', false)
       .eq('payment_status', 'paid')
-      .gte('sale_date', session.opened_at)
-      .lte('sale_date', nowISO)
+      .or(`sale_date.gte.${session.opened_at},created_at.gte.${session.opened_at}`)
+
+    const sessionSales = (candidateSales || []).filter((s) => {
+      const saleTime = new Date(s.sale_date).getTime()
+      const createdTime = new Date(s.created_at).getTime()
+      if (saleTime >= openedAtTime && saleTime <= nowTime) return true
+      if (createdTime >= openedAtTime && createdTime <= nowTime) {
+        const saleYMD = toTimezoneYYYYMMDD(s.sale_date, APP_TIMEZONE)
+        return saleYMD >= openedYMD
+      }
+      return false
+    })
 
     let cashSalesTotal = 0
     let otherSalesTotal = 0
