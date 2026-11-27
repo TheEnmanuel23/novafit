@@ -503,36 +503,46 @@ export function InventoryView({
 
       {/* Main Inventory Table */}
       <div className="glass overflow-hidden rounded-2xl border border-border">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[780px]">
+        <div className="overflow-auto max-h-[68dvh] overscroll-contain">
+          <table className="w-full text-left border-separate border-spacing-0 min-w-[840px] sm:min-w-[940px]">
             <thead>
-              <tr className="border-b border-border bg-white/[0.03] text-xs font-semibold text-muted-foreground">
-                <th className="py-3.5 px-4 min-w-[240px]">
+              <tr className="text-xs font-semibold text-muted-foreground">
+                <th className="sticky top-0 left-0 z-30 bg-[#141621] border-b border-r border-white/10 py-3.5 px-3 sm:px-4 w-[148px] min-w-[148px] max-w-[148px] sm:w-[230px] sm:min-w-[230px] sm:max-w-[260px] shadow-[4px_0_12px_-4px_rgba(0,0,0,0.65)]">
                   <div className="flex items-center gap-1.5">
                     <span>Producto</span>
                     <span
-                      className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-muted-foreground/40 text-[10px]"
+                      className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-muted-foreground/40 text-[10px] shrink-0"
                       title="Haz clic en el nombre para editar los detalles del producto"
                     >
                       i
                     </span>
                   </div>
                 </th>
-                <th className="py-3.5 px-3 w-36">Precio</th>
-                <th className="py-3.5 px-3 w-36">Costo</th>
-                <th className="py-3.5 px-3 w-32">
+                <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[136px]">
+                  Precio
+                </th>
+                <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[136px]">
+                  Costo
+                </th>
+                <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[108px]">
                   <span className="block leading-tight">
                     Cantidad
                     <br />
                     disponible
                   </span>
                 </th>
-                <th className="py-3.5 px-3 w-28">Ganancia</th>
-                <th className="py-3.5 px-3 w-20">%</th>
-                <th className="py-3.5 px-4 w-36 text-right">Historial</th>
+                <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[110px]">
+                  Ganancia
+                </th>
+                <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[76px]">
+                  %
+                </th>
+                <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-4 min-w-[136px] text-right">
+                  Historial
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border text-sm">
+            <tbody className="text-sm">
               {filteredProducts.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 px-4 text-center text-muted-foreground">
@@ -717,7 +727,7 @@ export function InventoryView({
               </div>
             )}
 
-            <div className="overflow-y-auto max-h-[60vh] pr-1 flex flex-col gap-2.5">
+            <div className="overflow-auto max-h-[60vh] overscroll-contain rounded-xl border border-border">
               {isHistoryLoading ? (
                 <div className="py-12 flex flex-col items-center justify-center gap-3 text-muted-foreground text-sm">
                   <div className="spinner" />
@@ -728,17 +738,27 @@ export function InventoryView({
                   No hay registros de cambios para este producto.
                 </div>
               ) : (
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="w-full text-left border-separate border-spacing-0 min-w-[560px] text-xs">
                   <thead>
-                    <tr className="border-b border-border text-muted-foreground">
-                      <th className="py-2.5 px-3">Fecha y hora</th>
-                      <th className="py-2.5 px-3">Acción / Campo</th>
-                      <th className="py-2.5 px-3">Valor anterior</th>
-                      <th className="py-2.5 px-3">Valor nuevo</th>
-                      <th className="py-2.5 px-3">Usuario</th>
+                    <tr className="text-muted-foreground">
+                      <th className="sticky top-0 left-0 z-30 bg-[#161824] border-b border-r border-white/10 py-2.5 px-3 min-w-[130px] shadow-[4px_0_12px_-4px_rgba(0,0,0,0.65)]">
+                        Fecha y hora
+                      </th>
+                      <th className="sticky top-0 z-20 bg-[#161824] border-b border-border py-2.5 px-3 min-w-[130px]">
+                        Acción / Campo
+                      </th>
+                      <th className="sticky top-0 z-20 bg-[#161824] border-b border-border py-2.5 px-3 min-w-[110px]">
+                        Valor anterior
+                      </th>
+                      <th className="sticky top-0 z-20 bg-[#161824] border-b border-border py-2.5 px-3 min-w-[110px]">
+                        Valor nuevo
+                      </th>
+                      <th className="sticky top-0 z-20 bg-[#161824] border-b border-border py-2.5 px-3 min-w-[110px]">
+                        Usuario
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody>
                     {historyEntries.map((item) => {
                       const isCreated = item.action === 'created'
                       const isDeleted = item.action === 'deleted'
@@ -747,11 +767,11 @@ export function InventoryView({
                         : 'Creación de producto'
 
                       return (
-                        <tr key={item.id} className="hover:bg-white/[0.02]">
-                          <td className="py-2.5 px-3 whitespace-nowrap text-muted-foreground">
+                        <tr key={item.id} className="hover:bg-white/[0.03] transition-colors group">
+                          <td className="sticky left-0 z-10 bg-[#12131c] group-hover:bg-[#191b27] transition-colors border-b border-r border-white/10 py-2.5 px-3 whitespace-nowrap text-muted-foreground shadow-[4px_0_12px_-4px_rgba(0,0,0,0.65)]">
                             {formatDateTime(item.created_at)}
                           </td>
-                          <td className="py-2.5 px-3 font-semibold">
+                          <td className="border-b border-border py-2.5 px-3 font-semibold">
                             {isCreated ? (
                               <span className="badge badge-active !text-[10px] !py-0.5 !px-2">
                                 Producto creado
@@ -764,15 +784,15 @@ export function InventoryView({
                               <span className="text-foreground">{fieldLabel}</span>
                             )}
                           </td>
-                          <td className="py-2.5 px-3 text-muted-foreground">
+                          <td className="border-b border-border py-2.5 px-3 text-muted-foreground">
                             {isCreated
                               ? '—'
                               : formatHistoryValue(item.field_name, item.old_value)}
                           </td>
-                          <td className="py-2.5 px-3 text-foreground font-medium">
+                          <td className="border-b border-border py-2.5 px-3 text-foreground font-medium">
                             {formatHistoryValue(item.field_name, item.new_value)}
                           </td>
-                          <td className="py-2.5 px-3 text-muted-foreground">
+                          <td className="border-b border-border py-2.5 px-3 text-muted-foreground">
                             {item.staff?.name || 'Sistema'}
                           </td>
                         </tr>
@@ -920,18 +940,18 @@ function ProductTableRow({
   }
 
   return (
-    <tr className="hover:bg-white/[0.02] transition-colors group">
-      {/* Merged Photo + Name Cell */}
-      <td className="py-3 px-4">
-        <div className="flex items-center gap-3">
+    <tr className="hover:bg-white/[0.03] transition-colors group">
+      {/* Merged Photo + Name Cell (Sticky Left Column) */}
+      <td className="sticky left-0 z-10 bg-[#10121b] group-hover:bg-[#171925] transition-colors border-b border-r border-white/10 py-3 px-3 sm:px-4 w-[148px] min-w-[148px] max-w-[148px] sm:w-[230px] sm:min-w-[230px] sm:max-w-[260px] shadow-[4px_0_12px_-4px_rgba(0,0,0,0.65)]">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           {primaryImage ? (
             <img
               src={primaryImage}
               alt={product.name}
-              className="w-10 h-10 rounded-lg object-cover bg-black/40 border border-white/10 shrink-0"
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg object-cover bg-black/40 border border-white/10 shrink-0"
             />
           ) : (
-            <div className="w-10 h-10 rounded-lg bg-accent/15 border border-accent/25 text-accent flex items-center justify-center font-bold text-sm shrink-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-accent/15 border border-accent/25 text-accent flex items-center justify-center font-bold text-xs sm:text-sm shrink-0">
               {product.name.charAt(0).toUpperCase()}
             </div>
           )}
@@ -939,13 +959,13 @@ function ProductTableRow({
           <div className="flex flex-col min-w-0">
             <Link
               href={`/inventory/${product.id}`}
-              className="font-semibold text-foreground underline decoration-white/30 hover:text-accent hover:decoration-accent transition-colors truncate max-w-[260px]"
+              className="font-semibold text-xs sm:text-sm text-foreground underline decoration-white/30 hover:text-accent hover:decoration-accent transition-colors truncate"
               title={product.name}
             >
               {product.name}
             </Link>
             {product.category && (
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground truncate">
                 {product.category.name}
               </span>
             )}
@@ -954,21 +974,22 @@ function ProductTableRow({
       </td>
 
       {/* Inline Editable Price */}
-      <td className="py-3 px-3">
+      <td className="border-b border-border py-3 px-3 min-w-[136px]">
         <div
-          className={`flex items-center rounded-xl border px-3 py-2 bg-black/30 transition-colors ${
+          className={`flex items-center rounded-xl border px-2.5 py-2 bg-black/30 transition-colors min-w-[114px] ${
             savingField === 'price'
               ? 'border-accent'
               : 'border-white/15 focus-within:border-accent'
           }`}
         >
-          <span className="text-muted-foreground text-xs font-medium mr-1.5 select-none">
+          <span className="text-muted-foreground text-xs font-medium mr-1 select-none shrink-0">
             C$
           </span>
           <input
             type="number"
             step="0.01"
             min="0"
+            inputMode="decimal"
             disabled={!canEdit}
             value={priceStr}
             onChange={(e) => setPriceStr(e.target.value)}
@@ -979,27 +1000,28 @@ function ProductTableRow({
               }
             }}
             aria-label={`Precio de ${product.name}`}
-            className="w-full bg-transparent text-sm font-medium text-foreground focus:outline-none disabled:opacity-60"
+            className="w-full min-w-[68px] bg-transparent text-sm font-medium text-foreground tabular-nums focus:outline-none disabled:opacity-60"
           />
         </div>
       </td>
 
       {/* Inline Editable Cost */}
-      <td className="py-3 px-3">
+      <td className="border-b border-border py-3 px-3 min-w-[136px]">
         <div
-          className={`flex items-center rounded-xl border px-3 py-2 bg-black/30 transition-colors ${
+          className={`flex items-center rounded-xl border px-2.5 py-2 bg-black/30 transition-colors min-w-[114px] ${
             savingField === 'cost'
               ? 'border-accent'
               : 'border-white/15 focus-within:border-accent'
           }`}
         >
-          <span className="text-muted-foreground text-xs font-medium mr-1.5 select-none">
+          <span className="text-muted-foreground text-xs font-medium mr-1 select-none shrink-0">
             C$
           </span>
           <input
             type="number"
             step="0.01"
             min="0"
+            inputMode="decimal"
             disabled={!canEdit}
             value={costStr}
             onChange={(e) => setCostStr(e.target.value)}
@@ -1010,15 +1032,15 @@ function ProductTableRow({
               }
             }}
             aria-label={`Costo de ${product.name}`}
-            className="w-full bg-transparent text-sm font-medium text-foreground focus:outline-none disabled:opacity-60"
+            className="w-full min-w-[68px] bg-transparent text-sm font-medium text-foreground tabular-nums focus:outline-none disabled:opacity-60"
           />
         </div>
       </td>
 
       {/* Inline Editable Quantity Available */}
-      <td className="py-3 px-3">
+      <td className="border-b border-border py-3 px-3 min-w-[108px]">
         <div
-          className={`flex items-center rounded-xl border px-3 py-2 bg-black/30 transition-colors ${
+          className={`flex items-center rounded-xl border px-2.5 py-2 bg-black/30 transition-colors min-w-[84px] ${
             validQty < 0
               ? 'border-error text-error'
               : isNegativeOrLowStock
@@ -1031,6 +1053,7 @@ function ProductTableRow({
           <input
             type="number"
             step="any"
+            inputMode="decimal"
             disabled={!canEdit}
             value={qtyStr}
             onChange={(e) => setQtyStr(e.target.value)}
@@ -1048,20 +1071,20 @@ function ProductTableRow({
               }
             }}
             aria-label={`Cantidad disponible de ${product.name}`}
-            className="w-full bg-transparent text-sm font-medium focus:outline-none disabled:opacity-60"
+            className="w-full min-w-[56px] bg-transparent text-sm font-medium text-center tabular-nums focus:outline-none disabled:opacity-60"
           />
         </div>
       </td>
 
       {/* Profit Margin (Ganancia) */}
-      <td className="py-3 px-3 font-medium whitespace-nowrap">
+      <td className="border-b border-border py-3 px-3 font-medium whitespace-nowrap tabular-nums">
         <span className={profit < 0 ? 'text-error' : 'text-foreground'}>
           C${formatCurrencyValue(profit)}
         </span>
       </td>
 
       {/* Profit Percentage (%) */}
-      <td className="py-3 px-3">
+      <td className="border-b border-border py-3 px-3 tabular-nums">
         <span
           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
             marginPercent < 0
@@ -1074,7 +1097,7 @@ function ProductTableRow({
       </td>
 
       {/* History & Delete Actions */}
-      <td className="py-3 px-4 text-right whitespace-nowrap">
+      <td className="border-b border-border py-3 px-4 text-right whitespace-nowrap">
         <div className="inline-flex items-center justify-end gap-3">
           <button
             type="button"

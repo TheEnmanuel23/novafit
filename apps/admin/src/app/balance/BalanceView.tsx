@@ -1021,17 +1021,25 @@ export function BalanceView({
             </div>
 
             {/* Table Content: Concepto | Valor | Medio de pago | Fecha y hora */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[640px]">
+            <div className="overflow-auto max-h-[68dvh] overscroll-contain">
+              <table className="w-full text-left border-separate border-spacing-0 min-w-[680px]">
                 <thead>
-                  <tr className="border-b border-border bg-white/[0.03] text-xs font-semibold text-muted-foreground">
-                    <th className="py-3.5 px-5">Concepto</th>
-                    <th className="py-3.5 px-4 w-36">Valor</th>
-                    <th className="py-3.5 px-4 w-44">Medio de pago</th>
-                    <th className="py-3.5 px-5 w-56">Fecha y hora</th>
+                  <tr className="text-xs font-semibold text-muted-foreground">
+                    <th className="sticky top-0 left-0 z-30 bg-[#141621] border-b border-r border-white/10 py-3.5 px-4 sm:px-5 w-[180px] min-w-[180px] sm:w-auto sm:min-w-[240px] shadow-[4px_0_12px_-4px_rgba(0,0,0,0.65)]">
+                      Concepto
+                    </th>
+                    <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-4 min-w-[120px]">
+                      Valor
+                    </th>
+                    <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-4 min-w-[160px]">
+                      Medio de pago
+                    </th>
+                    <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-5 min-w-[190px]">
+                      Fecha y hora
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border text-sm">
+                <tbody className="text-sm">
                   {activeTab === 'incomes' &&
                     (incomeSales.length === 0 ? (
                       <tr>
@@ -1190,20 +1198,34 @@ export function BalanceView({
             </div>
           ) : (
             <div className="glass rounded-2xl border border-border overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[760px] text-sm">
+              <div className="overflow-auto max-h-[68dvh] overscroll-contain">
+                <table className="w-full text-left border-separate border-spacing-0 min-w-[820px] text-sm">
                   <thead>
-                    <tr className="border-b border-border bg-white/[0.03] text-xs font-semibold text-muted-foreground">
-                      <th className="py-3.5 px-4">Estado / Apertura</th>
-                      <th className="py-3.5 px-3">Cierre</th>
-                      <th className="py-3.5 px-3">Base inicial</th>
-                      <th className="py-3.5 px-3">Ventas efectivo</th>
-                      <th className="py-3.5 px-3">Efectivo esperado</th>
-                      <th className="py-3.5 px-3">Efectivo contado</th>
-                      <th className="py-3.5 px-4 text-right">Diferencia</th>
+                    <tr className="text-xs font-semibold text-muted-foreground">
+                      <th className="sticky top-0 left-0 z-30 bg-[#141621] border-b border-r border-white/10 py-3.5 px-3 sm:px-4 w-[185px] min-w-[185px] sm:w-[220px] sm:min-w-[220px] shadow-[4px_0_12px_-4px_rgba(0,0,0,0.65)]">
+                        Estado / Apertura
+                      </th>
+                      <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[130px]">
+                        Cierre
+                      </th>
+                      <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[110px]">
+                        Base inicial
+                      </th>
+                      <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[125px]">
+                        Ventas efectivo
+                      </th>
+                      <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[135px]">
+                        Efectivo esperado
+                      </th>
+                      <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[130px]">
+                        Efectivo contado
+                      </th>
+                      <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-4 min-w-[115px] text-right">
+                        Diferencia
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody>
                     {periodFilteredCashSessions.map((session) => {
                       const isOpen = session.status === 'open'
                       const diff = Number(session.difference_amount ?? 0)
@@ -1212,9 +1234,9 @@ export function BalanceView({
                         <tr
                           key={session.id}
                           onClick={() => setSelectedCashSessionDetail(session)}
-                          className="hover:bg-white/[0.03] transition-colors cursor-pointer"
+                          className="hover:bg-white/[0.03] transition-colors cursor-pointer group"
                         >
-                          <td className="py-3.5 px-4">
+                          <td className="sticky left-0 z-10 bg-[#10121b] group-hover:bg-[#171925] transition-colors border-b border-r border-white/10 py-3.5 px-3 sm:px-4 w-[185px] min-w-[185px] sm:w-[220px] sm:min-w-[220px] shadow-[4px_0_12px_-4px_rgba(0,0,0,0.65)]">
                             <div className="flex flex-col gap-0.5">
                               <div className="flex items-center gap-2">
                                 {isOpen ? (
@@ -1230,13 +1252,13 @@ export function BalanceView({
                                   {formatTreintaDateTime(session.opened_at)}
                                 </span>
                               </div>
-                              <span className="text-[11px] text-muted-foreground">
+                              <span className="text-[11px] text-muted-foreground truncate">
                                 Abierta por: {session.opened_by_staff?.name || 'Staff'}
                               </span>
                             </div>
                           </td>
 
-                          <td className="py-3.5 px-3 text-xs">
+                          <td className="border-b border-border py-3.5 px-3 text-xs">
                             {session.closed_at ? (
                               <div className="flex flex-col">
                                 <span className="text-foreground font-medium">
@@ -1251,29 +1273,29 @@ export function BalanceView({
                             )}
                           </td>
 
-                          <td className="py-3.5 px-3 font-medium">
+                          <td className="border-b border-border py-3.5 px-3 font-medium tabular-nums whitespace-nowrap">
                             C${formatMoney(session.opening_amount)}
                           </td>
 
-                          <td className="py-3.5 px-3 font-medium text-success">
+                          <td className="border-b border-border py-3.5 px-3 font-medium text-success tabular-nums whitespace-nowrap">
                             {isOpen
                               ? `C$${formatMoney(currentShiftMetrics.cashSales)}`
                               : `C$${formatMoney(session.cash_sales_total)}`}
                           </td>
 
-                          <td className="py-3.5 px-3 font-bold">
+                          <td className="border-b border-border py-3.5 px-3 font-bold tabular-nums whitespace-nowrap">
                             {isOpen
                               ? `C$${formatMoney(currentShiftMetrics.expectedCash)}`
                               : `C$${formatMoney(session.expected_cash_amount)}`}
                           </td>
 
-                          <td className="py-3.5 px-3 font-bold">
+                          <td className="border-b border-border py-3.5 px-3 font-bold tabular-nums whitespace-nowrap">
                             {session.counted_cash_amount !== null
                               ? `C$${formatMoney(session.counted_cash_amount)}`
                               : '—'}
                           </td>
 
-                          <td className="py-3.5 px-4 text-right font-bold">
+                          <td className="border-b border-border py-3.5 px-4 text-right font-bold tabular-nums whitespace-nowrap">
                             {session.difference_amount !== null ? (
                               <span
                                 className={
@@ -2179,12 +2201,12 @@ function BalanceSaleRow({
   return (
     <tr
       onClick={onSelect}
-      className="hover:bg-white/[0.03] transition-colors cursor-pointer"
+      className="hover:bg-white/[0.03] transition-colors cursor-pointer group"
     >
-      <td className="py-3.5 px-5">
-        <div className="flex items-center gap-3.5">
+      <td className="sticky left-0 z-10 bg-[#10121b] group-hover:bg-[#171925] transition-colors border-b border-r border-white/10 py-3.5 px-4 sm:px-5 w-[180px] min-w-[180px] max-w-[180px] sm:w-auto sm:min-w-[240px] sm:max-w-none shadow-[4px_0_12px_-4px_rgba(0,0,0,0.65)]">
+        <div className="flex items-center gap-3 min-w-0">
           <div
-            className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 ${
               isCredit
                 ? 'bg-warning/15 text-warning'
                 : 'bg-success/15 text-success'
@@ -2207,8 +2229,10 @@ function BalanceSaleRow({
             </svg>
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="font-semibold text-foreground">{conceptTitle}</span>
-            <span className="text-xs text-muted-foreground truncate max-w-md">
+            <span className="font-semibold text-xs sm:text-sm text-foreground truncate">
+              {conceptTitle}
+            </span>
+            <span className="text-[11px] sm:text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-md">
               {itemsSummary}
               {sale.member ? ` • ${sale.member.name}` : ''}
             </span>
@@ -2216,18 +2240,18 @@ function BalanceSaleRow({
         </div>
       </td>
 
-      <td className="py-3.5 px-4 font-bold whitespace-nowrap">
+      <td className="border-b border-border py-3.5 px-4 font-bold whitespace-nowrap tabular-nums">
         <span className={isCredit ? 'text-warning' : 'text-foreground'}>
           C${formatMoney(sale.total)}
         </span>
       </td>
 
-      <td className="py-3.5 px-4 text-foreground whitespace-nowrap">
+      <td className="border-b border-border py-3.5 px-4 text-foreground whitespace-nowrap">
         {sale.payment_method?.name || 'Efectivo'}
         {sale.custom_payment_method ? ` (${sale.custom_payment_method})` : ''}
       </td>
 
-      <td className="py-3.5 px-5 text-muted-foreground whitespace-nowrap">
+      <td className="border-b border-border py-3.5 px-5 text-muted-foreground whitespace-nowrap">
         {formatTreintaDateTime(sale.sale_date)}
       </td>
     </tr>

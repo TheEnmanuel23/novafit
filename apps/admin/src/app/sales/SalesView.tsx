@@ -1236,20 +1236,34 @@ export function SalesView({
       {/* ─── TAB 3: SALES HISTORY ─── */}
       {activeTab === 'history' && (
         <div className="glass rounded-2xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[760px] text-sm">
+          <div className="overflow-auto max-h-[68dvh] overscroll-contain">
+            <table className="w-full text-left border-separate border-spacing-0 min-w-[820px] text-sm">
               <thead>
-                <tr className="border-b border-border bg-white/[0.03] text-xs font-semibold text-muted-foreground">
-                  <th className="py-3.5 px-4">Fecha</th>
-                  <th className="py-3.5 px-3">Comprobante / Productos</th>
-                  <th className="py-3.5 px-3">Cliente</th>
-                  <th className="py-3.5 px-3">Método / Pagos</th>
-                  <th className="py-3.5 px-3">Estado</th>
-                  <th className="py-3.5 px-3">Vendedor</th>
-                  <th className="py-3.5 px-4 text-right">Total</th>
+                <tr className="text-xs font-semibold text-muted-foreground">
+                  <th className="sticky top-0 left-0 z-30 bg-[#141621] border-b border-r border-white/10 py-3.5 px-3 sm:px-4 min-w-[130px] shadow-[4px_0_12px_-4px_rgba(0,0,0,0.65)]">
+                    Fecha
+                  </th>
+                  <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[190px]">
+                    Comprobante / Productos
+                  </th>
+                  <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[130px]">
+                    Cliente
+                  </th>
+                  <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[140px]">
+                    Método / Pagos
+                  </th>
+                  <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[100px]">
+                    Estado
+                  </th>
+                  <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-3 min-w-[125px]">
+                    Vendedor
+                  </th>
+                  <th className="sticky top-0 z-20 bg-[#141621] border-b border-border py-3.5 px-4 min-w-[120px] text-right">
+                    Total
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody>
                 {initialSales.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-muted-foreground">
@@ -1258,11 +1272,11 @@ export function SalesView({
                   </tr>
                 ) : (
                   initialSales.map((sale) => (
-                    <tr key={sale.id} className="hover:bg-white/[0.02]">
-                      <td className="py-3 px-4 whitespace-nowrap text-xs text-muted-foreground">
+                    <tr key={sale.id} className="hover:bg-white/[0.03] transition-colors group">
+                      <td className="sticky left-0 z-10 bg-[#10121b] group-hover:bg-[#171925] transition-colors border-b border-r border-white/10 py-3 px-3 sm:px-4 whitespace-nowrap text-xs text-muted-foreground shadow-[4px_0_12px_-4px_rgba(0,0,0,0.65)]">
                         {formatDateTime(sale.sale_date)}
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="border-b border-border py-3 px-3">
                         <div className="flex flex-col gap-0.5">
                           <div className="font-semibold text-foreground flex items-center gap-2">
                             <span>
@@ -1289,7 +1303,7 @@ export function SalesView({
                           )}
                         </div>
                       </td>
-                      <td className="py-3 px-3 text-xs">
+                      <td className="border-b border-border py-3 px-3 text-xs">
                         {sale.member ? (
                           <div>
                             <div className="font-medium text-foreground">
@@ -1303,7 +1317,7 @@ export function SalesView({
                           <span className="text-muted-foreground">Cliente general</span>
                         )}
                       </td>
-                      <td className="py-3 px-3 text-xs">
+                      <td className="border-b border-border py-3 px-3 text-xs">
                         <div className="font-medium text-foreground">
                           {sale.payment_method?.name || 'Efectivo'}
                           {sale.custom_payment_method
@@ -1315,7 +1329,7 @@ export function SalesView({
                           {sale.installments_count === 1 ? 'pago' : 'pagos'}
                         </div>
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="border-b border-border py-3 px-3">
                         {sale.payment_status === 'paid' ? (
                           <span className="badge badge-active !text-[11px]">Pagada</span>
                         ) : (
@@ -1324,7 +1338,7 @@ export function SalesView({
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-3 text-xs">
+                      <td className="border-b border-border py-3 px-3 text-xs">
                         <div className="font-medium">
                           {sale.assigned_staff?.name || 'Staff'}
                         </div>
@@ -1336,7 +1350,7 @@ export function SalesView({
                             </div>
                           )}
                       </td>
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                      <td className="border-b border-border py-3 px-4 text-right whitespace-nowrap tabular-nums">
                         <div className="flex items-center justify-end gap-2.5">
                           <div>
                             <div className="font-black text-sm text-success">
