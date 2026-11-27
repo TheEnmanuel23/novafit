@@ -1,12 +1,25 @@
 'use client'
 
-import { useActionState } from 'react'
+import { Suspense, useActionState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { signIn } from '../actions/auth'
+
+function DeactivatedNotice({ hasActionError }: { hasActionError: boolean }) {
+  const searchParams = useSearchParams()
+  if (hasActionError || searchParams.get('deactivated') !== '1') {
+    return null
+  }
+  return (
+    <div className="bg-error/10 border border-error/20 text-error px-4 py-3 rounded-xl text-sm font-medium">
+      Tu cuenta ha sido desactivada. Contacta a un administrador.
+    </div>
+  )
+}
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(
-    async (prevState: any, formData: FormData) => {
+    async (_prevState: { error?: string } | null, formData: FormData) => {
       return await signIn(formData)
     },
     null
@@ -40,6 +53,9 @@ export default function LoginPage() {
                 {state.error}
               </div>
             )}
+            <Suspense fallback={null}>
+              <DeactivatedNotice hasActionError={Boolean(state?.error)} />
+            </Suspense>
 
             <div className="input-group">
               <label className="input-label text-[11px]" htmlFor="identifier">Usuario o Correo</label>
@@ -84,9 +100,9 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-8 font-medium">
+        {/* <p className="text-center text-xs text-muted-foreground mt-8 font-medium">
           ¿Primera vez? <a href="/signup" className="text-white hover:text-accent transition-colors font-bold underline underline-offset-4">Registrarse</a>
-        </p>
+        </p> */}
       </div>
     </div>
   )

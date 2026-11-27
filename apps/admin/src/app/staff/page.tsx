@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getStaffList, getStaffCount, getCurrentStaff, hasRole } from '@novafit/supabase'
+import { getStaffList, getCurrentStaff, hasRole } from '@novafit/supabase'
 import { BottomNav } from '@/components/BottomNav'
+import { StaffListClient } from './StaffListClient'
 
 export default async function StaffPage() {
   const supabase = await createClient()
@@ -13,8 +14,8 @@ export default async function StaffPage() {
     redirect('/dashboard')
   }
 
-  const staffList = await getStaffList(supabase)
-  const total = await getStaffCount(supabase)
+  const staffList = await getStaffList(supabase, { includeDeleted: true })
+  const activeCount = staffList.filter((s) => !s.deleted && s.is_active !== false).length
 
   return (
     <div className="app-container">
@@ -22,7 +23,7 @@ export default async function StaffPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Staff</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {total} registrados
+            {activeCount} activos • {staffList.length} en total
           </p>
         </div>
         <div className="flex gap-2">
@@ -39,40 +40,7 @@ export default async function StaffPage() {
       </header>
 
       <main className="page-content mt-6">
-        <div className="glass p-2 mb-6 flex gap-2">
-          <div className="relative flex-1">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            <input type="text" className="input pl-9 border-none bg-transparent h-10 w-full focus:ring-0 shadow-none" placeholder="Buscar por nombre o usuario..." />
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          {staffList.map((staff) => (
-            <Link key={staff.id} href={`/staff/${staff.id}`} className="glass p-4 flex justify-between items-center hover-lift group">
-              <div>
-                <div className="font-semibold group-hover:text-accent transition-colors flex items-center gap-2">
-                  {staff.name}
-                  {staff.is_online && (
-                    <span className="flex h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" title="Online" />
-                  )}
-                </div>
-                <div className="text-sm text-muted-foreground mt-0.5">{staff.username}</div>
-              </div>
-              <div className="text-right">
-                <span className="badge badge-active">{staff.profile.name}</span>
-                <div className="text-sm text-muted-foreground mt-1">
-                  {staff.email}
-                </div>
-              </div>
-            </Link>
-          ))}
-          
-          {staffList.length === 0 && (
-            <div className="text-center p-8 text-muted-foreground">
-              No hay staff registrados aún.
-            </div>
-          )}
-        </div>
+        <StaffListClient staffList={staffList} />
       </main>
       
       <BottomNav currentPath="/staff" />
