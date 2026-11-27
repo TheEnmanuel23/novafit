@@ -100,9 +100,9 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-8 font-medium">
+        {/* <p className="text-center text-xs text-muted-foreground mt-8 font-medium">
           ¿Primera vez? <a href="/signup" className="text-white hover:text-accent transition-colors font-bold underline underline-offset-4">Registrarse</a>
-        </p>
+        </p> */}
       </div>
     </div>
   )
