@@ -145,6 +145,9 @@ export async function getCashRegisterSessions(
     cash_sales_total: Number(row.cash_sales_total ?? 0),
     other_sales_total: Number(row.other_sales_total ?? 0),
     total_sales: Number(row.total_sales ?? 0),
+    cash_expenses_total: Number(row.cash_expenses_total ?? 0),
+    other_expenses_total: Number(row.other_expenses_total ?? 0),
+    total_expenses: Number(row.total_expenses ?? 0),
     expected_cash_amount: Number(row.expected_cash_amount ?? 0),
     counted_cash_amount:
       row.counted_cash_amount !== null && row.counted_cash_amount !== undefined
@@ -186,6 +189,9 @@ export async function getOpenCashRegisterSession(
     cash_sales_total: Number(data.cash_sales_total ?? 0),
     other_sales_total: Number(data.other_sales_total ?? 0),
     total_sales: Number(data.total_sales ?? 0),
+    cash_expenses_total: Number(data.cash_expenses_total ?? 0),
+    other_expenses_total: Number(data.other_expenses_total ?? 0),
+    total_expenses: Number(data.total_expenses ?? 0),
     expected_cash_amount: Number(data.expected_cash_amount ?? 0),
     counted_cash_amount:
       data.counted_cash_amount !== null && data.counted_cash_amount !== undefined

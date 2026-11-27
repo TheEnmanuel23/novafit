@@ -689,6 +689,44 @@ export async function closeCashRegisterAction(input: {
       return false
     })
 
+    // Also calculate paid expenses registered during this cash session window
+    // (cash expenses reduce expected petty cash in caja)
+    const { data: candidateExpenses } = await supabase
+      .from('expenses')
+      .select(
+        `
+        id,
+        total,
+        expense_date,
+        created_at,
+        assigned_staff_id,
+        created_by,
+        payment_status,
+        payment_method:payment_methods (key)
+      `
+      )
+      .eq('deleted', false)
+      .eq('payment_status', 'paid')
+      .or(`expense_date.gte.${session.opened_at},created_at.gte.${session.opened_at}`)
+
+    const sessionExpenses = (candidateExpenses || []).filter((e) => {
+      if (
+        shiftOwnerId &&
+        e.assigned_staff_id !== shiftOwnerId &&
+        e.created_by !== shiftOwnerId
+      ) {
+        return false
+      }
+      const expTime = new Date(e.expense_date).getTime()
+      const createdTime = new Date(e.created_at).getTime()
+      if (expTime >= openedAtTime && expTime <= nowTime) return true
+      if (createdTime >= openedAtTime && createdTime <= nowTime) {
+        const expYMD = toTimezoneYYYYMMDD(e.expense_date, APP_TIMEZONE)
+        return expYMD >= openedYMD
+      }
+      return false
+    })
+
     let cashSalesTotal = 0
     let otherSalesTotal = 0
 
@@ -702,11 +740,29 @@ export async function closeCashRegisterAction(input: {
       }
     }
 
+    let cashExpensesTotal = 0
+    let otherExpensesTotal = 0
+
+    for (const e of sessionExpenses || []) {
+      const amt = Number(e.total ?? 0)
+      const pmKey = (e.payment_method as any)?.key || 'cash'
+      if (pmKey === 'cash') {
+        cashExpensesTotal += amt
+      } else {
+        otherExpensesTotal += amt
+      }
+    }
+
     cashSalesTotal = Number(cashSalesTotal.toFixed(2))
     otherSalesTotal = Number(otherSalesTotal.toFixed(2))
     const totalSales = Number((cashSalesTotal + otherSalesTotal).toFixed(2))
+    cashExpensesTotal = Number(cashExpensesTotal.toFixed(2))
+    otherExpensesTotal = Number(otherExpensesTotal.toFixed(2))
+    const totalExpenses = Number((cashExpensesTotal + otherExpensesTotal).toFixed(2))
     const openingAmount = Number(session.opening_amount ?? 0)
-    const expectedCashAmount = Number((openingAmount + cashSalesTotal).toFixed(2))
+    const expectedCashAmount = Number(
+      (openingAmount + cashSalesTotal - cashExpensesTotal).toFixed(2)
+    )
     const countedCashAmount = Number(counted.toFixed(2))
     const differenceAmount = Number((countedCashAmount - expectedCashAmount).toFixed(2))
 
@@ -717,6 +773,9 @@ export async function closeCashRegisterAction(input: {
         cash_sales_total: cashSalesTotal,
         other_sales_total: otherSalesTotal,
         total_sales: totalSales,
+        cash_expenses_total: cashExpensesTotal,
+        other_expenses_total: otherExpensesTotal,
+        total_expenses: totalExpenses,
         expected_cash_amount: expectedCashAmount,
         counted_cash_amount: countedCashAmount,
         difference_amount: differenceAmount,

@@ -97,6 +97,9 @@ export type RoleName =
   | 'view_sales'
   | 'create_sales'
   | 'delete_sales'
+  | 'view_expenses'
+  | 'create_expenses'
+  | 'delete_expenses'
   | 'view_balance'
   | 'manage_cash_register';
 
@@ -327,6 +330,9 @@ export interface CashRegisterSession {
   cash_sales_total: number;
   other_sales_total: number;
   total_sales: number;
+  cash_expenses_total: number;
+  other_expenses_total: number;
+  total_expenses: number;
   expected_cash_amount: number;
   counted_cash_amount: number | null;
   difference_amount: number | null;
@@ -344,6 +350,46 @@ export interface CashRegisterSession {
 export interface CashRegisterSessionWithDetails extends CashRegisterSession {
   opened_by_staff: { id: string; name: string; username: string } | null;
   closed_by_staff: { id: string; name: string; username: string } | null;
+}
+
+// ─── Expenses (Gastos) ───────────────────────────────────────────────────────
+
+export type ExpensePaymentStatus = 'paid' | 'credit';
+
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  deleted: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+export interface Expense {
+  id: string;
+  category_id: string | null;
+  concept: string;
+  expense_date: string;
+  payment_status: ExpensePaymentStatus;
+  payment_method_id: string | null;
+  custom_payment_method: string | null;
+  assigned_staff_id: string | null;
+  total: number;
+  notes: string | null;
+  deleted: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+export interface ExpenseWithDetails extends Expense {
+  category: ExpenseCategory | null;
+  payment_method: PaymentMethod | null;
+  assigned_staff: { id: string; name: string; username: string } | null;
+  creator: { id: string; name: string; username: string } | null;
 }
 
 // ─── Database Gen Types ───────────────────────────────────────────────────────
