@@ -102,7 +102,7 @@ export async function updateStaffProfile(prevState: any, formData: FormData) {
   // Prevent modifying another Global Admin
   const { data: targetStaff } = await supabaseAdmin
     .from('staff')
-    .select(`profile:profiles(name)`)
+    .select(`profile:profiles!profile_id(name)`)
     .eq('id', staffId)
     .single()
 
@@ -188,12 +188,13 @@ export async function toggleStaffActiveStatus(staffId: string, nextIsActive: boo
 
   const { data: targetStaff, error: fetchError } = await supabaseAdmin
     .from('staff')
-    .select('id, auth_user_id, name, profile:profiles(name)')
+    .select('id, auth_user_id, name, profile:profiles!profile_id(name)')
     .eq('id', staffId)
     .eq('deleted', false)
     .single()
 
   if (fetchError || !targetStaff) {
+    console.error('[StaffAction:toggleStaffActiveStatus] Staff fetch error:', fetchError)
     return { error: 'No se encontró al empleado.' }
   }
 
