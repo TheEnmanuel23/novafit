@@ -10,7 +10,11 @@ import {
   getOpenCashRegisterSession,
   getStaffOptionsForSales,
 } from '@novafit/supabase'
-import { getTodayYYYYMMDD } from '@novafit/supabase/src/utils/date'
+import {
+  APP_TIMEZONE,
+  getTodayYYYYMMDD,
+  toTimezoneYYYYMMDD,
+} from '@novafit/supabase/src/utils/date'
 import { BottomNav } from '@/components/BottomNav'
 import { BalanceView } from './BalanceView'
 
@@ -23,33 +27,48 @@ export default async function BalancePage() {
   }
 
   const isGlobal = await isGlobalAdmin(staff)
-  const canView =
-    isGlobal ||
-    (await hasRole(staff, 'view_sales')) ||
-    (await hasRole(staff, 'create_sales')) ||
-    (await hasRole(staff, 'manage_cash_register')) ||
-    (await hasRole(staff, 'view_reports'))
+  const canViewFullBalance = isGlobal || (await hasRole(staff, 'view_balance'))
+  const canManageCash = isGlobal || (await hasRole(staff, 'manage_cash_register'))
 
-  if (!canView) {
+  if (!canViewFullBalance && !canManageCash) {
     redirect('/dashboard')
   }
 
   const canEditSales = isGlobal || (await hasRole(staff, 'create_sales'))
   const canDeleteSales = isGlobal || (await hasRole(staff, 'delete_sales'))
-  const canManageCash =
-    isGlobal ||
-    (await hasRole(staff, 'manage_cash_register')) ||
-    (await hasRole(staff, 'create_sales'))
 
   const todayYMD = getTodayYYYYMMDD()
 
-  const [sales, paymentMethods, cashSessions, openSession, staffList] = await Promise.all([
-    getSales(supabase, { limit: 1000 }),
-    getPaymentMethods(supabase),
-    getCashRegisterSessions(supabase, 200),
-    getOpenCashRegisterSession(supabase),
-    getStaffOptionsForSales(supabase),
-  ])
+  const [allSales, paymentMethods, allCashSessions, openSession, staffList] =
+    await Promise.all([
+      getSales(supabase, { limit: canViewFullBalance ? 1000 : 250 }),
+      getPaymentMethods(supabase),
+      getCashRegisterSessions(supabase, canViewFullBalance ? 200 : 25),
+      getOpenCashRegisterSession(supabase),
+      canViewFullBalance ? getStaffOptionsForSales(supabase) : Promise.resolve([]),
+    ])
+
+  // Server-side scoping: users without `view_balance` only receive today's own sales
+  // and today's own / currently open cash register shift (never historical totals).
+  const sales = canViewFullBalance
+    ? allSales
+    : allSales.filter((sale) => {
+        const isToday = toTimezoneYYYYMMDD(sale.sale_date, APP_TIMEZONE) === todayYMD
+        const isOwnSale =
+          sale.assigned_staff_id === staff.id || sale.created_by === staff.id
+        return isToday && isOwnSale
+      })
+
+  const cashSessions = canViewFullBalance
+    ? allCashSessions
+    : allCashSessions.filter((session) => {
+        if (session.status === 'open') return true
+        const refDate = session.closed_at || session.opened_at
+        const isToday = toTimezoneYYYYMMDD(refDate, APP_TIMEZONE) === todayYMD
+        const isOwnSession =
+          session.opened_by === staff.id || session.closed_by === staff.id
+        return isToday && isOwnSession
+      })
 
   return (
     <div className="min-h-dvh bg-background text-foreground flex flex-col">
@@ -61,6 +80,7 @@ export default async function BalancePage() {
           openCashSession={openSession}
           staffList={staffList}
           defaultTodayYMD={todayYMD}
+          canViewFullBalance={canViewFullBalance}
           canEditSales={canEditSales}
           canDeleteSales={canDeleteSales}
           canManageCash={canManageCash}

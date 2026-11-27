@@ -69,6 +69,7 @@ export function BalanceView({
   openCashSession,
   staffList,
   defaultTodayYMD,
+  canViewFullBalance,
   canEditSales,
   canDeleteSales,
   canManageCash,
@@ -79,6 +80,7 @@ export function BalanceView({
   openCashSession: CashRegisterSessionWithDetails | null
   staffList: StaffOption[]
   defaultTodayYMD: string
+  canViewFullBalance: boolean
   canEditSales: boolean
   canDeleteSales: boolean
   canManageCash: boolean
@@ -88,8 +90,10 @@ export function BalanceView({
   // Top-level switcher matching Screenshot 1 & 2: [Transacciones] | [Cierres de caja]
   const [topSection, setTopSection] = useState<TopBalanceSection>('transactions')
 
-  // Period frequency filter: Diario, Semanal, Mensual, Anual, Rango personalizado
-  const [frequency, setFrequency] = useState<PeriodFrequency>('monthly')
+  // Period frequency filter: locked to daily (today) when user only has cash register access
+  const [frequency, setFrequency] = useState<PeriodFrequency>(
+    canViewFullBalance ? 'monthly' : 'daily'
+  )
   const [selectedDay, setSelectedDay] = useState<string>(defaultTodayYMD)
   const [selectedMonth, setSelectedMonth] = useState<string>(
     defaultTodayYMD.slice(0, 7) // YYYY-MM
@@ -531,7 +535,9 @@ export function BalanceView({
           </Link>
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-2xl font-bold tracking-tight">Balance</h1>
+              <h1 className="text-2xl font-bold tracking-tight">
+                {canViewFullBalance ? 'Balance' : 'Mi Caja'}
+              </h1>
               {openCashSession ? (
                 <span className="badge badge-active !text-[10px]">
                   ● Caja abierta
@@ -542,6 +548,11 @@ export function BalanceView({
                 </span>
               )}
             </div>
+            {!canViewFullBalance && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Tus movimientos del día de hoy ({defaultTodayYMD})
+              </p>
+            )}
           </div>
         </div>
 
@@ -695,88 +706,97 @@ export function BalanceView({
           </button>
         )}
 
-        {/* Period Frequency Selector (Diario, Semanal, Mensual, Anual, Rango personalizado) */}
-        <div className="relative">
-          <select
-            value={frequency}
-            onChange={(e) => setFrequency(e.target.value as PeriodFrequency)}
-            aria-label="Frecuencia de periodo"
-            className="input !min-h-11 !w-auto pr-9 pl-3.5 py-2 text-xs font-semibold rounded-xl appearance-none cursor-pointer"
-          >
-            <option value="daily">Diario</option>
-            <option value="weekly">Semanal</option>
-            <option value="monthly">Mensual</option>
-            <option value="yearly">Anual</option>
-            <option value="custom">Rango personalizado</option>
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground text-[10px]">
-            ▼
-          </div>
-        </div>
+        {/* Period Frequency Selector — only for users with full `view_balance` permission */}
+        {canViewFullBalance ? (
+          <>
+            <div className="relative">
+              <select
+                value={frequency}
+                onChange={(e) => setFrequency(e.target.value as PeriodFrequency)}
+                aria-label="Frecuencia de periodo"
+                className="input !min-h-11 !w-auto pr-9 pl-3.5 py-2 text-xs font-semibold rounded-xl appearance-none cursor-pointer"
+              >
+                <option value="daily">Diario</option>
+                <option value="weekly">Semanal</option>
+                <option value="monthly">Mensual</option>
+                <option value="yearly">Anual</option>
+                <option value="custom">Rango personalizado</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground text-[10px]">
+                ▼
+              </div>
+            </div>
 
-        {/* Date Picker matching active frequency */}
-        {frequency === 'daily' && (
-          <input
-            type="date"
-            value={selectedDay}
-            onChange={(e) => setSelectedDay(e.target.value)}
-            aria-label="Seleccionar día"
-            className="input !min-h-11 !w-auto px-3.5 py-2 text-xs font-medium rounded-xl"
-          />
-        )}
+            {/* Date Picker matching active frequency */}
+            {frequency === 'daily' && (
+              <input
+                type="date"
+                value={selectedDay}
+                onChange={(e) => setSelectedDay(e.target.value)}
+                aria-label="Seleccionar día"
+                className="input !min-h-11 !w-auto px-3.5 py-2 text-xs font-medium rounded-xl"
+              />
+            )}
 
-        {frequency === 'weekly' && (
-          <input
-            type="date"
-            value={selectedDay}
-            onChange={(e) => setSelectedDay(e.target.value)}
-            aria-label="Seleccionar semana"
-            className="input !min-h-11 !w-auto px-3.5 py-2 text-xs font-medium rounded-xl"
-          />
-        )}
+            {frequency === 'weekly' && (
+              <input
+                type="date"
+                value={selectedDay}
+                onChange={(e) => setSelectedDay(e.target.value)}
+                aria-label="Seleccionar semana"
+                className="input !min-h-11 !w-auto px-3.5 py-2 text-xs font-medium rounded-xl"
+              />
+            )}
 
-        {frequency === 'monthly' && (
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            aria-label="Seleccionar mes"
-            className="input !min-h-11 !w-auto px-3.5 py-2 text-xs font-medium rounded-xl"
-          />
-        )}
+            {frequency === 'monthly' && (
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                aria-label="Seleccionar mes"
+                className="input !min-h-11 !w-auto px-3.5 py-2 text-xs font-medium rounded-xl"
+              />
+            )}
 
-        {frequency === 'yearly' && (
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            aria-label="Seleccionar año"
-            className="input !min-h-11 !w-auto px-3.5 py-2 text-xs font-medium rounded-xl cursor-pointer"
-          >
-            {[2024, 2025, 2026, 2027, 2028].map((yr) => (
-              <option key={yr} value={String(yr)}>
-                {yr}
-              </option>
-            ))}
-          </select>
-        )}
+            {frequency === 'yearly' && (
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                aria-label="Seleccionar año"
+                className="input !min-h-11 !w-auto px-3.5 py-2 text-xs font-medium rounded-xl cursor-pointer"
+              >
+                {[2024, 2025, 2026, 2027, 2028].map((yr) => (
+                  <option key={yr} value={String(yr)}>
+                    {yr}
+                  </option>
+                ))}
+              </select>
+            )}
 
-        {frequency === 'custom' && (
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={customStartDate}
-              onChange={(e) => setCustomStartDate(e.target.value)}
-              aria-label="Fecha inicial"
-              className="input !min-h-11 !w-auto px-3 py-2 text-xs rounded-xl"
-            />
-            <span className="text-xs text-muted-foreground">a</span>
-            <input
-              type="date"
-              value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)}
-              aria-label="Fecha final"
-              className="input !min-h-11 !w-auto px-3 py-2 text-xs rounded-xl"
-            />
+            {frequency === 'custom' && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  aria-label="Fecha inicial"
+                  className="input !min-h-11 !w-auto px-3 py-2 text-xs rounded-xl"
+                />
+                <span className="text-xs text-muted-foreground">a</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  aria-label="Fecha final"
+                  className="input !min-h-11 !w-auto px-3 py-2 text-xs rounded-xl"
+                />
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface border border-border text-xs font-semibold text-muted-foreground">
+            <span>Hoy</span>
+            <span className="text-foreground">{defaultTodayYMD}</span>
           </div>
         )}
 
@@ -855,7 +875,8 @@ export function BalanceView({
             </div>
           )}
 
-          {/* 3 Summary Cards: Balance, Ventas totales, Gastos totales */}
+          {/* 3 Summary Cards: Balance, Ventas totales, Gastos totales — only with `view_balance` */}
+          {canViewFullBalance && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="glass p-4 rounded-2xl border border-border flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-success/15 text-success flex items-center justify-center shrink-0">
@@ -940,6 +961,7 @@ export function BalanceView({
               </div>
             </div>
           </div>
+          )}
 
           {/* 4 Inner Tabs: Ingresos | Egresos | Por cobrar | Por pagar */}
           <div className="glass rounded-2xl border border-border overflow-hidden">

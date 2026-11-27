@@ -97,6 +97,7 @@ export type RoleName =
   | 'view_sales'
   | 'create_sales'
   | 'delete_sales'
+  | 'view_balance'
   | 'manage_cash_register';
 
 export interface Role {

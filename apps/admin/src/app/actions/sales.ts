@@ -562,7 +562,6 @@ export async function openCashRegisterAction(openingAmount: number, notes?: stri
   try {
     const currentStaff = await requireSalesPermission(supabase, [
       'manage_cash_register',
-      'create_sales',
     ])
 
     const safeOpening = Number(openingAmount)
@@ -619,7 +618,6 @@ export async function closeCashRegisterAction(input: {
   try {
     const currentStaff = await requireSalesPermission(supabase, [
       'manage_cash_register',
-      'create_sales',
     ])
 
     const counted = Number(input.countedCashAmount)
