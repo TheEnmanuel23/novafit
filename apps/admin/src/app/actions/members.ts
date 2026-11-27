@@ -164,7 +164,7 @@ export async function deactivateMemberAction(memberId: string) {
 
   } catch (error: any) {
     console.error(`[MembersAction:deactivateMemberAction] Error:`, error)
-    throw new Error(error.message || 'Error inesperado al desactivar el miembro.')
+    return { error: error.message || 'Error inesperado al desactivar el miembro.' }
   }
 
   revalidatePath('/members')
@@ -333,4 +333,34 @@ export async function checkDuplicateMembersAction(field: 'name' | 'phone', value
     console.error(`[MembersAction:checkDuplicateMembersAction] Error:`, error)
     return []
   }
+}
+
+export async function toggleMemberPasswordResetAction(memberId: string, allow: boolean) {
+  console.info(`[MembersAction:toggleMemberPasswordResetAction] Setting password_reset_allowed=${allow} for ${memberId}`)
+  const supabase = await createServerClient()
+
+  try {
+    const staff = await getCurrentStaff(supabase)
+    if (!staff || !(await hasRole(staff, 'manage_members'))) {
+      throw new Error('No tienes permisos para autorizar cambios de contraseña.')
+    }
+
+    const appDate = await getAppDate()
+    const { error } = await supabase
+      .from('members')
+      .update({
+        password_reset_allowed: allow,
+        updated_by: staff.id,
+        updated_at: appDate.toISOString(),
+      })
+      .eq('member_id', memberId)
+
+    if (error) throw new Error(error.message)
+  } catch (error: any) {
+    console.error(`[MembersAction:toggleMemberPasswordResetAction] Error:`, error)
+    return { error: error.message || 'Error al actualizar la autorización de contraseña.' }
+  }
+
+  revalidatePath(`/members/${memberId}`)
+  return { success: true, allowed: allow }
 }

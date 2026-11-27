@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   title: `${titlePrefix}NovaFit — Panel Administrativo`,
   description: 'Sistema de gestión de visitas para NovaFit Gym',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/novafit-logo.jpg',
+    shortcut: '/novafit-logo.jpg',
+    apple: '/novafit-logo.jpg',
+  },
 }
 
 export const viewport: Viewport = {

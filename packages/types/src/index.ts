@@ -19,6 +19,10 @@ export interface Member {
   member_id: string;
   name: string;
   phone: string | null;
+  email?: string | null;
+  address?: string | null;
+  date_of_birth?: string | null;
+  password_reset_allowed?: boolean;
   username: string; // short unique human-readable ID e.g. "ABCD-1234"
   qr_code: string | null;
   deleted: boolean;
@@ -80,15 +84,119 @@ export interface Attendance {
 export type RoleName =
   | 'manage_members'
   | 'manage_staff'
+  | 'manage_settings'
   | 'view_reports'
   | 'process_checkin'
-  | 'process_recharge';
+  | 'process_recharge'
+  | 'checkin_qr'
+  | 'checkin_manual'
+  | 'view_products'
+  | 'create_products'
+  | 'edit_products'
+  | 'delete_products'
+  | 'view_sales'
+  | 'create_sales'
+  | 'delete_sales'
+  | 'view_balance'
+  | 'manage_cash_register';
 
 export interface Role {
   id: string;
   name: RoleName;
   description: string | null;
   created_at: string;
+}
+
+// ─── Inventory ───────────────────────────────────────────────────────────────
+
+export type ProductUnitCategory = 'count' | 'weight' | 'volume' | 'length' | 'area';
+
+export type ProductUnit =
+  | 'unit'
+  | 'box'
+  | 'pack'
+  | 'dozen'
+  | 'pair'
+  | 'kg'
+  | 'lb'
+  | 'g'
+  | 'oz'
+  | 'mg'
+  | 'l'
+  | 'ml'
+  | 'gal'
+  | 'fl_oz'
+  | 'm'
+  | 'cm'
+  | 'mm'
+  | 'in'
+  | 'ft'
+  | 'yd'
+  | 'm2'
+  | 'cm2'
+  | 'ft2';
+
+export interface ProductCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+export interface ProductImage {
+  id: string;
+  product_id: string;
+  image_url: string;
+  display_order: number;
+  created_at: string;
+  created_by: string | null;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string | null;
+  sku: string | null;
+  barcode: string | null;
+  price: number;
+  cost: number;
+  quantity_available: number;
+  low_stock_threshold: number;
+  unit: ProductUnit | string;
+  unit_category: ProductUnitCategory | string;
+  category_id: string | null;
+  show_in_catalog: boolean;
+  deleted: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+export interface ProductWithDetails extends Product {
+  category: ProductCategory | null;
+  images: ProductImage[];
+}
+
+export type ProductHistoryAction = 'created' | 'updated' | 'deleted';
+
+export interface ProductHistory {
+  id: string;
+  product_id: string;
+  action: ProductHistoryAction;
+  field_name: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  changed_by: string | null;
+  created_at: string;
+  staff?: {
+    id: string;
+    name: string;
+    username: string;
+  } | null;
 }
 
 export interface Profile {
@@ -145,6 +253,96 @@ export interface CheckInResult {
   balance_after?: number;
   expiration_date?: string;
   message: string;
+}
+
+// ─── Sales ───────────────────────────────────────────────────────────────────
+
+export interface PaymentMethod {
+  id: string;
+  key: string;
+  name: string;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+export type SaleType = 'products' | 'free';
+export type SalePaymentStatus = 'paid' | 'credit';
+
+export interface SaleItem {
+  id: string;
+  sale_id: string;
+  product_id: string | null;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  unit_cost: number;
+  subtotal: number;
+  created_at: string;
+  created_by: string | null;
+}
+
+export interface Sale {
+  id: string;
+  sale_type: SaleType;
+  sale_date: string;
+  payment_status: SalePaymentStatus;
+  installments_count: number;
+  payment_method_id: string | null;
+  custom_payment_method: string | null;
+  assigned_staff_id: string | null;
+  member_id: string | null;
+  subtotal: number;
+  discount: number;
+  total: number;
+  receipt_name: string | null;
+  receipt_details: string | null;
+  deleted: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+export interface SaleWithDetails extends Sale {
+  items: SaleItem[];
+  payment_method: PaymentMethod | null;
+  assigned_staff: { id: string; name: string; username: string } | null;
+  creator: { id: string; name: string; username: string } | null;
+  member: { id: string; member_id: string; name: string; username: string } | null;
+}
+
+// ─── Cash Register Sessions (Cierres de caja) ────────────────────────────────
+
+export type CashRegisterStatus = 'open' | 'closed';
+
+export interface CashRegisterSession {
+  id: string;
+  status: CashRegisterStatus;
+  opening_amount: number;
+  cash_sales_total: number;
+  other_sales_total: number;
+  total_sales: number;
+  expected_cash_amount: number;
+  counted_cash_amount: number | null;
+  difference_amount: number | null;
+  notes: string | null;
+  opened_at: string;
+  closed_at: string | null;
+  opened_by: string | null;
+  closed_by: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+export interface CashRegisterSessionWithDetails extends CashRegisterSession {
+  opened_by_staff: { id: string; name: string; username: string } | null;
+  closed_by_staff: { id: string; name: string; username: string } | null;
 }
 
 // ─── Database Gen Types ───────────────────────────────────────────────────────

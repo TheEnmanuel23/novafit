@@ -14,8 +14,8 @@ export function ShareMemberAppModal({ member }: ShareMemberAppModalProps) {
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [copied, setCopied] = useState(false)
 
-  // Use the member app URL, or fallback to localhost during dev
-  const memberAppUrl = process.env.NEXT_PUBLIC_MEMBER_APP_URL || 'http://localhost:3001'
+  // Use the member app URL from environment variable, or fallback to localhost:3000 during dev
+  const memberAppUrl = process.env.NEXT_PUBLIC_MEMBER_APP_URL || 'http://localhost:3000'
   
   // Construct the URL with query parameters
   const registerUrl = new URL('/register', memberAppUrl)
@@ -99,7 +99,15 @@ export function ShareMemberAppModal({ member }: ShareMemberAppModalProps) {
                 <div className="bg-black/40 p-3 rounded-lg border border-white/10 text-xs text-muted-foreground font-mono break-words whitespace-pre-wrap">
                   ¡Hola {member.name}! 👋{'\n\n'}
                   Este es tu enlace para registrarte en la aplicación de miembros de NovaFit:{'\n\n'}
-                  <span className="text-accent break-all">{urlString}</span>{'\n\n'}
+                  <a
+                    href={urlString}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent hover:text-accent-hover underline underline-offset-2 font-semibold inline-flex items-center gap-1"
+                  >
+                    Haz clic aquí para registrarte
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                  </a>{'\n\n'}
                   Tu ID de usuario es: {member.username}{'\n\n'}
                   Por favor, ingresa al enlace para crear tu contraseña.
                 </div>

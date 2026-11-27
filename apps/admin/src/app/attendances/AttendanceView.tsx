@@ -124,54 +124,70 @@ export function AttendanceView({ initialAttendances, plans, todayStr }: Attendan
         />
       </div>
 
-      <div className="glass rounded-xl overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b border-white/5 text-xs text-muted-foreground uppercase tracking-wider bg-black/20">
-              <th className="p-4 font-medium"><SortHeader label="Fecha" field="scanned_at" sortBy={sortBy} order={order} onSort={handleHeaderClick} /></th>
-              <th className="p-4 font-medium"><SortHeader label="Nombre" field="name" sortBy={sortBy} order={order} onSort={handleHeaderClick} /></th>
-              <th className="p-4 font-medium hidden md:table-cell"><SortHeader label="ID Usuario" field="username" sortBy={sortBy} order={order} onSort={handleHeaderClick} /></th>
-              <th className="p-4 font-medium hidden lg:table-cell"><SortHeader label="Plan" field="plan" sortBy={sortBy} order={order} onSort={handleHeaderClick} /></th>
-              <th className="p-4 font-medium hidden sm:table-cell"><SortHeader label="Estado" field="status" sortBy={sortBy} order={order} onSort={handleHeaderClick} /></th>
-              <th className="p-4 font-medium hidden lg:table-cell"><SortHeader label="Método" field="checkin_type" sortBy={sortBy} order={order} onSort={handleHeaderClick} /></th>
-              <th className="p-4 font-medium text-right"><SortHeader label="Balance" field="balance_after" sortBy={sortBy} order={order} onSort={handleHeaderClick} alignRight /></th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedAttendances.map((attendance: any) => (
-              <tr key={attendance.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
-                <td className="p-4 whitespace-nowrap text-sm">
-                  {formatDateTime(attendance.scanned_at)}
-                </td>
-                <td className="p-4">
-                  <Link href={`/members/${attendance.members.member_id}`} className="font-semibold group-hover:text-accent transition-colors block">
-                    {attendance.members.name}
-                  </Link>
-                  <div className="text-xs text-muted-foreground md:hidden mt-0.5">
-                    ID: {attendance.members.username} • Tel: {attendance.members.phone || 'N/A'}
-                  </div>
-                </td>
-                <td className="p-4 text-sm text-muted-foreground hidden md:table-cell">
-                  {attendance.members.username}
-                </td>
-                <td className="p-4 text-sm hidden lg:table-cell">
-                  <span className="text-muted-foreground">{attendance.member_plan?.plan?.description || 'N/A'}</span>
-                </td>
-                <td className="p-4 hidden sm:table-cell">
-                  <StatusBadge status={attendance.members.status} />
-                </td>
-                <td className="p-4 hidden lg:table-cell">
-                  <CheckinTypeBadge type={attendance.checkin_type || 'manual'} />
-                </td>
-                <td className="p-4 text-right">
-                  <span className="font-bold text-sm bg-black/20 px-2 py-1 rounded border border-white/5 inline-block min-w-[3rem] text-center">
-                    {attendance.balance_after}
-                  </span>
-                </td>
+      <div className="glass rounded-xl overflow-hidden border border-border">
+        <div className="overflow-auto max-h-[68dvh] overscroll-contain">
+          <table className="w-full text-left border-separate border-spacing-0 min-w-[360px]">
+            <thead>
+              <tr className="text-xs text-muted-foreground uppercase tracking-wider">
+                <th className="sticky top-0 left-0 z-30 bg-[#141621] border-b border-r border-white/10 p-3.5 sm:p-4 font-medium min-w-[125px] shadow-[4px_0_12px_-4px_rgba(0,0,0,0.65)]">
+                  <SortHeader label="Fecha" field="scanned_at" sortBy={sortBy} order={order} onSort={handleHeaderClick} />
+                </th>
+                <th className="sticky top-0 z-20 bg-[#141621] border-b border-white/10 p-3.5 sm:p-4 font-medium min-w-[160px]">
+                  <SortHeader label="Nombre" field="name" sortBy={sortBy} order={order} onSort={handleHeaderClick} />
+                </th>
+                <th className="sticky top-0 z-20 bg-[#141621] border-b border-white/10 p-4 font-medium hidden md:table-cell">
+                  <SortHeader label="ID Usuario" field="username" sortBy={sortBy} order={order} onSort={handleHeaderClick} />
+                </th>
+                <th className="sticky top-0 z-20 bg-[#141621] border-b border-white/10 p-4 font-medium hidden lg:table-cell">
+                  <SortHeader label="Plan" field="plan" sortBy={sortBy} order={order} onSort={handleHeaderClick} />
+                </th>
+                <th className="sticky top-0 z-20 bg-[#141621] border-b border-white/10 p-4 font-medium hidden sm:table-cell">
+                  <SortHeader label="Estado" field="status" sortBy={sortBy} order={order} onSort={handleHeaderClick} />
+                </th>
+                <th className="sticky top-0 z-20 bg-[#141621] border-b border-white/10 p-4 font-medium hidden lg:table-cell">
+                  <SortHeader label="Método" field="checkin_type" sortBy={sortBy} order={order} onSort={handleHeaderClick} />
+                </th>
+                <th className="sticky top-0 z-20 bg-[#141621] border-b border-white/10 p-3.5 sm:p-4 font-medium text-right min-w-[90px]">
+                  <SortHeader label="Balance" field="balance_after" sortBy={sortBy} order={order} onSort={handleHeaderClick} alignRight />
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {sortedAttendances.map((attendance: any) => (
+                <tr key={attendance.id} className="hover:bg-white/5 transition-colors group">
+                  <td className="sticky left-0 z-10 bg-[#10121b] group-hover:bg-[#171925] transition-colors border-b border-r border-white/10 p-3.5 sm:p-4 whitespace-nowrap text-xs sm:text-sm shadow-[4px_0_12px_-4px_rgba(0,0,0,0.65)]">
+                    {formatDateTime(attendance.scanned_at)}
+                  </td>
+                  <td className="border-b border-white/5 p-3.5 sm:p-4">
+                    <Link href={`/members/${attendance.members.member_id}`} className="font-semibold group-hover:text-accent transition-colors block">
+                      {attendance.members.name}
+                    </Link>
+                    <div className="text-xs text-muted-foreground md:hidden mt-0.5">
+                      ID: {attendance.members.username} • Tel: {attendance.members.phone || 'N/A'}
+                    </div>
+                  </td>
+                  <td className="border-b border-white/5 p-4 text-sm text-muted-foreground hidden md:table-cell">
+                    {attendance.members.username}
+                  </td>
+                  <td className="border-b border-white/5 p-4 text-sm hidden lg:table-cell">
+                    <span className="text-muted-foreground">{attendance.member_plan?.plan?.description || 'N/A'}</span>
+                  </td>
+                  <td className="border-b border-white/5 p-4 hidden sm:table-cell">
+                    <StatusBadge status={attendance.members.status} />
+                  </td>
+                  <td className="border-b border-white/5 p-4 hidden lg:table-cell">
+                    <CheckinTypeBadge type={attendance.checkin_type || 'manual'} />
+                  </td>
+                  <td className="border-b border-white/5 p-3.5 sm:p-4 text-right tabular-nums">
+                    <span className="font-bold text-sm bg-black/20 px-2 py-1 rounded border border-white/5 inline-block min-w-[3rem] text-center">
+                      {attendance.balance_after}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         {sortedAttendances.length === 0 && (
           <div className="text-center p-8 text-muted-foreground border-t border-white/5">
