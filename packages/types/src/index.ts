@@ -101,7 +101,8 @@ export type RoleName =
   | 'create_expenses'
   | 'delete_expenses'
   | 'view_balance'
-  | 'manage_cash_register';
+  | 'manage_cash_register'
+  | 'reopen_cash_register';
 
 export interface Role {
   id: string;

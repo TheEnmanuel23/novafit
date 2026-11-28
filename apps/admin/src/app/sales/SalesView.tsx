@@ -58,6 +58,8 @@ export function SalesView({
   currentStaff,
   initialSales,
   defaultTodayYMD,
+  cashRegisterStatus,
+  openCashOwnerName,
   permissions,
 }: {
   initialProducts: ProductWithDetails[]
@@ -68,6 +70,8 @@ export function SalesView({
   currentStaff: StaffOption
   initialSales: SaleWithDetails[]
   defaultTodayYMD: string
+  cashRegisterStatus: 'open' | 'closed' | 'open_other'
+  openCashOwnerName?: string | null
   permissions: {
     canView: boolean
     canCreate: boolean
@@ -75,6 +79,7 @@ export function SalesView({
   }
 }) {
   const router = useRouter()
+  const isCashOpenForUser = cashRegisterStatus === 'open'
 
   // Active tab: 'products' (Venta de productos) | 'free' (Venta libre) | 'history' (Historial de ventas)
   const [activeTab, setActiveTab] = useState<'products' | 'free' | 'history'>(
@@ -268,6 +273,14 @@ export function SalesView({
 
   const handleOpenCheckout = () => {
     setFeedbackError(null)
+    if (!isCashOpenForUser) {
+      setFeedbackError(
+        cashRegisterStatus === 'open_other'
+          ? `La caja abierta pertenece a ${openCashOwnerName || 'otro recepcionista'}. Debe cerrarse antes de abrir tu turno.`
+          : 'Debes abrir caja chica antes de registrar una venta.'
+      )
+      return
+    }
     if (isFreeSaleMode) {
       if (freeAmountNum <= 0) {
         setFeedbackError('Ingresa un monto mayor a C$ 0 para continuar con la venta libre.')
@@ -444,6 +457,35 @@ export function SalesView({
         </div>
       </header>
 
+      {/* Cash Register Closed / Occupied Blocker Banner */}
+      {permissions.canCreate && !isCashOpenForUser && (
+        <div className="rounded-2xl bg-warning/10 border border-warning/35 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="text-warning text-lg leading-none mt-0.5">🔒</span>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-bold text-warning">
+                {cashRegisterStatus === 'open_other'
+                  ? `Caja abierta por ${openCashOwnerName || 'otro recepcionista'}`
+                  : 'Caja chica cerrada — Ventas deshabilitadas'}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {cashRegisterStatus === 'open_other'
+                  ? 'El turno actual debe cerrarse antes de abrir tu caja y registrar ventas.'
+                  : 'Debes abrir caja antes de poder registrar ventas de productos o ventas libres.'}
+              </span>
+            </div>
+          </div>
+          {cashRegisterStatus === 'closed' && (
+            <Link
+              href="/balance"
+              className="btn !min-h-10 px-5 text-xs font-bold rounded-xl bg-warning text-black hover:bg-warning/90 shrink-0 self-start sm:self-auto"
+            >
+              Ir a abrir caja
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* Feedback Banner */}
       {feedbackError && (
         <div className="bg-error/15 border border-error/30 text-error px-4 py-3 rounded-xl text-sm flex justify-between items-center">
@@ -473,7 +515,12 @@ export function SalesView({
 
       {/* ─── TAB 1: PRODUCT SALES (Mobile-First Grid + Active Item Panel + Sticky Bottom Bar) ─── */}
       {activeTab === 'products' && permissions.canCreate && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div
+          className={`grid grid-cols-1 lg:grid-cols-12 gap-6 items-start ${
+            !isCashOpenForUser ? 'opacity-45 pointer-events-none select-none' : ''
+          }`}
+          aria-disabled={!isCashOpenForUser}
+        >
           {/* Left / Main Area: Filters + Product Grid with Pictures */}
           <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
             {/* Step 0: Filters identical to Inventory (Search by name + clickable category pills) */}
@@ -1080,7 +1127,12 @@ export function SalesView({
 
       {/* ─── TAB 2: VENTA LIBRE (Free Sale without selecting an existing product) ─── */}
       {activeTab === 'free' && permissions.canCreate && (
-        <div className="max-w-lg mx-auto w-full glass p-6 rounded-2xl border border-border flex flex-col gap-5">
+        <div
+          className={`max-w-lg mx-auto w-full glass p-6 rounded-2xl border border-border flex flex-col gap-5 ${
+            !isCashOpenForUser ? 'opacity-45 pointer-events-none select-none' : ''
+          }`}
+          aria-disabled={!isCashOpenForUser}
+        >
           <div>
             <span className="badge badge-active !text-[10px] mb-2">Venta libre</span>
             <h2 className="text-lg font-bold">Registrar venta sin producto</h2>

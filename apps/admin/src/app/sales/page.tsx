@@ -10,6 +10,7 @@ import {
   getClientsForSales,
   getStaffOptionsForSales,
   getSales,
+  getOpenCashRegisterSession,
 } from '@novafit/supabase'
 import { getTodayYYYYMMDD } from '@novafit/supabase/src/utils/date'
 import { BottomNav } from '@/components/BottomNav'
@@ -36,6 +37,7 @@ export default async function SalesPage() {
 
   const canCreate = isGlobal || (await hasRole(staff, 'create_sales'))
   const canDelete = isGlobal || (await hasRole(staff, 'delete_sales'))
+  const canViewFullBalance = isGlobal || (await hasRole(staff, 'view_balance'))
 
   const todayYMD = getTodayYYYYMMDD()
 
@@ -46,6 +48,7 @@ export default async function SalesPage() {
     clients,
     staffList,
     recentSales,
+    openCashSession,
   ] = await Promise.all([
     getProducts(supabase),
     getProductCategories(supabase),
@@ -53,7 +56,18 @@ export default async function SalesPage() {
     getClientsForSales(supabase),
     getStaffOptionsForSales(supabase),
     getSales(supabase, { limit: 100 }),
+    getOpenCashRegisterSession(supabase),
   ])
+
+  const cashRegisterStatus: 'open' | 'closed' | 'open_other' = !openCashSession
+    ? 'closed'
+    : !canViewFullBalance &&
+      openCashSession.opened_by &&
+      openCashSession.opened_by !== staff.id
+    ? 'open_other'
+    : 'open'
+
+  const openCashOwnerName = openCashSession?.opened_by_staff?.name || null
 
   return (
     <div className="min-h-dvh bg-background text-foreground flex flex-col">
@@ -71,6 +85,8 @@ export default async function SalesPage() {
           }}
           initialSales={recentSales}
           defaultTodayYMD={todayYMD}
+          cashRegisterStatus={cashRegisterStatus}
+          openCashOwnerName={openCashOwnerName}
           permissions={{
             canView,
             canCreate,

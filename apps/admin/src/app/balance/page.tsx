@@ -30,6 +30,7 @@ export default async function BalancePage() {
   const isGlobal = await isGlobalAdmin(staff)
   const canViewFullBalance = isGlobal || (await hasRole(staff, 'view_balance'))
   const canManageCash = isGlobal || (await hasRole(staff, 'manage_cash_register'))
+  const canReopenCash = isGlobal || (await hasRole(staff, 'reopen_cash_register'))
 
   if (!canViewFullBalance && !canManageCash) {
     redirect('/dashboard')
@@ -117,6 +118,7 @@ export default async function BalancePage() {
           canCreateExpenses={canCreateExpenses}
           canDeleteExpenses={canDeleteExpenses}
           canManageCash={canManageCash}
+          canReopenCash={canReopenCash}
         />
       </div>
 

@@ -20,6 +20,7 @@ import {
   deleteSaleAction,
   openCashRegisterAction,
   closeCashRegisterAction,
+  reopenCashRegisterAction,
 } from '@/app/actions/sales'
 import {
   markExpenseAsPaidAction,
@@ -82,6 +83,7 @@ export function BalanceView({
   canCreateExpenses,
   canDeleteExpenses,
   canManageCash,
+  canReopenCash,
 }: {
   initialSales: SaleWithDetails[]
   initialExpenses: ExpenseWithDetails[]
@@ -97,6 +99,7 @@ export function BalanceView({
   canCreateExpenses: boolean
   canDeleteExpenses: boolean
   canManageCash: boolean
+  canReopenCash: boolean
 }) {
   const router = useRouter()
 
@@ -169,6 +172,7 @@ export function BalanceView({
   const [isCashPending, startCashTransition] = useTransition()
   const [selectedCashSessionDetail, setSelectedCashSessionDetail] =
     useState<CashRegisterSessionWithDetails | null>(null)
+  const [isConfirmingReopenCash, setIsConfirmingReopenCash] = useState(false)
 
   // Helper to check if a YYYY-MM-DD falls within the active period filter
   const matchesActivePeriod = useMemo(() => {
@@ -613,6 +617,22 @@ export function BalanceView({
         setOpeningNotes('')
         setFeedbackMessage('¡Caja abierta correctamente!')
         setTimeout(() => setFeedbackMessage(null), 3500)
+        router.refresh()
+      }
+    })
+  }
+
+  const handleReopenCashRegister = (sessionId: string) => {
+    setFeedbackError(null)
+    startCashTransition(async () => {
+      const res = await reopenCashRegisterAction(sessionId)
+      if (res.error) {
+        setFeedbackError(res.error)
+      } else {
+        setIsConfirmingReopenCash(false)
+        setSelectedCashSessionDetail(null)
+        setFeedbackMessage('¡Caja reabierta correctamente!')
+        setTimeout(() => setFeedbackMessage(null), 4000)
         router.refresh()
       }
     })
@@ -1898,15 +1918,68 @@ export function BalanceView({
               )}
             </div>
 
-            <div className="flex justify-end pt-2">
-              <button
-                type="button"
-                onClick={() => setSelectedCashSessionDetail(null)}
-                className="btn btn-ghost !min-h-10 px-5 text-xs rounded-xl"
-              >
-                Cerrar
-              </button>
-            </div>
+            {isConfirmingReopenCash && selectedCashSessionDetail.status === 'closed' ? (
+              <div className="rounded-xl bg-warning/10 border border-warning/35 p-3.5 flex flex-col gap-3">
+                <p className="text-xs font-semibold text-warning">
+                  ¿Reabrir este turno de caja? Volverá a estado Abierta y podrás registrar o
+                  ajustar movimientos antes de cerrarla nuevamente.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={isCashPending}
+                    onClick={() => setIsConfirmingReopenCash(false)}
+                    className="btn btn-ghost !min-h-9 px-3.5 text-xs rounded-xl"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isCashPending}
+                    onClick={() => handleReopenCashRegister(selectedCashSessionDetail.id)}
+                    className="btn !min-h-9 px-4 text-xs font-bold rounded-xl bg-warning text-black hover:bg-warning/90"
+                  >
+                    {isCashPending ? 'Reabriendo...' : 'Sí, reabrir caja'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 pt-2">
+                {selectedCashSessionDetail.status === 'closed' &&
+                  canReopenCash &&
+                  (openCashSession || otherStaffOpenShift) && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Cierra la caja abierta actual para poder reabrir este turno.
+                    </p>
+                  )}
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    {selectedCashSessionDetail.status === 'closed' &&
+                      canReopenCash &&
+                      !openCashSession &&
+                      !otherStaffOpenShift && (
+                        <button
+                          type="button"
+                          onClick={() => setIsConfirmingReopenCash(true)}
+                          className="btn !min-h-10 px-4 text-xs font-bold rounded-xl bg-warning/15 text-warning border border-warning/35 hover:bg-warning/25"
+                        >
+                          Reabrir caja
+                        </button>
+                      )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsConfirmingReopenCash(false)
+                      setSelectedCashSessionDetail(null)
+                    }}
+                    className="btn btn-ghost !min-h-10 px-5 text-xs rounded-xl"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
