@@ -28,6 +28,12 @@ export default async function DashboardPage() {
       (await hasRole(staff, 'create_sales')) ||
       (await hasRole(staff, 'delete_sales'))
     : false
+  const canAccessExpenses = staff
+    ? isGlobal ||
+      (await hasRole(staff, 'view_expenses')) ||
+      (await hasRole(staff, 'create_expenses')) ||
+      (await hasRole(staff, 'delete_expenses'))
+    : false
   const canViewBalance = staff ? isGlobal || (await hasRole(staff, 'view_balance')) : false
   const canManageCash = staff ? isGlobal || (await hasRole(staff, 'manage_cash_register')) : false
   const canAccessBalance = canViewBalance || canManageCash
@@ -41,6 +47,7 @@ export default async function DashboardPage() {
     !canManageStaff &&
     !canAccessInventory &&
     !canAccessSales &&
+    !canAccessExpenses &&
     !canAccessBalance
   if (isKioskOnly) {
     redirect('/checkin')
@@ -89,6 +96,7 @@ export default async function DashboardPage() {
             canManageMembers,
             canAccessInventory,
             canAccessSales,
+            canAccessExpenses,
             canViewBalance,
             canManageCash,
           }}

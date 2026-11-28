@@ -8,6 +8,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { es } from 'date-fns/locale'
 import type {
   CashRegisterSessionWithDetails,
+  ExpenseWithDetails,
   PaymentMethod,
   SalePaymentStatus,
   SaleWithDetails,
@@ -19,7 +20,12 @@ import {
   deleteSaleAction,
   openCashRegisterAction,
   closeCashRegisterAction,
+  reopenCashRegisterAction,
 } from '@/app/actions/sales'
+import {
+  markExpenseAsPaidAction,
+  deleteExpenseAction,
+} from '@/app/actions/expenses'
 
 type EditableSaleItem = {
   id: string
@@ -64,6 +70,7 @@ function formatTreintaDateTime(dateInput: string | null | undefined): string {
 
 export function BalanceView({
   initialSales,
+  initialExpenses,
   paymentMethods,
   initialCashSessions,
   openCashSession,
@@ -73,9 +80,13 @@ export function BalanceView({
   canViewFullBalance,
   canEditSales,
   canDeleteSales,
+  canCreateExpenses,
+  canDeleteExpenses,
   canManageCash,
+  canReopenCash,
 }: {
   initialSales: SaleWithDetails[]
+  initialExpenses: ExpenseWithDetails[]
   paymentMethods: PaymentMethod[]
   initialCashSessions: CashRegisterSessionWithDetails[]
   openCashSession: CashRegisterSessionWithDetails | null
@@ -85,7 +96,10 @@ export function BalanceView({
   canViewFullBalance: boolean
   canEditSales: boolean
   canDeleteSales: boolean
+  canCreateExpenses: boolean
+  canDeleteExpenses: boolean
   canManageCash: boolean
+  canReopenCash: boolean
 }) {
   const router = useRouter()
 
@@ -123,6 +137,10 @@ export function BalanceView({
   const [selectedSaleDetail, setSelectedSaleDetail] = useState<SaleWithDetails | null>(
     null
   )
+  const [selectedExpenseDetail, setSelectedExpenseDetail] =
+    useState<ExpenseWithDetails | null>(null)
+  const [isConfirmingDeleteExpense, setIsConfirmingDeleteExpense] = useState(false)
+  const [isExpenseActionPending, startExpenseActionTransition] = useTransition()
 
   // Sale Edit & Delete state inside Sale Detail modal
   const [isEditingSale, setIsEditingSale] = useState(false)
@@ -154,6 +172,7 @@ export function BalanceView({
   const [isCashPending, startCashTransition] = useTransition()
   const [selectedCashSessionDetail, setSelectedCashSessionDetail] =
     useState<CashRegisterSessionWithDetails | null>(null)
+  const [isConfirmingReopenCash, setIsConfirmingReopenCash] = useState(false)
 
   // Helper to check if a YYYY-MM-DD falls within the active period filter
   const matchesActivePeriod = useMemo(() => {
@@ -235,6 +254,37 @@ export function BalanceView({
     })
   }, [initialCashSessions, matchesActivePeriod])
 
+  // Filter expenses by the active date period, payment method, and concept search
+  const periodFilteredExpenses = useMemo(() => {
+    const q = searchConcept.trim().toLowerCase()
+
+    return initialExpenses.filter((exp) => {
+      const expYMD = toTimezoneYYYYMMDD(exp.expense_date, APP_TIMEZONE)
+      if (!matchesActivePeriod(expYMD)) return false
+
+      if (selectedPaymentMethodId !== 'all') {
+        if (exp.payment_method_id !== selectedPaymentMethodId) return false
+      }
+
+      if (q) {
+        const conceptText = exp.concept.toLowerCase()
+        const categoryText = (exp.category?.name || '').toLowerCase()
+        const staffText = (exp.assigned_staff?.name || '').toLowerCase()
+        const notesText = (exp.notes || '').toLowerCase()
+        if (
+          !conceptText.includes(q) &&
+          !categoryText.includes(q) &&
+          !staffText.includes(q) &&
+          !notesText.includes(q)
+        ) {
+          return false
+        }
+      }
+
+      return true
+    })
+  }, [initialExpenses, matchesActivePeriod, selectedPaymentMethodId, searchConcept])
+
   // Live metrics for the currently open cash register shift
   const currentShiftMetrics = useMemo(() => {
     if (!openCashSession) {
@@ -243,6 +293,9 @@ export function BalanceView({
         cashSales: 0,
         otherSales: 0,
         totalSales: 0,
+        cashExpenses: 0,
+        otherExpenses: 0,
+        totalExpenses: 0,
         expectedCash: 0,
       }
     }
@@ -252,6 +305,8 @@ export function BalanceView({
     const shiftOwnerId = openCashSession.opened_by
     let cashSales = 0
     let otherSales = 0
+    let cashExpenses = 0
+    let otherExpenses = 0
 
     for (const s of initialSales) {
       if (s.payment_status !== 'paid') continue
@@ -279,18 +334,47 @@ export function BalanceView({
       }
     }
 
+    for (const exp of initialExpenses) {
+      if (exp.payment_status !== 'paid') continue
+      if (
+        shiftOwnerId &&
+        exp.assigned_staff_id !== shiftOwnerId &&
+        exp.created_by !== shiftOwnerId
+      ) {
+        continue
+      }
+      const expTime = new Date(exp.expense_date).getTime()
+      const createdTime = new Date(exp.created_at).getTime()
+      const belongsToShift =
+        expTime >= openedAtTime ||
+        (createdTime >= openedAtTime &&
+          toTimezoneYYYYMMDD(exp.expense_date, APP_TIMEZONE) >= openedYMD)
+
+      if (belongsToShift) {
+        const amt = Number(exp.total || 0)
+        if (exp.payment_method?.key === 'cash' || !exp.payment_method) {
+          cashExpenses += amt
+        } else {
+          otherExpenses += amt
+        }
+      }
+    }
+
     const openingAmount = Number(openCashSession.opening_amount || 0)
-    const expectedCash = Number((openingAmount + cashSales).toFixed(2))
+    const expectedCash = Number((openingAmount + cashSales - cashExpenses).toFixed(2))
     return {
       openingAmount,
       cashSales: Number(cashSales.toFixed(2)),
       otherSales: Number(otherSales.toFixed(2)),
       totalSales: Number((cashSales + otherSales).toFixed(2)),
+      cashExpenses: Number(cashExpenses.toFixed(2)),
+      otherExpenses: Number(otherExpenses.toFixed(2)),
+      totalExpenses: Number((cashExpenses + otherExpenses).toFixed(2)),
       expectedCash,
     }
-  }, [openCashSession, initialSales])
+  }, [openCashSession, initialSales, initialExpenses])
 
-  // Split into Ingresos (paid sales) and Por cobrar (credit sales)
+  // Split into Ingresos (paid sales), Egresos (paid expenses), Por cobrar (credit sales), Por pagar (credit expenses)
   const incomeSales = useMemo(
     () => periodFilteredSales.filter((s) => s.payment_status === 'paid'),
     [periodFilteredSales]
@@ -301,15 +385,32 @@ export function BalanceView({
     [periodFilteredSales]
   )
 
+  const outcomeExpenses = useMemo(
+    () => periodFilteredExpenses.filter((e) => e.payment_status === 'paid'),
+    [periodFilteredExpenses]
+  )
+
+  const payableExpenses = useMemo(
+    () => periodFilteredExpenses.filter((e) => e.payment_status === 'credit'),
+    [periodFilteredExpenses]
+  )
+
   const totalIncomes = useMemo(
     () => incomeSales.reduce((acc, s) => acc + Number(s.total || 0), 0),
     [incomeSales]
   )
-  const totalOutcomes = 0 // Egresos empty for now
+  const totalOutcomes = useMemo(
+    () => outcomeExpenses.reduce((acc, e) => acc + Number(e.total || 0), 0),
+    [outcomeExpenses]
+  )
   const netBalance = totalIncomes - totalOutcomes
   const totalReceivables = useMemo(
     () => receivableSales.reduce((acc, s) => acc + Number(s.total || 0), 0),
     [receivableSales]
+  )
+  const totalPayables = useMemo(
+    () => payableExpenses.reduce((acc, e) => acc + Number(e.total || 0), 0),
+    [payableExpenses]
   )
 
   const closeSaleDetailModal = () => {
@@ -454,6 +555,38 @@ export function BalanceView({
     })
   }
 
+  const handleMarkExpenseAsPaid = (expenseId: string) => {
+    setFeedbackError(null)
+    startExpenseActionTransition(async () => {
+      const res = await markExpenseAsPaidAction(expenseId)
+      if (res.error) {
+        setFeedbackError(res.error)
+      } else {
+        setSelectedExpenseDetail(null)
+        setIsConfirmingDeleteExpense(false)
+        setFeedbackMessage('Gasto marcado como Pagado y movido a Egresos.')
+        setTimeout(() => setFeedbackMessage(null), 3500)
+        router.refresh()
+      }
+    })
+  }
+
+  const handleDeleteExpense = (expenseId: string) => {
+    setFeedbackError(null)
+    startExpenseActionTransition(async () => {
+      const res = await deleteExpenseAction(expenseId)
+      if (res.error) {
+        setFeedbackError(res.error)
+      } else {
+        setSelectedExpenseDetail(null)
+        setIsConfirmingDeleteExpense(false)
+        setFeedbackMessage('Gasto eliminado correctamente.')
+        setTimeout(() => setFeedbackMessage(null), 3500)
+        router.refresh()
+      }
+    })
+  }
+
   const handleMarkAsPaid = (saleId: string) => {
     setFeedbackError(null)
     startMarkPaidTransition(async () => {
@@ -484,6 +617,22 @@ export function BalanceView({
         setOpeningNotes('')
         setFeedbackMessage('¡Caja abierta correctamente!')
         setTimeout(() => setFeedbackMessage(null), 3500)
+        router.refresh()
+      }
+    })
+  }
+
+  const handleReopenCashRegister = (sessionId: string) => {
+    setFeedbackError(null)
+    startCashTransition(async () => {
+      const res = await reopenCashRegisterAction(sessionId)
+      if (res.error) {
+        setFeedbackError(res.error)
+      } else {
+        setIsConfirmingReopenCash(false)
+        setSelectedCashSessionDetail(null)
+        setFeedbackMessage('¡Caja reabierta correctamente!')
+        setTimeout(() => setFeedbackMessage(null), 4000)
         router.refresh()
       }
     })
@@ -614,6 +763,15 @@ export function BalanceView({
                 </button>
               ) : null}
             </>
+          )}
+
+          {canCreateExpenses && (
+            <Link
+              href="/expenses"
+              className="btn !min-h-10 px-4 text-xs font-bold rounded-full bg-error/15 text-error border border-error/30 hover:bg-error/25"
+            >
+              - Nuevo gasto
+            </Link>
           )}
 
           <Link
@@ -1012,11 +1170,11 @@ export function BalanceView({
                 onClick={() => setActiveTab('outcomes')}
                 className={`py-3.5 px-4 text-xs sm:text-sm font-bold text-center transition-all cursor-pointer border-b-2 ${
                   activeTab === 'outcomes'
-                    ? 'border-foreground text-foreground bg-white/[0.04]'
+                    ? 'border-error text-error bg-error/10'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.02]'
                 }`}
               >
-                Egresos (0)
+                Egresos ({outcomeExpenses.length})
               </button>
 
               <button
@@ -1039,13 +1197,18 @@ export function BalanceView({
               <button
                 type="button"
                 onClick={() => setActiveTab('payables')}
-                className={`py-3.5 px-4 text-xs sm:text-sm font-bold text-center transition-all cursor-pointer border-b-2 ${
+                className={`py-3.5 px-4 text-xs sm:text-sm font-bold text-center transition-all cursor-pointer border-b-2 flex items-center justify-center gap-1.5 ${
                   activeTab === 'payables'
-                    ? 'border-foreground text-foreground bg-white/[0.04]'
+                    ? 'border-warning text-warning bg-warning/10'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.02]'
                 }`}
               >
-                Por pagar (0)
+                <span>Por pagar ({payableExpenses.length})</span>
+                {totalPayables > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-warning/20 text-warning text-[10px] font-black">
+                    C${formatMoney(totalPayables)}
+                  </span>
+                )}
               </button>
             </div>
 
@@ -1090,16 +1253,29 @@ export function BalanceView({
                       ))
                     ))}
 
-                  {activeTab === 'outcomes' && (
-                    <tr>
-                      <td
-                        colSpan={4}
-                        className="py-14 px-4 text-center text-muted-foreground text-sm"
-                      >
-                        No hay egresos registrados.
-                      </td>
-                    </tr>
-                  )}
+                  {activeTab === 'outcomes' &&
+                    (outcomeExpenses.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="py-14 px-4 text-center text-muted-foreground text-sm"
+                        >
+                          No hay egresos registrados en este periodo.
+                        </td>
+                      </tr>
+                    ) : (
+                      outcomeExpenses.map((exp) => (
+                        <BalanceExpenseRow
+                          key={exp.id}
+                          expense={exp}
+                          isCredit={false}
+                          onSelect={() => {
+                            setIsConfirmingDeleteExpense(false)
+                            setSelectedExpenseDetail(exp)
+                          }}
+                        />
+                      ))
+                    ))}
 
                   {activeTab === 'receivables' &&
                     (receivableSales.length === 0 ? (
@@ -1122,16 +1298,29 @@ export function BalanceView({
                       ))
                     ))}
 
-                  {activeTab === 'payables' && (
-                    <tr>
-                      <td
-                        colSpan={4}
-                        className="py-14 px-4 text-center text-muted-foreground text-sm"
-                      >
-                        No hay cuentas por pagar registradas.
-                      </td>
-                    </tr>
-                  )}
+                  {activeTab === 'payables' &&
+                    (payableExpenses.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="py-14 px-4 text-center text-muted-foreground text-sm"
+                        >
+                          No hay cuentas por pagar pendientes en este periodo.
+                        </td>
+                      </tr>
+                    ) : (
+                      payableExpenses.map((exp) => (
+                        <BalanceExpenseRow
+                          key={exp.id}
+                          expense={exp}
+                          isCredit={true}
+                          onSelect={() => {
+                            setIsConfirmingDeleteExpense(false)
+                            setSelectedExpenseDetail(exp)
+                          }}
+                        />
+                      ))
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -1168,6 +1357,12 @@ export function BalanceView({
                     <span className="text-muted-foreground">Ventas efectivo: </span>
                     <strong className="text-success">
                       +C${formatMoney(currentShiftMetrics.cashSales)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Gastos efectivo: </span>
+                    <strong className="text-error">
+                      -C${formatMoney(currentShiftMetrics.cashExpenses)}
                     </strong>
                   </div>
                   <div>
@@ -1482,6 +1677,14 @@ export function BalanceView({
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
+                  Gastos pagados en efectivo:
+                </span>
+                <span className="font-semibold text-error">
+                  -C${formatMoney(currentShiftMetrics.cashExpenses)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">
                   Ventas por otros medios (Tarjeta, Transferencia, etc.):
                 </span>
                 <span className="font-semibold text-foreground">
@@ -1652,7 +1855,13 @@ export function BalanceView({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Ventas en efectivo:</span>
                 <span className="font-bold text-success">
-                  C${formatMoney(selectedCashSessionDetail.cash_sales_total)}
+                  +C${formatMoney(selectedCashSessionDetail.cash_sales_total)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Gastos en efectivo:</span>
+                <span className="font-bold text-error">
+                  -C${formatMoney(selectedCashSessionDetail.cash_expenses_total ?? 0)}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -1709,15 +1918,68 @@ export function BalanceView({
               )}
             </div>
 
-            <div className="flex justify-end pt-2">
-              <button
-                type="button"
-                onClick={() => setSelectedCashSessionDetail(null)}
-                className="btn btn-ghost !min-h-10 px-5 text-xs rounded-xl"
-              >
-                Cerrar
-              </button>
-            </div>
+            {isConfirmingReopenCash && selectedCashSessionDetail.status === 'closed' ? (
+              <div className="rounded-xl bg-warning/10 border border-warning/35 p-3.5 flex flex-col gap-3">
+                <p className="text-xs font-semibold text-warning">
+                  ¿Reabrir este turno de caja? Volverá a estado Abierta y podrás registrar o
+                  ajustar movimientos antes de cerrarla nuevamente.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={isCashPending}
+                    onClick={() => setIsConfirmingReopenCash(false)}
+                    className="btn btn-ghost !min-h-9 px-3.5 text-xs rounded-xl"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isCashPending}
+                    onClick={() => handleReopenCashRegister(selectedCashSessionDetail.id)}
+                    className="btn !min-h-9 px-4 text-xs font-bold rounded-xl bg-warning text-black hover:bg-warning/90"
+                  >
+                    {isCashPending ? 'Reabriendo...' : 'Sí, reabrir caja'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 pt-2">
+                {selectedCashSessionDetail.status === 'closed' &&
+                  canReopenCash &&
+                  (openCashSession || otherStaffOpenShift) && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Cierra la caja abierta actual para poder reabrir este turno.
+                    </p>
+                  )}
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    {selectedCashSessionDetail.status === 'closed' &&
+                      canReopenCash &&
+                      !openCashSession &&
+                      !otherStaffOpenShift && (
+                        <button
+                          type="button"
+                          onClick={() => setIsConfirmingReopenCash(true)}
+                          className="btn !min-h-10 px-4 text-xs font-bold rounded-xl bg-warning/15 text-warning border border-warning/35 hover:bg-warning/25"
+                        >
+                          Reabrir caja
+                        </button>
+                      )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsConfirmingReopenCash(false)
+                      setSelectedCashSessionDetail(null)
+                    }}
+                    className="btn btn-ghost !min-h-10 px-5 text-xs rounded-xl"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2209,7 +2471,216 @@ export function BalanceView({
           </div>
         </div>
       )}
+      {/* Expense Detail / Pay / Delete Modal */}
+      {selectedExpenseDetail && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-[#12131c] border border-border w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-2xl shadow-2xl p-6 flex flex-col gap-4">
+            <div className="flex items-start justify-between border-b border-border pb-3">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-lg font-bold">{selectedExpenseDetail.concept}</h3>
+                  {selectedExpenseDetail.payment_status === 'credit' ? (
+                    <span className="badge badge-warning !text-[10px]">Por pagar</span>
+                  ) : (
+                    <span className="badge badge-expired !text-[10px]">Pagado</span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {formatTreintaDateTime(selectedExpenseDetail.expense_date)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedExpenseDetail(null)
+                  setIsConfirmingDeleteExpense(false)
+                }}
+                className="text-muted-foreground hover:text-white p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Categoría:</span>
+                <span className="font-semibold text-foreground">
+                  {selectedExpenseDetail.category?.name || 'Sin categoría'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Medio de pago:</span>
+                <span className="font-semibold text-foreground">
+                  {selectedExpenseDetail.payment_method?.name || 'Efectivo'}
+                  {selectedExpenseDetail.custom_payment_method
+                    ? ` (${selectedExpenseDetail.custom_payment_method})`
+                    : ''}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Responsable:</span>
+                <span className="font-semibold text-foreground">
+                  {selectedExpenseDetail.assigned_staff?.name || 'Staff'}
+                </span>
+              </div>
+              {selectedExpenseDetail.notes && (
+                <div className="flex flex-col gap-0.5 pt-1">
+                  <span className="text-muted-foreground">Comentarios:</span>
+                  <span className="text-foreground bg-surface p-2 rounded-lg border border-border">
+                    {selectedExpenseDetail.notes}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between text-base font-black pt-2 border-t border-border">
+              <span>Total</span>
+              <span className="text-error tabular-nums">
+                -C${formatMoney(selectedExpenseDetail.total)}
+              </span>
+            </div>
+
+            {isConfirmingDeleteExpense ? (
+              <div className="rounded-xl bg-error/10 border border-error/30 p-3.5 flex flex-col gap-3">
+                <p className="text-xs font-semibold text-error">
+                  ¿Estás seguro de que deseas eliminar este gasto?
+                </p>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={isExpenseActionPending}
+                    onClick={() => setIsConfirmingDeleteExpense(false)}
+                    className="btn btn-ghost !min-h-9 px-3.5 text-xs rounded-xl"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isExpenseActionPending}
+                    onClick={() => handleDeleteExpense(selectedExpenseDetail.id)}
+                    className="btn btn-error !min-h-9 px-4 text-xs rounded-xl"
+                  >
+                    {isExpenseActionPending ? 'Eliminando...' : 'Sí, eliminar'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5 pt-2">
+                {selectedExpenseDetail.payment_status === 'credit' && canCreateExpenses && (
+                  <button
+                    type="button"
+                    disabled={isExpenseActionPending}
+                    onClick={() => handleMarkExpenseAsPaid(selectedExpenseDetail.id)}
+                    className="btn btn-success !min-h-10 px-4 text-xs rounded-xl w-full"
+                  >
+                    {isExpenseActionPending ? 'Procesando...' : '✓ Marcar como pagado'}
+                  </button>
+                )}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    {canCreateExpenses && (
+                      <Link
+                        href="/expenses"
+                        className="btn btn-primary !min-h-10 px-4 text-xs rounded-xl"
+                      >
+                        Gestionar en Gastos
+                      </Link>
+                    )}
+                    {canDeleteExpenses && (
+                      <button
+                        type="button"
+                        onClick={() => setIsConfirmingDeleteExpense(true)}
+                        className="btn !min-h-10 px-4 text-xs rounded-xl bg-error/15 text-error border border-error/30 hover:bg-error/25"
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedExpenseDetail(null)}
+                    className="btn btn-ghost !min-h-10 px-5 text-xs rounded-xl"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+function BalanceExpenseRow({
+  expense,
+  isCredit,
+  onSelect,
+}: {
+  expense: ExpenseWithDetails
+  isCredit: boolean
+  onSelect: () => void
+}) {
+  return (
+    <tr
+      onClick={onSelect}
+      className="hover:bg-white/[0.03] transition-colors cursor-pointer group"
+    >
+      <td className="sticky left-0 z-10 bg-[#10121b] group-hover:bg-[#171925] transition-colors border-b border-r border-white/10 py-3.5 px-4 sm:px-5 w-[180px] min-w-[180px] max-w-[180px] sm:w-auto sm:min-w-[240px] sm:max-w-none shadow-[4px_0_12px_-4px_rgba(0,0,0,0.65)]">
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 ${
+              isCredit
+                ? 'bg-warning/15 text-warning'
+                : 'bg-error/15 text-error'
+            }`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="font-semibold text-xs sm:text-sm text-foreground truncate">
+              {expense.concept}
+            </span>
+            <span className="text-[11px] sm:text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-md">
+              {expense.category?.name || 'Sin categoría'}
+              {expense.assigned_staff ? ` • ${expense.assigned_staff.name}` : ''}
+            </span>
+          </div>
+        </div>
+      </td>
+
+      <td className="border-b border-border py-3.5 px-4 font-bold whitespace-nowrap tabular-nums">
+        <span className={isCredit ? 'text-warning' : 'text-error'}>
+          -C${formatMoney(expense.total)}
+        </span>
+      </td>
+
+      <td className="border-b border-border py-3.5 px-4 text-foreground whitespace-nowrap">
+        {expense.payment_method?.name || 'Efectivo'}
+        {expense.custom_payment_method ? ` (${expense.custom_payment_method})` : ''}
+      </td>
+
+      <td className="border-b border-border py-3.5 px-5 text-muted-foreground whitespace-nowrap">
+        {formatTreintaDateTime(expense.expense_date)}
+      </td>
+    </tr>
   )
 }
 

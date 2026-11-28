@@ -5,6 +5,7 @@ import {
   hasRole,
   isGlobalAdmin,
   getSales,
+  getExpenses,
   getPaymentMethods,
   getCashRegisterSessions,
   getOpenCashRegisterSession,
@@ -29,6 +30,7 @@ export default async function BalancePage() {
   const isGlobal = await isGlobalAdmin(staff)
   const canViewFullBalance = isGlobal || (await hasRole(staff, 'view_balance'))
   const canManageCash = isGlobal || (await hasRole(staff, 'manage_cash_register'))
+  const canReopenCash = isGlobal || (await hasRole(staff, 'reopen_cash_register'))
 
   if (!canViewFullBalance && !canManageCash) {
     redirect('/dashboard')
@@ -36,19 +38,22 @@ export default async function BalancePage() {
 
   const canEditSales = isGlobal || (await hasRole(staff, 'create_sales'))
   const canDeleteSales = isGlobal || (await hasRole(staff, 'delete_sales'))
+  const canCreateExpenses = isGlobal || (await hasRole(staff, 'create_expenses'))
+  const canDeleteExpenses = isGlobal || (await hasRole(staff, 'delete_expenses'))
 
   const todayYMD = getTodayYYYYMMDD()
 
-  const [allSales, paymentMethods, allCashSessions, openSession, staffList] =
+  const [allSales, allExpenses, paymentMethods, allCashSessions, openSession, staffList] =
     await Promise.all([
       getSales(supabase, { limit: canViewFullBalance ? 1000 : 250 }),
+      getExpenses(supabase, { limit: canViewFullBalance ? 1000 : 250 }),
       getPaymentMethods(supabase),
       getCashRegisterSessions(supabase, canViewFullBalance ? 200 : 25),
       getOpenCashRegisterSession(supabase),
       canViewFullBalance ? getStaffOptionsForSales(supabase) : Promise.resolve([]),
     ])
 
-  // Server-side scoping: users without `view_balance` only receive today's own sales
+  // Server-side scoping: users without `view_balance` only receive today's own sales/expenses
   // and today's own / currently open cash register shift (never historical totals).
   const sales = canViewFullBalance
     ? allSales
@@ -57,6 +62,15 @@ export default async function BalancePage() {
         const isOwnSale =
           sale.assigned_staff_id === staff.id || sale.created_by === staff.id
         return isToday && isOwnSale
+      })
+
+  const expenses = canViewFullBalance
+    ? allExpenses
+    : allExpenses.filter((exp) => {
+        const isToday = toTimezoneYYYYMMDD(exp.expense_date, APP_TIMEZONE) === todayYMD
+        const isOwnExpense =
+          exp.assigned_staff_id === staff.id || exp.created_by === staff.id
+        return isToday && isOwnExpense
       })
 
   const isOtherStaffOpenShift = Boolean(
@@ -91,6 +105,7 @@ export default async function BalancePage() {
       <div className="w-full max-w-6xl mx-auto flex-1 flex flex-col px-4 pt-5 pb-28">
         <BalanceView
           initialSales={sales}
+          initialExpenses={expenses}
           paymentMethods={paymentMethods}
           initialCashSessions={cashSessions}
           openCashSession={visibleOpenSession}
@@ -100,7 +115,10 @@ export default async function BalancePage() {
           canViewFullBalance={canViewFullBalance}
           canEditSales={canEditSales}
           canDeleteSales={canDeleteSales}
+          canCreateExpenses={canCreateExpenses}
+          canDeleteExpenses={canDeleteExpenses}
           canManageCash={canManageCash}
+          canReopenCash={canReopenCash}
         />
       </div>
 

@@ -13,6 +13,7 @@ import type {
 import { formatDateTime } from '@novafit/supabase/src/utils/date'
 import { getUnitDefinition } from '@novafit/supabase/src/queries/inventory'
 import { createSaleAction, deleteSaleAction } from '@/app/actions/sales'
+import { PaymentMethodSelector } from '@/components/PaymentMethodSelector'
 
 interface CartItem {
   productId: string
@@ -48,105 +49,6 @@ function formatMoney(num: number): string {
 
 const PRESET_INSTALLMENTS = [1, 2, 3, 4, 5, 6] as const
 
-function PaymentMethodIcon({ methodKey }: { methodKey: string }) {
-  switch (methodKey) {
-    case 'cash':
-      return (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="22"
-          height="22"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect width="20" height="12" x="2" y="6" rx="2" />
-          <circle cx="12" cy="12" r="2" />
-          <path d="M6 12h.01M18 12h.01" />
-        </svg>
-      )
-    case 'card':
-      return (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="22"
-          height="22"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect width="20" height="14" x="2" y="5" rx="2" />
-          <line x1="2" x2="22" y1="10" y2="10" />
-        </svg>
-      )
-    case 'bank_transfer':
-      return (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="22"
-          height="22"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <line x1="3" x2="21" y1="22" y2="22" />
-          <line x1="6" x2="6" y1="18" y2="11" />
-          <line x1="10" x2="10" y1="18" y2="11" />
-          <line x1="14" x2="14" y1="18" y2="11" />
-          <line x1="18" x2="18" y1="18" y2="11" />
-          <polygon points="12 2 20 7 4 7" />
-        </svg>
-      )
-    case 'tigo_money':
-      return (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="22"
-          height="22"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
-          <path d="M12 18h.01" />
-          <path d="M10 8h4" />
-          <path d="M12 6v6" />
-        </svg>
-      )
-    default:
-      return (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="22"
-          height="22"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="12" cy="12" r="10" />
-          <path d="M8 12h.01" />
-          <path d="M12 12h.01" />
-          <path d="M16 12h.01" />
-        </svg>
-      )
-  }
-}
-
 export function SalesView({
   initialProducts,
   initialCategories,
@@ -156,6 +58,8 @@ export function SalesView({
   currentStaff,
   initialSales,
   defaultTodayYMD,
+  cashRegisterStatus,
+  openCashOwnerName,
   permissions,
 }: {
   initialProducts: ProductWithDetails[]
@@ -166,6 +70,8 @@ export function SalesView({
   currentStaff: StaffOption
   initialSales: SaleWithDetails[]
   defaultTodayYMD: string
+  cashRegisterStatus: 'open' | 'closed' | 'open_other'
+  openCashOwnerName?: string | null
   permissions: {
     canView: boolean
     canCreate: boolean
@@ -173,6 +79,7 @@ export function SalesView({
   }
 }) {
   const router = useRouter()
+  const isCashOpenForUser = cashRegisterStatus === 'open'
 
   // Active tab: 'products' (Venta de productos) | 'free' (Venta libre) | 'history' (Historial de ventas)
   const [activeTab, setActiveTab] = useState<'products' | 'free' | 'history'>(
@@ -366,6 +273,14 @@ export function SalesView({
 
   const handleOpenCheckout = () => {
     setFeedbackError(null)
+    if (!isCashOpenForUser) {
+      setFeedbackError(
+        cashRegisterStatus === 'open_other'
+          ? `La caja abierta pertenece a ${openCashOwnerName || 'otro recepcionista'}. Debe cerrarse antes de abrir tu turno.`
+          : 'Debes abrir caja chica antes de registrar una venta.'
+      )
+      return
+    }
     if (isFreeSaleMode) {
       if (freeAmountNum <= 0) {
         setFeedbackError('Ingresa un monto mayor a C$ 0 para continuar con la venta libre.')
@@ -542,6 +457,35 @@ export function SalesView({
         </div>
       </header>
 
+      {/* Cash Register Closed / Occupied Blocker Banner */}
+      {permissions.canCreate && !isCashOpenForUser && (
+        <div className="rounded-2xl bg-warning/10 border border-warning/35 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="text-warning text-lg leading-none mt-0.5">🔒</span>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-bold text-warning">
+                {cashRegisterStatus === 'open_other'
+                  ? `Caja abierta por ${openCashOwnerName || 'otro recepcionista'}`
+                  : 'Caja chica cerrada — Ventas deshabilitadas'}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {cashRegisterStatus === 'open_other'
+                  ? 'El turno actual debe cerrarse antes de abrir tu caja y registrar ventas.'
+                  : 'Debes abrir caja antes de poder registrar ventas de productos o ventas libres.'}
+              </span>
+            </div>
+          </div>
+          {cashRegisterStatus === 'closed' && (
+            <Link
+              href="/balance"
+              className="btn !min-h-10 px-5 text-xs font-bold rounded-xl bg-warning text-black hover:bg-warning/90 shrink-0 self-start sm:self-auto"
+            >
+              Ir a abrir caja
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* Feedback Banner */}
       {feedbackError && (
         <div className="bg-error/15 border border-error/30 text-error px-4 py-3 rounded-xl text-sm flex justify-between items-center">
@@ -571,7 +515,12 @@ export function SalesView({
 
       {/* ─── TAB 1: PRODUCT SALES (Mobile-First Grid + Active Item Panel + Sticky Bottom Bar) ─── */}
       {activeTab === 'products' && permissions.canCreate && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div
+          className={`grid grid-cols-1 lg:grid-cols-12 gap-6 items-start ${
+            !isCashOpenForUser ? 'opacity-45 pointer-events-none select-none' : ''
+          }`}
+          aria-disabled={!isCashOpenForUser}
+        >
           {/* Left / Main Area: Filters + Product Grid with Pictures */}
           <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
             {/* Step 0: Filters identical to Inventory (Search by name + clickable category pills) */}
@@ -1178,7 +1127,12 @@ export function SalesView({
 
       {/* ─── TAB 2: VENTA LIBRE (Free Sale without selecting an existing product) ─── */}
       {activeTab === 'free' && permissions.canCreate && (
-        <div className="max-w-lg mx-auto w-full glass p-6 rounded-2xl border border-border flex flex-col gap-5">
+        <div
+          className={`max-w-lg mx-auto w-full glass p-6 rounded-2xl border border-border flex flex-col gap-5 ${
+            !isCashOpenForUser ? 'opacity-45 pointer-events-none select-none' : ''
+          }`}
+          aria-disabled={!isCashOpenForUser}
+        >
           <div>
             <span className="badge badge-active !text-[10px] mb-2">Venta libre</span>
             <h2 className="text-lg font-bold">Registrar venta sin producto</h2>
@@ -1525,46 +1479,13 @@ export function SalesView({
               </div>
 
               {/* 4. Method of payment (1-click cards with icon above label, from payment_methods table) */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Método de pago
-                </span>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                  {paymentMethods.map((pm) => {
-                    const isSelected = selectedPaymentMethodId === pm.id
-                    return (
-                      <button
-                        key={pm.id}
-                        type="button"
-                        onClick={() => setSelectedPaymentMethodId(pm.id)}
-                        aria-pressed={isSelected}
-                        className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 text-center transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-accent/20 border-accent text-white shadow-md shadow-accent/20'
-                            : 'bg-surface border-border text-muted-foreground hover:text-foreground hover:border-white/25'
-                        }`}
-                      >
-                        <div className={isSelected ? 'text-accent' : 'text-muted-foreground'}>
-                          <PaymentMethodIcon methodKey={pm.key} />
-                        </div>
-                        <span className="text-[11px] font-bold leading-tight">
-                          {pm.name}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {selectedPaymentMethod?.key === 'other' && (
-                  <input
-                    type="text"
-                    value={customPaymentMethodText}
-                    onChange={(e) => setCustomPaymentMethodText(e.target.value)}
-                    placeholder="Especifica el método de pago..."
-                    className="input !min-h-10 text-sm mt-1"
-                  />
-                )}
-              </div>
+              <PaymentMethodSelector
+                paymentMethods={paymentMethods}
+                selectedId={selectedPaymentMethodId}
+                onSelect={setSelectedPaymentMethodId}
+                customValue={customPaymentMethodText}
+                onCustomChange={setCustomPaymentMethodText}
+              />
 
               {/* 5. Assign Employee (defaults to signed-in user, editable on their behalf) */}
               <div className="flex flex-col gap-1.5">

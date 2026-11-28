@@ -131,12 +131,23 @@ export async function getMembers(
   }
 
   if (opts.plan_id) {
-    members = members.filter(
-      (m) =>
+    members = members.filter((m: any) => {
+      if (opts.status === 'active') {
+        return m.active_plan?.plan_id === opts.plan_id
+      }
+      if (opts.status === 'scheduled') {
+        return m.scheduled_plans?.some((sp: any) => sp.plan_id === opts.plan_id)
+      }
+      return (
         m.active_plan?.plan_id === opts.plan_id ||
-        m.scheduled_plans?.some((sp: any) => sp.plan_id === opts.plan_id)
-    )
+        m.scheduled_plans?.some((sp: any) => sp.plan_id === opts.plan_id) ||
+        (Array.isArray(m.member_plans) &&
+          m.member_plans.some((mp: any) => mp.plan_id === opts.plan_id))
+      )
+    })
   }
+
+  const filteredTotal = (opts.status || opts.plan_id) ? members.length : (count ?? 0)
 
   if (needsJSPostProcess) {
     if (sort_by === 'status') {
@@ -167,7 +178,7 @@ export async function getMembers(
     members = members.slice(offset, offset + limit)
   }
 
-  return { members, total: opts.status ? members.length : (count ?? 0) }
+  return { members, total: filteredTotal }
 }
 
 export async function getMemberByUsername(
